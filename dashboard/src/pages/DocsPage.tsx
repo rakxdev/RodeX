@@ -79,8 +79,10 @@ const toc = [
   { a: "items", label: "ITEMS" },
   { a: "query", label: "QUERY" },
   { a: "idempotency", label: "IDEMPOTENCY" },
+  { a: "modeling", label: "DATA MODELING" },
   { a: "admin", label: "ADMIN API" },
   { a: "limits", label: "LIMITS" },
+  { a: "playbook", label: "RATE-LIMIT PLAYBOOK" },
   { a: "errors", label: "ERRORS" },
 ];
 
@@ -325,7 +327,67 @@ curl -X POST $GW/v1/table/create \\
             </P>
           </Section>
 
-          <Section cell="07" title="ADMIN API" anchor="admin">
+          <Section cell="07" title="DATA MODELING & SCHEMA DESIGN" anchor="modeling">
+            <P>
+              RodeX follows the DynamoDB single-table discipline: every row is keyed by{" "}
+              <code className="text-ink">pk</code> (hash, required) and <code className="text-ink">sk</code>{" "}
+              (sort, optional, defaults to <code className="text-ink">"~"</code>). The sk is a physical sort key —
+              design it so that the order you read in is the order you write in.
+            </P>
+            <table className="doc-table mb-4">
+              <thead>
+                <tr>
+                  <th>Pattern</th>
+                  <th>pk</th>
+                  <th>sk</th>
+                  <th>Use case</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>Entity row</code></td>
+                  <td><code>USER#1</code></td>
+                  <td><code>PROFILE</code></td>
+                  <td>exactly one row per entity</td>
+                </tr>
+                <tr>
+                  <td><code>Time log</code></td>
+                  <td><code>DEVICE#7</code></td>
+                  <td><code>EVT#1786300000</code></td>
+                  <td>events sorted by time — newest last</td>
+                </tr>
+                <tr>
+                  <td><code>Inbox/outbox</code></td>
+                  <td><code>USER#1</code></td>
+                  <td><code>MSG#&lt;epoch&gt;#&lt;seq&gt;</code></td>
+                  <td>messages, paginated oldest→newest</td>
+                </tr>
+                <tr>
+                  <td><code>Status set</code></td>
+                  <td><code>ORDER#9</code></td>
+                  <td><code>STATE</code></td>
+                  <td>current state, updated with <code>expected_version</code></td>
+                </tr>
+              </tbody>
+            </table>
+            <P className="mb-4">Design rules:</P>
+            <ul className="font-mono text-[11.5px] text-inkdim space-y-2 mb-4 list-none">
+              <li>— <b className="text-ink">Read order = sk order.</b> Put the timestamp (or the natural range) in sk when you will page through rows.</li>
+              <li>— <b className="text-ink">One row per entity.</b> Prefer updating one row over delete+put pairs (writes are the scarce budget).</li>
+              <li>— <b className="text-ink">Keep rows ≤ 20 KB.</b> Big payloads belong in object storage; store the URL in the row.</li>
+              <li>— <b className="text-ink">Avoid hot keys.</b> Spread frequent writes across several pks (e.g. <code>[0-9]#&lt;id&gt;</code>) when one key would absorb all traffic.</li>
+              <li>— <b className="text-ink">Version everything mutable.</b> Read the version, write with <code>expected_version</code>, handle the 409.</li>
+              <li>— <b className="text-ink">All keys carry your app's id</b> inside the table — <code>app_&lt;id&gt;_&lt;name&gt;</code> is always the physical name.</li>
+            </ul>
+            <P>
+              Example — a chat app: table <code className="text-ink">chat</code> with rows{" "}
+              <code className="text-ink">USER#1 / PROFILE</code>, <code className="text-ink">USER#1 / MSG#&lt;epoch&gt;</code>,{" "}
+              <code className="text-ink">ROOM#a / LAST_READ#USER#1</code>. Queries: one sk_prefix per room, limit 50, page with{" "}
+              <code className="text-ink">next_start_key</code>.
+            </P>
+          </Section>
+
+          <Section cell="08" title="ADMIN API" anchor="admin">
             <P>The console itself runs on this surface — session cookie or bearer token, 12 h TTL.</P>
             <table className="doc-table">
               <thead>
@@ -395,7 +457,7 @@ curl -X POST $GW/v1/table/create \\
             </table>
           </Section>
 
-          <Section cell="08" title="LIMITS" anchor="limits">
+          <Section cell="09" title="LIMITS" anchor="limits">
             <P>Engineered so the always-free DynamoDB budget is never hit — these are the contract.</P>
             <table className="doc-table">
               <thead>
@@ -437,7 +499,61 @@ curl -X POST $GW/v1/table/create \\
             </table>
           </Section>
 
-          <Section cell="09" title="ERRORS" anchor="errors">
+          <Section cell="10" title="RATE-LIMIT PLAYBOOK" anchor="playbook">
+            <P>
+              Limits are buckets, not averages: a request counts the minute it arrives, and{" "}
+              <span className="text-redx">429</span> comes with <code className="text-ink">retry_after</code> (seconds).
+              The symptom → cause → fix table:
+            </P>
+            <table className="doc-table mb-4">
+              <thead>
+                <tr>
+                  <th>Symptom</th>
+                  <th>Cause</th>
+                  <th>Fix</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>429</code> on bursts of writes</td>
+                  <td>&gt; 120 writes in one minute</td>
+                  <td>queue writes client-side; spread over seconds; coalesce updates</td>
+                </tr>
+                <tr>
+                  <td><code>429</code> on reads</td>
+                  <td>&gt; 240 reads/min — often N+1 gets</td>
+                  <td>one query with sk_prefix + limit instead of many gets</td>
+                </tr>
+                <tr>
+                  <td><code>429</code> on everything</td>
+                  <td>&gt; 600 total req/min</td>
+                  <td>back off, cache responses, gossip between instances</td>
+                </tr>
+                <tr>
+                  <td><code>429</code> early on a fresh key</td>
+                  <td>platform pool (1 000/min) shared across apps</td>
+                  <td>spread traffic; stagger cron jobs</td>
+                </tr>
+                <tr>
+                  <td><code>429</code> on the console</td>
+                  <td>admin surface 60/min (fast clicking)</td>
+                  <td>slow down; the UI never throttles itself</td>
+                </tr>
+                <tr>
+                  <td><code>413</code> instead of 429</td>
+                  <td>payload over 20 KB — different ceiling</td>
+                  <td>shrink the row; store blobs elsewhere</td>
+                </tr>
+              </tbody>
+            </table>
+            <P>
+              The honest math: 120 writes/min ≈ 2 writes/sec ≈ 2 WCU — under the table's burst capacity, so steady apps{" "}
+              <span className="text-ink">never see 429 by design</span>. The boundaries above are the contract; treat{" "}
+              <span className="text-redx">429 as the meter</span> — if you ever see it, throttle to ~80% of the budget and it resolves within the minute.
+            </P>
+          </Section>
+
+          <Section cell="11" title="ERRORS" anchor="errors">
             <P>
               Every error is JSON: <code className="text-ink">{"{ \"ok\": false, \"error\": { \"code\": 409, \"message\": \"…\" } }"}</code>
             </P>

@@ -15,15 +15,6 @@ export function PublicHeader({ tag }: { tag: string }) {
       </Link>
       <nav className="ml-auto flex items-center gap-2">
         <Link
-          to="/usage"
-          aria-current={tag === "USAGE" ? "true" : undefined}
-          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
-            tag === "USAGE" ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
-          }`}
-        >
-          USAGE
-        </Link>
-        <Link
           to="/docs"
           aria-current={tag === "DOCS" ? "true" : undefined}
           className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
@@ -31,6 +22,15 @@ export function PublicHeader({ tag }: { tag: string }) {
           }`}
         >
           DOCS
+        </Link>
+        <Link
+          to="/usage"
+          aria-current={tag === "USAGE" ? "true" : undefined}
+          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+            tag === "USAGE" ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
+          }`}
+        >
+          USAGE
         </Link>
         <FoldLink to="/login" variant="ghost" size="sm">
           ENTER CONSOLE

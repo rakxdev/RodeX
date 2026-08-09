@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Search, X } from "lucide-react";
 import { api, ApiError, gatewayBase, type AppInfo, type AppStatus } from "@/api/client";
-import { pageTransition, fadeUp, stagger, springLift } from "@/lib/motion";
+import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
 import Loader from "@/components/Loader";
+import TiltCard from "@/components/TiltCard";
 import { FoldButton } from "@/components/FoldButton";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
@@ -290,8 +291,9 @@ export default function AppsPage() {
         )}
         {(visible ?? []).map((app) => (
           <motion.div key={app.app_id} variants={fadeUp}>
-            <Link to={`/apps/${app.app_id}`} className="block">
-              <motion.div whileHover={{ y: -3 }} transition={springLift} className="nameplate p-4 hover:border-gold/50 transition-colors">
+            <TiltCard className="h-full">
+              <Link to={`/apps/${app.app_id}`} className="block h-full">
+                <div className="nameplate p-4 h-full hover:border-gold/50 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-mono text-[14px] tracking-[0.04em] truncate">{app.name}</h3>
                   <span className="ml-auto shrink-0">{statusStamp(app.status)}</span>
@@ -309,8 +311,9 @@ export default function AppsPage() {
                     TABLES <b className="text-ink font-medium">{(app.tables ?? []).length}</b>
                   </span>
                 </div>
-              </motion.div>
-            </Link>
+                </div>
+              </Link>
+            </TiltCard>
           </motion.div>
         ))}
         {apps && (visible ?? []).length === 0 && (

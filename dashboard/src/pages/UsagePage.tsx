@@ -133,6 +133,56 @@ export default function UsagePage() {
         </table>
       </motion.div>
 
+      {/* 429 field manual — scenarios + fixes */}
+      <motion.div variants={foldIn} initial="hidden" animate="show" className="sheet-panel p-5 mt-4">
+        <h4 className="mb-4">
+          <b>429 FIELD MANUAL</b> — WHAT TRIGGERS IT, HOW TO READ IT, HOW TO NEVER SEE IT
+        </h4>
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Symptom</th>
+              <th>Cause</th>
+              <th>Recovery</th>
+              <th>Prevention</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>429</code> with <code>retry_after: 1</code></td>
+              <td>one of the per-app buckets topped out this minute</td>
+              <td>wait <code>retry_after</code> seconds, retry — writes with <code>request_id</code> are always safe to retry</td>
+              <td>stay under 600 total / 120 writes / 240 reads per minute</td>
+            </tr>
+            <tr>
+              <td><code>429</code> on every call, all apps</td>
+              <td>platform pool (1 000/min) shared across your apps</td>
+              <td>spread calls; stagger cron jobs by a few seconds</td>
+              <td>run heavy jobs off-peak; cache hot reads</td>
+            </tr>
+            <tr>
+              <td><code>429</code> while fast-clicking the console</td>
+              <td>admin surface: 60 req/min</td>
+              <td>pause a second — the UI never hits this on its own</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>413</code> (not 429)</td>
+              <td>row over 20 KB — a size ceiling, not a rate</td>
+              <td>reduce the payload</td>
+              <td>keep rows small; store blobs elsewhere</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="font-mono text-[11px] leading-relaxed text-inkdim mt-4">
+          The numbers, exactly: <span className="text-ink">600 req/min total</span> ·{" "}
+          <span className="text-ink">120 writes/min</span> · <span className="text-ink">240 reads/min</span> per app —{" "}
+          <span className="text-ink">1 000 req/min platform pool</span> — <span className="text-ink">60 req/min admin</span>.
+          A 429 is a bucket, not a ban: it resets within the minute, and if you throttle to ~80% of the budget you{" "}
+          <span className="text-ink">should never see it again</span>.
+        </p>
+      </motion.div>
+
       {/* safety boundaries — how to never hit a limit */}
       <motion.div variants={foldIn} initial="hidden" animate="show" className="sheet-panel p-5 mt-4">
         <h4 className="mb-4">
