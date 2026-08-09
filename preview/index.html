@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RodeX DB — Direction & Logo Lab</title>
+<style>
+  :root{
+    --bg:#0e1013; --panel:#171a1f; --panel2:#1d2127; --line:#2a2f37;
+    --ink:#e8e4da; --ink-dim:#8a9184; --red:#e8452c; --amber:#d9a441;
+    --gold:#d9b64a; --gold-deep:#b8952f; --paper:#f2efe6;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;
+    background-image:radial-gradient(900px 420px at 72% -10%, #26241c 0%, transparent 55%),
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.015) 31px 32px);}
+  .wrap{max-width:1060px;margin:0 auto;padding:44px 26px 80px}
+  .topbar{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:26px}
+  .mark{width:34px;height:34px;border:1.5px solid var(--gold);border-radius:6px;display:grid;place-items:center;
+    font-family:var(--mono);font-weight:700;color:var(--gold);font-size:15px;background:#121417}
+  .wordmark{font-family:var(--mono);font-weight:700;letter-spacing:.22em;font-size:15px}
+  .wordmark em{font-style:normal;color:var(--gold)}
+  .rev{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);letter-spacing:.15em}
+  h1{font-family:var(--mono);font-size:clamp(21px,3.8vw,31px);letter-spacing:.05em;margin-bottom:6px}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--ink-dim);font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;margin-bottom:8px}
+  .fuse{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--amber);
+    border:1px solid rgba(217,164,65,.5);border-radius:4px;padding:5px 12px;margin:4px 0 30px}
+  .label{font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:.25em;text-transform:uppercase;margin:34px 0 13px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+  .packet{background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-radius:10px;padding:16px;position:relative;overflow:hidden}
+  .packet::before{content:"";position:absolute;inset:5px;border:1px dashed rgba(255,255,255,.055);border-radius:7px}
+  .seal{position:absolute;top:0;right:0;background:linear-gradient(150deg,var(--gold),var(--gold-deep));
+    color:#1a1508;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.18em;
+    padding:4px 12px 5px;border-bottom-left-radius:7px}
+  .head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .head h3{font-family:var(--mono);font-size:14.5px;letter-spacing:.04em}
+  .stamp{font-family:var(--mono);font-size:9px;letter-spacing:.22em;padding:3px 8px;border-radius:3px;border:1px solid}
+  .stamp.active{color:var(--amber);border-color:rgba(217,164,65,.55);background:rgba(217,164,65,.08)}
+  .stamp.suspended{color:var(--ink-dim);border-color:var(--line)}
+  .ser{font-family:var(--mono);font-size:10px;color:var(--ink-dim);letter-spacing:.1em;margin:6px 0}
+  .foldline{height:1px;background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 12px);margin:8px 0}
+  .kv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim)}
+  .kv b{color:var(--ink);font-weight:500}
+  .cellid{position:absolute;bottom:6px;left:10px;font-family:var(--mono);font-size:8px;color:rgba(138,145,132,.5);letter-spacing:.2em}
+
+  .sheet{background:linear-gradient(160deg,#191c22,#13161b);border:1px solid var(--line);border-radius:12px;padding:4px;position:relative}
+  .sheet-top{display:flex;align-items:center;gap:10px;padding:14px 18px 10px}
+  .sheet-top h3{font-family:var(--mono);font-size:16px;letter-spacing:.05em}
+  .sheet-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border-radius:0 0 8px 8px;overflow:hidden}
+  .panel{background:#14171c;padding:14px 16px}
+  .panel h4{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--ink-dim);margin-bottom:10px}
+  .panel h4 b{color:var(--gold)}
+  .prow{font-family:var(--mono);font-size:11px;color:var(--ink);margin-bottom:6px;display:flex;justify-content:space-between}
+  .prow span{color:var(--ink-dim)}
+  .prow .key{color:var(--gold)}
+
+  .seals{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+  .sealbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .sealbox h4{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--ink-dim);margin-bottom:12px}
+  .foil{background:linear-gradient(140deg,#e3c96a,#b8952f 55%,#8f7420);color:#1a1508;font-family:var(--mono);
+    font-size:11px;font-weight:700;letter-spacing:.16em;padding:22px 16px;border-radius:6px;text-align:center}
+  .foil small{display:block;font-weight:600;opacity:.75;margin-top:6px;font-size:9px}
+  .torn{background:#14171c;border:1px solid var(--line);border-radius:6px;padding:18px 16px;overflow:hidden}
+  .torn::before{content:"";position:absolute;top:0;left:0;right:0;height:22px;
+    background:linear-gradient(140deg,#e3c96a,#b8952f);clip-path:polygon(0 100%,12% 0,24% 100%,38% 12%,52% 100%,66% 0,80% 100%,92% 10%,100% 100%)}
+  .tlabel{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--gold);margin-top:16px;margin-bottom:8px}
+  .thekey{font-family:var(--mono);font-size:12.5px;color:var(--paper);word-break:break-all;line-height:1.7}
+
+  /* ── LOGO LAB ─────────────────────────────────────────────── */
+  .logogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+  .logocard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 12px 12px;
+    display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s}
+  .logocard:hover{border-color:var(--gold)}
+  .logocard svg{width:72px;height:72px}
+  .logocard .lname{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink)}
+  .logocard .ldesc{font-family:var(--mono);font-size:9px;color:var(--ink-dim);letter-spacing:.05em;text-align:center;line-height:1.5;min-height:28px}
+
+  .glyphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .glyph{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .glyph svg{width:44px;height:44px}
+  .glyph span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink-dim)}
+
+  .btn{display:inline-flex;align-items:center;gap:10px;background:var(--red);color:#fff;font-family:var(--mono);
+    font-size:12.5px;letter-spacing:.12em;padding:12px 22px;border:none;border-radius:6px;cursor:pointer;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 8px 20px rgba(232,69,44,.22)}
+  .footer{margin-top:52px;border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:10px;color:var(--ink-dim);letter-spacing:.16em;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="mark">R</div>
+    <div class="wordmark">RODEX<em>DB</em></div>
+    <div class="rev">DIRECTION + LOGO LAB · REV F</div>
+  </div>
+
+  <h1>The Instrument <span>Packet</span> <span style="color:var(--red)">· Logo Lab</span></h1>
+  <div class="sub">Approved direction 01×02. Twenty logo concepts below — reply with your number(s).</div>
+  <div class="fuse">FUSED: 01 MACHINE-SHOP × 02 MIURA FOLD · ALL MARKS: PRIMARY / REVERSED / MONO READY</div>
+
+  <div class="label">// ✅ FINAL — LOCKED MARK · R3-14 PACKET-RETICLE-KEY</div>
+  <div class="logogrid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+    <div class="logocard" style="border-color:var(--gold)">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#E8E4DA" stroke-width="2.4" stroke-linejoin="round"/><path d="M32 10 L52 22 M32 10 L12 22 M32 54 L52 42 M32 54 L12 42" stroke="#8A9184" stroke-width="1.3"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#E8E4DA" stroke-width="2.5" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#D9B64A" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#E8452C"/><rect x="22" y="2" width="20" height="6" fill="#D9B64A"/></svg>
+      <div class="lname">PRIMARY</div>
+      <div class="ldesc">rodex-mark.svg — ink/gold/red on carbon</div>
+    </div>
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#D9B64A" stroke-width="2.4" stroke-linejoin="round"/><path d="M32 10 L52 22 M32 10 L12 22 M32 54 L52 42 M32 54 L12 42" stroke="rgba(217,182,74,.5)" stroke-width="1.3"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#D9B64A" stroke-width="2.5" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#E8E4DA" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#E8452C"/><rect x="22" y="2" width="20" height="6" fill="#D9B64A"/></svg>
+      <div class="lname">REVERSED</div>
+      <div class="ldesc">gold on dark — foil/seal contexts</div>
+    </div>
+    <div class="logocard">
+      <svg viewBox="0 0 64 64" style="color:#E8E4DA"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M32 10 L52 22 M32 10 L12 22 M32 54 L52 42 M32 54 L12 42" stroke="currentColor" stroke-width="1.1" opacity=".55"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="currentColor"/><rect x="22" y="2" width="20" height="6" fill="currentColor"/></svg>
+      <div class="lname">MONO</div>
+      <div class="ldesc">single color — print, stamps, favicon</div>
+    </div>
+  </div>
+
+  <div class="label">// direction recap (compact)</div>
+  <div class="grid">
+    <div class="packet">
+      <div class="seal">SEALED</div>
+      <div class="head"><h3>weather-bot</h3><span class="stamp active">ACTIVE</span></div>
+      <div class="ser">S/N app_71e3ef550648ba9a</div>
+      <div class="foldline"></div>
+      <div class="kv"><span>KEY <b style="color:var(--gold)">gold-sealed</b></span><span>TABLES <b>02</b></span></div>
+      <div class="cellid">CELL 01 · MOUNTAIN</div>
+    </div>
+    <div class="packet">
+      <div class="seal" style="background:linear-gradient(150deg,#3a3f47,#262b31);color:#9aa0a6">PRIOR</div>
+      <div class="head"><h3>anime-tracker</h3><span class="stamp suspended">SUSPENDED</span></div>
+      <div class="ser">S/N app_0b4f21c0a91d3e77</div>
+      <div class="foldline"></div>
+      <div class="kv"><span>KEY <b style="color:var(--gold)">gold-sealed</b></span><span>TABLES <b>05</b></span></div>
+      <div class="cellid">CELL 04 · VALLEY</div>
+    </div>
+  </div>
+
+  <div class="label">// LOGO CONCEPTS — 20 MARKS</div>
+  <div class="logogrid">
+
+    <!-- 01 X-Fold -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M12 12 L32 32 L12 52" fill="none" stroke="#e8e4da" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M52 12 L32 32 L52 52" fill="none" stroke="#e8e4da" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="26" y="26" width="12" height="12" fill="#d9b64a" transform="rotate(45 32 32)"/></svg>
+      <div class="lname">01 · X-FOLD</div>
+      <div class="ldesc">Two folded chevrons meet at a gold seam diamond — the packet's X.</div>
+    </div>
+
+    <!-- 02 Sealed X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L50 50 M50 14 L14 50" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="10" fill="none" stroke="#d9b64a" stroke-width="3"/><rect x="29" y="29" width="6" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">02 · SEALED X</div>
+      <div class="ldesc">The X crossed out by a gold foil seal — nothing opens without it.</div>
+    </div>
+
+    <!-- 03 Nameplate X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="6" fill="none" stroke="#1d2127" stroke-width="2"/><rect x="10" y="10" width="44" height="44" rx="4" fill="none" stroke="#2a2f37" stroke-width="1.5"/><path d="M18 18 L46 46 M46 18 L18 46" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="10" cy="10" r="1.8" fill="#8a9184"/><circle cx="54" cy="10" r="1.8" fill="#8a9184"/><circle cx="10" cy="54" r="1.8" fill="#8a9184"/><circle cx="54" cy="54" r="1.8" fill="#8a9184"/></svg>
+      <div class="lname">03 · NAMEPLATE X</div>
+      <div class="ldesc">Engraved panel, four corner screws, the instrument as brand.</div>
+    </div>
+
+    <!-- 04 Packet X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linejoin="round"/><path d="M8 22 L32 58 M56 22 L32 58 M32 6 L32 58" stroke="#8a9184" stroke-width="1.6"/><path d="M32 6 L44 14 L32 32 L20 14 Z" fill="none" stroke="#d9b64a" stroke-width="2"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">04 · PACKET X</div>
+      <div class="ldesc">A folded packet with a gold tab — the Miura diamond as a mark.</div>
+    </div>
+
+    <!-- 05 Tensegrity X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><rect x="10" y="14" width="44" height="8" rx="3" fill="#1d2127" transform="rotate(45 32 32)"/><rect x="10" y="42" width="44" height="8" rx="3" fill="#1d2127" transform="rotate(-45 32 32)"/><circle cx="32" cy="32" r="4" fill="#d9b64a"/><circle cx="14" cy="14" r="2.5" fill="#e8e4da"/><circle cx="50" cy="50" r="2.5" fill="#e8e4da"/><circle cx="50" cy="14" r="2.5" fill="#e8e4da"/><circle cx="14" cy="50" r="2.5" fill="#e8e4da"/></svg>
+      <div class="lname">05 · TENSEGRITY X</div>
+      <div class="ldesc">Two struts held by a gold tension core — forces in balance.</div>
+    </div>
+
+    <!-- 06 Serial X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 16 L48 48 M48 16 L16 48" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M22 12 v8 M28 12 v8 M34 12 v8 M40 12 v8" stroke="#8a9184" stroke-width="1.6"/><path d="M22 44 v8 M28 44 v8 M34 44 v8 M40 44 v8" stroke="#8a9184" stroke-width="1.6"/><path d="M12 22 h8 M12 28 h8 M12 34 h8 M12 40 h8" stroke="#8a9184" stroke-width="1.6"/><path d="M44 22 h8 M44 28 h8 M44 34 h8 M44 40 h8" stroke="#8a9184" stroke-width="1.6"/></svg>
+      <div class="lname">06 · SERIAL X</div>
+      <div class="ldesc">The X with engraved calibration ticks — a measured instrument.</div>
+    </div>
+
+    <!-- 07 X-Stamp -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><polygon points="32,6 54,19 54,45 32,58 10,45 10,19" fill="none" stroke="#2a2f37" stroke-width="3" stroke-linejoin="round"/><polygon points="32,12 49,22 49,42 32,52 15,42 15,22" fill="none" stroke="#d9b64a" stroke-width="1.6"/><path d="M20 20 L44 44 M44 20 L20 44" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.2" fill="#e8452c"/></svg>
+      <div class="lname">07 · X-STAMP</div>
+      <div class="ldesc">An inspection stamp — hex seal, verified, stamped in amber.</div>
+    </div>
+
+    <!-- 08 Fold-X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 10 L22 16 L14 22 L22 28 L14 34 L22 40 L14 46 L22 52" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 10 L42 16 L50 22 L42 28 L50 34 L42 40 L50 46 L42 52" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="30" y="30" width="4" height="4" fill="#d9b64a"/></svg>
+      <div class="lname">08 · FOLD-X</div>
+      <div class="ldesc">Zigzag mountain/valley creases — the X as a folded accordion.</div>
+    </div>
+
+    <!-- 09 R-Seal -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="24" fill="none" stroke="#d9b64a" stroke-width="3"/><circle cx="32" cy="32" r="19" fill="none" stroke="rgba(217,182,74,.35)" stroke-width="1"/><path d="M24 44 V20 H33 a7 7 0 0 1 0 14 H24 M31 34 L40 44" fill="none" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="lname">09 · R-SEAL</div>
+      <div class="ldesc">The R engraved inside a gold foil seal — wax-meets-machined.</div>
+    </div>
+
+    <!-- 10 R-Packet -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 8 V56" stroke="#8a9184" stroke-width="2"/><path d="M14 8 H34 a10 10 0 0 1 0 20 H14 M29 28 L40 56" fill="none" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="4" width="14" height="8" fill="#d9b64a"/><path d="M14 44 H34 a6 6 0 0 1 0 12 H14" fill="none" stroke="#e8e4da" stroke-width="3.4"/></svg>
+      <div class="lname">10 · R-PACKET</div>
+      <div class="ldesc">The R as a folded sheet with a gold tab on its spine.</div>
+    </div>
+
+    <!-- 11 X-Reticle -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="none" stroke="#2a2f37" stroke-width="2.5"/><path d="M14 32 H6 M58 32 H50 M32 14 V6 M32 58 V50" stroke="#8a9184" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L44 44 M44 20 L20 44" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#d9b64a"/></svg>
+      <div class="lname">11 · X-RETICLE</div>
+      <div class="ldesc">A precision reticle — the database through the sight.</div>
+    </div>
+
+    <!-- 12 X-Chamfer -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M18 10 L46 10 L54 18 L54 46 L46 54 L18 54 L10 46 L10 18 Z" fill="none" stroke="#e8e4da" stroke-width="3.4" stroke-linejoin="round"/><path d="M10 18 L18 10 M54 18 L46 10 M54 46 L46 54 M10 46 L18 54" stroke="#d9b64a" stroke-width="2.4"/><rect x="29" y="29" width="6" height="6" fill="#e8452c"/></svg>
+      <div class="lname">12 · X-CHAMFER</div>
+      <div class="ldesc">Machined corners cut at 45° — an X milled from solid stock.</div>
+    </div>
+
+    <!-- 13 X-Key -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L38 38" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M50 14 L14 50 L32 50 L50 32 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linejoin="round"/><path d="M40 42 v8 M44 46 v4 M36 46 v4" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/><circle cx="32" cy="32" r="2.4" fill="#e8452c"/></svg>
+      <div class="lname">13 · X-KEY</div>
+      <div class="ldesc">One arm is a key — the gateway as a lock you own.</div>
+    </div>
+
+    <!-- 14 R-Serial -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 48 V16 H30 a9 9 0 0 1 0 18 H16 M28 34 L40 48" fill="none" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M46 10 v6 M52 10 v6 M46 22 v6 M52 22 v6" stroke="#d9b64a" stroke-width="2.4"/><rect x="14" y="8" width="2.6" height="48" fill="#2a2f37"/></svg>
+      <div class="lname">14 · R-SERIAL</div>
+      <div class="ldesc">The R with gold calibration ticks and a machined spine.</div>
+    </div>
+
+    <!-- 15 X-Engraved -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 16 L32 32 L16 48 M48 16 L32 32 L48 48" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 16 L32 26 M42 16 L32 26 M22 48 L32 38 M42 48 L32 38" stroke="#d9b64a" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="lname">15 · X-ENGRAVED</div>
+      <div class="ldesc">Double-cut strokes, gold inner etch — engraved, not drawn.</div>
+    </div>
+
+    <!-- 16 X-Cell -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L54 19 L32 32 L10 19 Z M32 32 L54 45 L32 58 L10 45 Z" fill="none" stroke="#e8e4da" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 19 L32 32 L54 19 M10 45 L32 32 L54 45 M32 6 L32 32 L32 58" stroke="#8a9184" stroke-width="1.4"/><rect x="29" y="29" width="6" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">16 · X-CELL</div>
+      <div class="ldesc">Four fold cells on the crease graph — the packet's plan view.</div>
+    </div>
+
+    <!-- 17 X-Pin -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M18 18 L46 46 M46 18 L18 46" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="18" r="4.5" fill="#1d2127" stroke="#d9b64a" stroke-width="2.2"/><circle cx="46" cy="46" r="4.5" fill="#1d2127" stroke="#d9b64a" stroke-width="2.2"/><circle cx="46" cy="18" r="4.5" fill="#1d2127" stroke="#8a9184" stroke-width="2.2"/><circle cx="18" cy="46" r="4.5" fill="#1d2127" stroke="#8a9184" stroke-width="2.2"/></svg>
+      <div class="lname">17 · X-PIN</div>
+      <div class="ldesc">Riveted at all four corners — assembled, inspected, fixed.</div>
+    </div>
+
+    <!-- 18 R-Foil -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M20 52 V20 H34 a9 9 0 0 1 0 18 H20 M32 38 L44 52" fill="none" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><polygon points="14,28 26,24 38,29 50,25 52,32 40,36 28,31 16,35" fill="#d9b64a"/></svg>
+      <div class="lname">18 · R-FOIL</div>
+      <div class="ldesc">A torn foil strip across the R — the seal, mid-break.</div>
+    </div>
+
+    <!-- 19 X-Tolerance -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M20 20 L44 44 M44 20 L20 44" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M10 20 h6 M10 20 l3 -4 M10 20 l3 4 M48 44 h6 M54 44 l-3 -4 M54 44 l-3 4" stroke="#8a9184" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 10 v6 M20 10 l-4 3 M20 10 l4 3 M44 48 v6 M44 54 l-4 -3 M44 54 l4 -3" stroke="#8a9184" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="30" y="30" width="4" height="4" fill="#d9b64a"/></svg>
+      <div class="lname">19 · X-TOLERANCE</div>
+      <div class="ldesc">Dimensioned like a drawing — measured twice, cut once.</div>
+    </div>
+
+    <!-- 20 X-Balance -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 16 L48 48 M48 16 L16 48" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="7" fill="none" stroke="#d9b64a" stroke-width="2.2"/><path d="M32 25 v14 M25 32 h14" stroke="#d9b64a" stroke-width="2"/><circle cx="32" cy="32" r="1.8" fill="#e8452c"/></svg>
+      <div class="lname">20 · X-BALANCE</div>
+      <div class="ldesc">A gold tension ring at the crossing — the column in equilibrium.</div>
+    </div>
+  </div>
+
+  <div class="label">// Section glyph family — every page gets its own mark in the same grammar</div>
+  <div class="glyphs">
+    <div class="glyph">
+      <svg viewBox="0 0 64 64"><rect x="8" y="8" width="48" height="48" rx="5" fill="none" stroke="#e8e4da" stroke-width="3"/><rect x="8" y="8" width="48" height="12" rx="5" fill="#1d2127" stroke="#2a2f37"/><path d="M16 24 h32 M16 32 h32 M16 40 h20" stroke="#8a9184" stroke-width="2.4" stroke-linecap="round"/><rect x="46" y="3" width="12" height="7" fill="#d9b64a"/></svg>
+      <span>APPS · PACKET</span>
+    </div>
+    <div class="glyph">
+      <svg viewBox="0 0 64 64"><path d="M8 8 L56 8 L56 56 L8 56 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linejoin="round"/><path d="M8 22 L56 22 M20 8 L20 22 M40 22 L40 56" stroke="#8a9184" stroke-width="2"/><rect x="22" y="10" width="16" height="8" fill="#d9b64a"/></svg>
+      <span>DOCS · SPEC SHEET</span>
+    </div>
+    <div class="glyph">
+      <svg viewBox="0 0 64 64"><path d="M32 8 A20 20 0 0 1 52 28 H32 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 36 V44 M32 8 V16" stroke="#8a9184" stroke-width="2.4" stroke-linecap="round"/><path d="M22 30 L14 30 M28 26 L22 20 M36 26 L42 20 M42 30 L50 30" stroke="#8a9184" stroke-width="2.4" stroke-linecap="round"/><path d="M32 44 L28 50 M32 44 L36 50" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>USAGE · GAUGE</span>
+    </div>
+    <div class="glyph">
+      <svg viewBox="0 0 64 64"><circle cx="32" cy="28" r="10" fill="none" stroke="#e8e4da" stroke-width="3"/><rect x="26" y="34" width="12" height="16" rx="2" fill="none" stroke="#e8e4da" stroke-width="3"/><path d="M32 22 v4 M32 32 v4 M22 28 h4 M38 28 h4" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><rect x="8" y="44" width="48" height="12" rx="3" fill="none" stroke="#8a9184" stroke-width="2.4"/></svg>
+      <span>SETTINGS · SEAL</span>
+    </div>
+  </div>
+
+  <div class="label">// ROUND 02 — FUSIONS OF 05 × 13 (TENSEGRITY × KEY)</div>
+  <div class="logogrid">
+
+    <!-- R2-01 KEYSTRUT -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><rect x="9" y="13" width="46" height="9" rx="4" fill="#1d2127" stroke="#2a2f37" stroke-width="1.5" transform="rotate(45 32 32)"/><rect x="9" y="42" width="46" height="9" rx="4" fill="#1d2127" stroke="#2a2f37" stroke-width="1.5" transform="rotate(-45 32 32)"/><path d="M49 44 v10 M53 46 v6 M45 46 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="5" fill="none" stroke="#d9b64a" stroke-width="2.4"/><circle cx="14" cy="14" r="2.6" fill="#e8e4da"/><circle cx="50" cy="50" r="2.6" fill="#e8e4da"/><circle cx="50" cy="14" r="2.6" fill="#8a9184"/><circle cx="14" cy="50" r="2.6" fill="#8a9184"/></svg>
+      <div class="lname">R2-01 · KEYSTRUT</div>
+      <div class="ldesc">The tensegrity X, one arm cut as a key — tension held by teeth.</div>
+    </div>
+
+    <!-- R2-02 KEYCORD -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 16 L48 48 M48 16 L16 48" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M44 46 v10 M49 49 v6 M39 49 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="2.4" fill="#e8452c"/><circle cx="16" cy="16" r="3" fill="#d9b64a"/><circle cx="48" cy="48" r="3" fill="#8a9184"/><circle cx="48" cy="16" r="3" fill="#8a9184"/><circle cx="16" cy="48" r="3" fill="#8a9184"/></svg>
+      <div class="lname">R2-02 · KEYCORD</div>
+      <div class="ldesc">Line-built X with cord terminals — key teeth at the gold node.</div>
+    </div>
+
+    <!-- R2-03 VERTKEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><rect x="13" y="8" width="9" height="48" rx="4" fill="#1d2127" stroke="#2a2f37" stroke-width="1.5"/><path d="M14 50 h20 v6 h-20 Z" fill="none" stroke="#e8e4da" stroke-width="2.6"/><path d="M24 50 v4 M28 52 v6 M32 50 v4" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/><rect x="28" y="20" width="24" height="8" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.5" transform="rotate(28 40 24)"/><circle cx="46" cy="13" r="2.6" fill="#8a9184"/><circle cx="46" cy="35" r="2.6" fill="#8a9184"/><circle cx="32" cy="32" r="4.4" fill="none" stroke="#d9b64a" stroke-width="2.2"/></svg>
+      <div class="lname">R2-03 · VERTKEY</div>
+      <div class="ldesc">A full key strut crossed by a diagonal member — the gateway as key.</div>
+    </div>
+
+    <!-- R2-04 KEYHOLE-X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M12 12 L44 44 M52 12 L20 44" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="11" fill="#121417" stroke="#d9b64a" stroke-width="2.6"/><rect x="29.5" y="30" width="5" height="13" rx="2" fill="#121417" stroke="#d9b64a" stroke-width="2"/><path d="M20 44 L32 56 M44 44 L32 56" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M40 49 v5 M44 47 v3" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div class="lname">R2-04 · KEYHOLE-X</div>
+      <div class="ldesc">The X passes through a gold keyhole — access is the identity.</div>
+    </div>
+
+    <!-- R2-05 KEYSEAL -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L46 46 M50 14 L18 46" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="10" fill="#d9b64a"/><circle cx="32" cy="32" r="6" fill="#121417"/><rect x="29.5" y="30" width="5" height="10" rx="2" fill="#d9b64a"/></svg>
+      <div class="lname">R2-05 · KEYSEAL</div>
+      <div class="ldesc">A gold foil seal locks the crossing — key hidden beneath.</div>
+    </div>
+
+    <!-- R2-06 KEYSTAMP -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><polygon points="32,5 55,18.5 55,45.5 32,59 9,45.5 9,18.5" fill="none" stroke="#2a2f37" stroke-width="2.6" stroke-linejoin="round"/><polygon points="32,11 50,21 50,43 32,53 14,43 14,21" fill="none" stroke="#d9b64a" stroke-width="1.6"/><path d="M20 20 L44 44 M46 20 L22 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M40 42 v9 M44 45 v5 M36 45 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#e8452c"/></svg>
+      <div class="lname">R2-06 · KEYSTAMP</div>
+      <div class="ldesc">The key-X stamped inside an inspection hex.</div>
+    </div>
+
+    <!-- R2-07 KEYENGRAVE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M18 14 L32 28 L18 42 M46 14 L32 28 L46 42" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 14 L32 22 M40 14 L32 22 M24 42 L32 34 M40 42 L32 34" stroke="#8a9184" stroke-width="1.8" stroke-linecap="round"/><path d="M40 38 v10 M45 41 v6 M35 41 v6" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/><rect x="29" y="29" width="6" height="6" fill="#e8452c" transform="rotate(45 32 32)"/></svg>
+      <div class="lname">R2-07 · KEYENGRAVE</div>
+      <div class="ldesc">Double-cut etching, key teeth in gold — engraved, not drawn.</div>
+    </div>
+
+    <!-- R2-08 KEYSERIAL -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L46 46 M50 14 L18 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><path d="M20 10 v7 M26 10 v7 M32 10 v7 M38 10 v7 M44 10 v7" stroke="#8a9184" stroke-width="1.6"/><circle cx="32" cy="32" r="3.6" fill="none" stroke="#d9b64a" stroke-width="2.2"/></svg>
+      <div class="lname">R2-08 · KEYSERIAL</div>
+      <div class="ldesc">Calibration ticks + gold key ring — measured, keyed, certified.</div>
+    </div>
+
+    <!-- R2-09 KEYPIN -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 16 L48 48 M48 16 L16 48" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="16" r="4.2" fill="#1d2127" stroke="#d9b64a" stroke-width="2"/><circle cx="48" cy="48" r="4.2" fill="#1d2127" stroke="#8a9184" stroke-width="2"/><circle cx="48" cy="16" r="4.2" fill="#1d2127" stroke="#8a9184" stroke-width="2"/><circle cx="16" cy="48" r="4.2" fill="#1d2127" stroke="#8a9184" stroke-width="2"/></svg>
+      <div class="lname">R2-09 · KEYPIN</div>
+      <div class="ldesc">Key arm riveted in gold — assembled, torqued, shipped.</div>
+    </div>
+
+    <!-- R2-10 KEYBALANCE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L48 48 M50 14 L16 48" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="8" fill="none" stroke="#d9b64a" stroke-width="2.2"/><circle cx="14" cy="14" r="3" fill="#8a9184"/><circle cx="50" cy="14" r="3" fill="#8a9184"/><circle cx="16" cy="48" r="3" fill="#8a9184"/><circle cx="48" cy="48" r="3" fill="#d9b64a"/><circle cx="32" cy="32" r="1.8" fill="#e8452c"/></svg>
+      <div class="lname">R2-10 · KEYBALANCE</div>
+      <div class="ldesc">The column in equilibrium — key side weighted in gold.</div>
+    </div>
+
+    <!-- R2-11 KEYCHAMFER -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M20 8 L44 8 L56 20 L56 44 L44 56 L20 56 L8 44 L8 20 Z" fill="none" stroke="#2a2f37" stroke-width="2.6" stroke-linejoin="round"/><path d="M8 20 L20 8 M56 20 L44 8 M56 44 L44 56 M8 44 L20 56" stroke="#d9b64a" stroke-width="2"/><path d="M20 20 L44 44 M46 20 L22 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M40 42 v9 M44 45 v5 M36 45 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div class="lname">R2-11 · KEYCHAMFER</div>
+      <div class="ldesc">Milled stock with chamfered corners, key-X engraved within.</div>
+    </div>
+
+    <!-- R2-12 MASTERKEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M14 14 L46 46" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round"/><path d="M50 14 L18 46" stroke="#e8e4da" stroke-width="3.4" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><path d="M22 42 v-10 M17 39 v-6 M27 39 v-6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="3.4" fill="#d9b64a"/></svg>
+      <div class="lname">R2-12 · MASTERKEY</div>
+      <div class="ldesc">Two keys crossing — the master key to every isolated database.</div>
+    </div>
+
+    <!-- R2-13 KEYRETICLE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="21" fill="none" stroke="#2a2f37" stroke-width="2.4"/><path d="M14 32 H6 M58 32 H50 M32 14 V6 M32 58 V50" stroke="#8a9184" stroke-width="2.4" stroke-linecap="round"/><path d="M20 20 L44 44 M46 20 L22 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M40 42 v9 M44 45 v5 M36 45 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="1.8" fill="#e8452c"/></svg>
+      <div class="lname">R2-13 · KEYRETICLE</div>
+      <div class="ldesc">The key-X sighted through a precision reticle.</div>
+    </div>
+
+    <!-- R2-14 KEYFOLD -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 14 L46 46 M50 14 L20 46" stroke="#e8e4da" stroke-width="3" stroke-linecap="round"/><path d="M22 20 l6 6 M26 14 l6 6 M40 38 l6 6 M44 32 l6 6" stroke="#8a9184" stroke-width="1.8"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><rect x="22" y="2" width="14" height="7" fill="#d9b64a"/></svg>
+      <div class="lname">R2-14 · KEYFOLD</div>
+      <div class="ldesc">Crease marks across the arms, gold tab on the spine.</div>
+    </div>
+
+    <!-- R2-15 KEYPACKET -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.8" stroke-linejoin="round"/><path d="M8 22 L32 58 M56 22 L32 58" stroke="#8a9184" stroke-width="1.5"/><path d="M32 22 L44 32 L32 50 L20 32 Z" fill="none" stroke="#d9b64a" stroke-width="2"/><path d="M32 32 v4 M29 35 v-4 M35 35 v-4" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R2-15 · KEYPACKET</div>
+      <div class="ldesc">The key diamond inside the folded packet — the whole product, one glyph.</div>
+    </div>
+
+    <!-- R2-16 KEYPLATE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><rect x="5" y="5" width="54" height="54" rx="6" fill="none" stroke="#2a2f37" stroke-width="2.2"/><rect x="9" y="9" width="46" height="46" rx="4" fill="none" stroke="#1d2127" stroke-width="1.4"/><path d="M20 20 L44 44 M46 20 L22 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M40 42 v9 M44 45 v5 M36 45 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="9" cy="9" r="1.8" fill="#8a9184"/><circle cx="55" cy="9" r="1.8" fill="#8a9184"/><circle cx="9" cy="55" r="1.8" fill="#8a9184"/><circle cx="55" cy="55" r="1.8" fill="#8a9184"/></svg>
+      <div class="lname">R2-16 · KEYPLATE</div>
+      <div class="ldesc">The full instrument: nameplate, screws, key-X — the complete badge.</div>
+    </div>
+
+    <!-- R2-17 KEYGATE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M16 14 L48 46" stroke="#e8e4da" stroke-width="3.2" stroke-linecap="round"/><path d="M50 14 L18 46" stroke="#e8e4da" stroke-width="3.2" stroke-linecap="round"/><path d="M42 44 v10 M47 47 v6 M37 47 v6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><path d="M22 40 v-10 M17 37 v-6 M27 37 v-6" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#e8452c"/></svg>
+      <div class="lname">R2-17 · KEYGATE</div>
+      <div class="ldesc">Tooth-cut at both ends — a key that is also a gate.</div>
+    </div>
+
+    <!-- R2-18 KEYTOL -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M18 18 L46 46 M48 18 L20 46" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M42 44 v9 M46 47 v5 M38 47 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><path d="M10 18 h6 M10 18 l3 -4 M10 18 l3 4 M48 46 h6 M54 46 l-3 -4 M54 46 l-3 4" stroke="#8a9184" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 10 v6 M18 10 l-4 3 M18 10 l4 3 M46 48 v6 M46 54 l-4 -3 M46 54 l4 -3" stroke="#8a9184" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="30" y="30" width="4" height="4" fill="#d9b64a"/></svg>
+      <div class="lname">R2-18 · KEYTOL</div>
+      <div class="ldesc">Dimensioned like a drawing — the key measured to tolerance.</div>
+    </div>
+  </div>
+
+  <div class="label">// ROUND 03 — MERGE OF R2-15 × R2-01 (KEYPACKET × KEYSTRUT)</div>
+  <div class="logogrid">
+
+    <!-- R3-01 STRUTPACKET -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><rect x="11" y="14" width="42" height="8" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.4" transform="rotate(45 32 32)"/><rect x="11" y="42" width="42" height="8" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.4" transform="rotate(-45 32 32)"/><path d="M46 44 v9 M50 47 v5 M42 47 v5" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/><circle cx="32" cy="32" r="4.6" fill="none" stroke="#d9b64a" stroke-width="2.2"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/><circle cx="12" cy="16" r="2.2" fill="#8a9184"/><circle cx="52" cy="50" r="2.2" fill="#8a9184"/></svg>
+      <div class="lname">R3-01 · STRUTPACKET</div>
+      <div class="ldesc">The keystrut housed inside the packet — instrument, sealed, shipped.</div>
+    </div>
+
+    <!-- R3-02 PACKET-FOLD-X -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M32 6 L32 58 M8 22 L32 32 L56 22" stroke="#8a9184" stroke-width="1.5"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.4" stroke-linecap="round"/><path d="M40 40 v8 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="3" fill="none" stroke="#d9b64a" stroke-width="2"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-02 · PACKET-FOLD-X</div>
+      <div class="ldesc">The X drawn as creases inside the folded sheet — structure as mark.</div>
+    </div>
+
+    <!-- R3-03 SEALED PACKET KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><circle cx="32" cy="32" r="12" fill="#d9b64a"/><circle cx="32" cy="32" r="8" fill="#121417"/><path d="M27 27 L40 40 M42 27 L30 40" stroke="#e8e4da" stroke-width="2.4" stroke-linecap="round"/><path d="M38 38 v7 M41 40 v4 M35 40 v4" stroke="#d9b64a" stroke-width="2" stroke-linecap="round"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-03 · SEALED PACKET KEY</div>
+      <div class="ldesc">A gold seal in the packet's heart — the key locked beneath foil.</div>
+    </div>
+
+    <!-- R3-04 KEY-DIAMOND -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linejoin="round"/><path d="M8 22 L32 6 L56 22 M8 22 L32 32 L56 22" stroke="#8a9184" stroke-width="1.5"/><path d="M44 32 v16 M49 35 v7 M39 35 v7" stroke="#d9b64a" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="22" r="6" fill="none" stroke="#d9b64a" stroke-width="2.4"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-04 · KEY-DIAMOND</div>
+      <div class="ldesc">The packet itself is the key — teeth cut into its lower edge.</div>
+    </div>
+
+    <!-- R3-05 TENSION PACKET -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 10 L54 24 L32 54 L10 24 Z" fill="none" stroke="#e8e4da" stroke-width="2.4" stroke-linejoin="round"/><rect x="6" y="14" width="52" height="8" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.4" transform="rotate(45 32 32)"/><rect x="6" y="42" width="52" height="8" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.4" transform="rotate(-45 32 32)"/><path d="M50 46 v10 M55 49 v6 M45 49 v6" stroke="#d9b64a" stroke-width="2.4" stroke-linecap="round"/><circle cx="32" cy="32" r="4.6" fill="none" stroke="#d9b64a" stroke-width="2.2"/><circle cx="10" cy="18" r="2.2" fill="#8a9184"/><circle cx="54" cy="52" r="2.2" fill="#8a9184"/><rect x="22" y="4" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-05 · TENSION PACKET</div>
+      <div class="ldesc">Struts pierce the packet — tension visible beyond the seal.</div>
+    </div>
+
+    <!-- R3-06 PACKET-GATE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><path d="M24 38 v-9 M20 35 v-5 M28 35 v-5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.4" fill="#e8452c"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-06 · PACKET-GATE</div>
+      <div class="ldesc">Tooth-cut both arms — the packet opens like a gate.</div>
+    </div>
+
+    <!-- R3-07 FOLD-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z M32 32 L56 22 M32 32 L8 22 M32 32 L32 6 M32 32 L32 58" fill="none" stroke="#e8e4da" stroke-width="2" stroke-linejoin="round"/><path d="M32 6 L42 13 L32 20 L22 13 Z" fill="none" stroke="#d9b64a" stroke-width="2"/><path d="M44 32 v14 M49 35 v7 M39 35 v7" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#e8452c"/></svg>
+      <div class="lname">R3-07 · FOLD-KEY</div>
+      <div class="ldesc">The packet as four fold cells, one gold cell, key teeth below.</div>
+    </div>
+
+    <!-- R3-08 PACKET-SEAL-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="32" cy="32" r="4" fill="#d9b64a"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/><circle cx="12" cy="16" r="2" fill="#8a9184"/><circle cx="52" cy="50" r="2" fill="#8a9184"/></svg>
+      <div class="lname">R3-08 · PACKET-SEAL-KEY</div>
+      <div class="ldesc">Gold dot seal at the crossing, tab, end caps — full packet ritual.</div>
+    </div>
+
+    <!-- R3-09 KEY-PACKET-VERT -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><rect x="14" y="10" width="8.5" height="44" rx="4" fill="#1d2127" stroke="#2a2f37" stroke-width="1.3"/><path d="M15 48 h18 v6 h-18 Z" fill="none" stroke="#e8e4da" stroke-width="2.4"/><path d="M25 48 v4 M29 50 v6 M33 48 v4" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><rect x="30" y="18" width="22" height="7.5" rx="3.5" fill="#1d2127" stroke="#2a2f37" stroke-width="1.3" transform="rotate(30 41 22)"/><circle cx="47" cy="13" r="2.3" fill="#8a9184"/><circle cx="47" cy="33" r="2.3" fill="#8a9184"/><circle cx="32" cy="30" r="4" fill="none" stroke="#d9b64a" stroke-width="2"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-09 · KEY-PACKET-VERT</div>
+      <div class="ldesc">A standing key inside the packet, crossed by a diagonal strut.</div>
+    </div>
+
+    <!-- R3-10 PACKET-RING -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><rect x="29" y="29" width="6" height="6" fill="#d9b64a" transform="rotate(45 32 32)"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-10 · PACKET-RING</div>
+      <div class="ldesc">The gold tension ring becomes a diamond gem at the crossing.</div>
+    </div>
+
+    <!-- R3-11 HALF-PACKET KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.4" stroke-linejoin="round"/><path d="M8 22 L32 32 L56 22" stroke="#8a9184" stroke-width="1.5"/><path d="M32 32 L20 46 M32 32 L44 46" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M41 44 v8 M45 47 v5 M37 47 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2.2" fill="#d9b64a"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-11 · HALF-PACKET KEY</div>
+      <div class="ldesc">The packet half-deployed — key-X opening out of the fold.</div>
+    </div>
+
+    <!-- R3-12 PACKET-PIN-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="20" cy="18" r="3.6" fill="#1d2127" stroke="#8a9184" stroke-width="1.8"/><circle cx="44" cy="42" r="3.6" fill="#1d2127" stroke="#d9b64a" stroke-width="1.8"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-12 · PACKET-PIN-KEY</div>
+      <div class="ldesc">Riveted arm ends — the packet pinned like an instrument.</div>
+    </div>
+
+    <!-- R3-13 MASTER-PACKET -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M46 18 L22 42" stroke="#e8e4da" stroke-width="2.8" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><path d="M24 38 v-9 M20 35 v-5 M28 35 v-5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.6" fill="#d9b64a"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-13 · MASTER-PACKET</div>
+      <div class="ldesc">Two keys in one packet — the master instrument, sealed.</div>
+    </div>
+
+    <!-- R3-14 PACKET-RETICLE-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.4" stroke-linejoin="round"/><path d="M32 10 L52 22 M32 10 L12 22 M32 54 L52 42 M32 54 L12 42" stroke="#8a9184" stroke-width="1.3"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.5" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#e8452c"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-14 · PACKET-RETICLE-KEY</div>
+      <div class="ldesc">Sighting ticks on the packet's seams — aimed and keyed.</div>
+    </div>
+
+    <!-- R3-15 PACKET-ENGRAVE-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M24 16 L32 24 L24 32 M40 16 L32 24 L40 32 M24 40 L32 48 L24 56 M40 40 L32 48 L40 56" fill="none" stroke="#8a9184" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M38 38 v9 M42 41 v5 M34 41 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#d9b64a"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-15 · PACKET-ENGRAVE-KEY</div>
+      <div class="ldesc">Crease-etched arms like engraving lines, gold key teeth.</div>
+    </div>
+
+    <!-- R3-16 TAB-KEY -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><rect x="22" y="-2" width="20" height="12" rx="2" fill="#d9b64a"/><circle cx="32" cy="4" r="2.4" fill="#121417"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/></svg>
+      <div class="lname">R3-16 · TAB-KEY</div>
+      <div class="ldesc">The tab is the key bow — pull the gold tab, unlock the packet.</div>
+    </div>
+
+    <!-- R3-17 PACKET-BALANCE -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 18 L44 42 M46 18 L22 42" stroke="#e8e4da" stroke-width="2.6" stroke-linecap="round"/><path d="M40 40 v9 M44 43 v5 M36 43 v5" stroke="#d9b64a" stroke-width="2.3" stroke-linecap="round"/><circle cx="20" cy="18" r="2.6" fill="#8a9184"/><circle cx="44" cy="42" r="2.6" fill="#8a9184"/><circle cx="46" cy="18" r="2.6" fill="#8a9184"/><circle cx="20" cy="42" r="2.6" fill="#8a9184"/><circle cx="32" cy="32" r="5" fill="none" stroke="#d9b64a" stroke-width="2"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/></svg>
+      <div class="lname">R3-17 · PACKET-BALANCE</div>
+      <div class="ldesc">Tension ring with four counterweights — the packet in equilibrium.</div>
+    </div>
+
+    <!-- R3-18 INSTRUMENT-PACKET -->
+    <div class="logocard">
+      <svg viewBox="0 0 64 64"><path d="M32 6 L56 22 L32 58 L8 22 Z" fill="none" stroke="#e8e4da" stroke-width="3" stroke-linejoin="round"/><path d="M32 6 L32 58 M8 22 L56 22" stroke="#8a9184" stroke-width="1.2"/><rect x="24" y="24" width="16" height="16" fill="none" stroke="#d9b64a" stroke-width="2.2" transform="rotate(45 32 32)"/><path d="M42 42 v8 M46 45 v5 M38 45 v5" stroke="#d9b64a" stroke-width="2.2" stroke-linecap="round"/><rect x="22" y="2" width="20" height="6" fill="#d9b64a"/><circle cx="10" cy="17" r="1.8" fill="#8a9184"/><circle cx="54" cy="51" r="1.8" fill="#8a9184"/><circle cx="54" cy="17" r="1.8" fill="#8a9184"/><circle cx="10" cy="51" r="1.8" fill="#8a9184"/></svg>
+      <div class="lname">R3-18 · INSTRUMENT-PACKET</div>
+      <div class="ldesc">Crosshair seams, key teeth, corner pins — the complete instrument.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>RODEX DB — DIRECTION + LOGO LAB</span>
+    <span>REPLY WITH YOUR LOGO NUMBER(S)</span>
+    <span>REV F · PAGES: rodexdb.pages.dev</span>
+  </div>
+</div>
+</body>
+</html>
