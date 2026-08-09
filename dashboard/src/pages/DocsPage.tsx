@@ -222,6 +222,12 @@ curl -X POST $GW/v1/table/create \\
               <span className="text-inkdim">suspended</span> returns 403 · <span className="text-redx">deleting</span>{" "}
               returns 403 during the 5-minute recovery window. Rotating the key invalidates the old one instantly.
             </P>
+            <P>
+              Keys are branded — they start with <code className="text-ink">rok_</code> — and are shown once at issue.
+              For 48 hours after creation or rotation the console can <span className="text-gold">VIEW KEY</span> (the raw key
+              is stored AES-GCM encrypted, decrypted on demand); after that only the HMAC hash remains and rotation is the
+              way to a fresh key. The old key dies the moment you rotate.
+            </P>
           </Section>
 
           <Section cell="03" title="TABLES" anchor="tables">

@@ -8,10 +8,12 @@ import { unauthorized } from "./errors";
 
 const enc = new TextEncoder();
 
-/** 32 random bytes → base64url (no padding). */
+/** Branded API key: `rok_` + 43 base64url chars.
+ *  The prefix is the RodeX fingerprint — like sk- (OpenAI), pk_ (Stripe),
+ *  cf_ (Cloudflare) — so any project using RodeX is instantly recognizable. */
 export function generateApiKey(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return base64Url(bytes);
+  return `rok_${base64Url(bytes)}`;
 }
 
 function base64Url(bytes: Uint8Array): string {

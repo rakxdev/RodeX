@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { ensureSessionChecked, getAuthedState, isExplicitLogout, subscribeAuthed } from "@/api/client";
+import Loader from "@/components/Loader";
 
 type SessionState = "checking" | "authed" | "anon";
 
@@ -28,11 +29,7 @@ export function useSession(): SessionState {
 }
 
 function VerifyingScreen() {
-  return (
-    <div className="min-h-[60vh] grid place-items-center">
-      <div className="font-mono text-[11px] tracking-[0.24em] text-inkdim animate-pulse">VERIFYING SESSION…</div>
-    </div>
-  );
+  return <Loader label="VERIFYING SESSION" />;
 }
 
 function SessionGate({ children }: { children: ReactNode }) {

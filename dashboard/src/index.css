@@ -297,6 +297,38 @@ body {
 .dot-amber { background: var(--amber); animation: dotpulse 2.4s ease-in-out 0.4s infinite; }
 .dot-ok { background: var(--ok); animation: dotpulse 2.4s ease-in-out 0.8s infinite; }
 
+/* loader — slow-turning diamond frame */
+@keyframes loaderspin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes loadertick {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes loaderdots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+.loader-mark svg {
+  width: 46px;
+  height: 46px;
+  animation: loaderspin 2.8s linear infinite;
+}
+.loader-tick {
+  animation: loadertick 1.6s ease-in-out infinite;
+  transform-origin: 32px 8px;
+}
+.loader-dots::after {
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  content: "";
+  animation: loaderdots 1.4s steps(1) infinite;
+}
+
 .no-scrollbar {
   scrollbar-width: none; /* firefox */
   -ms-overflow-style: none;

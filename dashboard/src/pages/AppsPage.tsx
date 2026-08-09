@@ -5,6 +5,7 @@ import { Check, Copy, Search, X } from "lucide-react";
 import { api, ApiError, gatewayBase, type AppInfo, type AppStatus } from "@/api/client";
 import { pageTransition, fadeUp, stagger, springLift } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
+import Loader from "@/components/Loader";
 import { FoldButton } from "@/components/FoldButton";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
@@ -282,6 +283,11 @@ export default function AppsPage() {
         animate="show"
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start"
       >
+        {apps === null && (
+          <div className="col-span-full">
+            <Loader label="FETCHING BOARD" />
+          </div>
+        )}
         {(visible ?? []).map((app) => (
           <motion.div key={app.app_id} variants={fadeUp}>
             <Link to={`/apps/${app.app_id}`} className="block">
@@ -301,9 +307,6 @@ export default function AppsPage() {
                   </span>
                   <span>
                     TABLES <b className="text-ink font-medium">{(app.tables ?? []).length}</b>
-                  </span>
-                  <span>
-                    <b className="text-ink font-medium">500 MB</b>
                   </span>
                 </div>
               </motion.div>

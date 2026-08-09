@@ -70,6 +70,64 @@ export default function UsagePage() {
         </p>
       </motion.div>
 
+      {/* platform feature sheet — criteria + cost for every capability */}
+      <motion.div variants={foldIn} initial="hidden" animate="show" className="sheet-panel p-5 mt-4">
+        <h4 className="mb-4">
+          <b>PLATFORM FEATURE SHEET</b> — WHAT EACH CAPABILITY NEEDS & WHAT IT COSTS
+        </h4>
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Criteria</th>
+              <th>Cost impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Per-app keys</code></td>
+              <td>Automatic at fabrication; branded <code>rok_</code>; one shown at issue</td>
+              <td>0 — one hashed write per issue/rotate</td>
+            </tr>
+            <tr>
+              <td><code>View key (48 h)</code></td>
+              <td>Admin session + within 48 h of last issue/rotate</td>
+              <td>0 — one read + in-worker AES decrypt</td>
+            </tr>
+            <tr>
+              <td><code>Per-app tables</code></td>
+              <td>Created via API; owned by one app; <code>app_&lt;id&gt;_&lt;name&gt;</code></td>
+              <td>1 WCU + 1 RCU provisioned each (25+25 free account-wide)</td>
+            </tr>
+            <tr>
+              <td><code>Idempotent writes</code></td>
+              <td>Pass <code>request_id</code>; deduped 24 h</td>
+              <td>1 write per unique id; TTL expiry deletes free (0 WCU)</td>
+            </tr>
+            <tr>
+              <td><code>Version conflicts</code></td>
+              <td>Pass <code>expected_version</code> on update/delete</td>
+              <td>0 — conditional write, same unit cost as a normal write</td>
+            </tr>
+            <tr>
+              <td><code>Soft delete + recover</code></td>
+              <td>Any app; 5-min window; purge after</td>
+              <td>0 — status flag + one-time TTL marker</td>
+            </tr>
+            <tr>
+              <td><code>App notes</code></td>
+              <td>Optional ≤ 200 chars at fabrication</td>
+              <td>0 — plain attribute</td>
+            </tr>
+            <tr>
+              <td><code>Storage</code></td>
+              <td><b>No per-app cap</b> — 25 GB shared across all apps (always-free tier)</td>
+              <td>Free up to 25 GB total</td>
+            </tr>
+          </tbody>
+        </table>
+      </motion.div>
+
       {/* safety boundaries — how to never hit a limit */}
       <motion.div variants={foldIn} initial="hidden" animate="show" className="sheet-panel p-5 mt-4">
         <h4 className="mb-4">

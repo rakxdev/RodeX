@@ -10,10 +10,10 @@ import {
 import { HttpError } from "../src/errors";
 
 describe("auth — api keys", () => {
-  it("generates a 43-char base64url key (32 bytes)", () => {
+  it("generates a branded rok_ base64url key (32 bytes)", () => {
     const k1 = generateApiKey();
     const k2 = generateApiKey();
-    expect(k1).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(k1).toMatch(/^rok_[A-Za-z0-9_-]{43}$/);
     expect(k1).not.toBe(k2);
   });
 

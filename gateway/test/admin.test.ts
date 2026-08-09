@@ -125,7 +125,8 @@ describe("admin app management", () => {
     const r = await call("POST", "/v1/admin/apps", { name: "weather-bot" }, { Cookie: adminCookie });
     expect(r.status).toBe(200);
     const body = (await r.json()) as any;
-    expect(body.result.api_key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(body.result.api_key).toMatch(/^rok_[A-Za-z0-9_-]{43}$/);
+    expect(body.result.key_prefix).toMatch(/^rok_/);
     expect(body.result.status).toBe("active");
 
     const list = await (await call("GET", "/v1/admin/apps", undefined, { Cookie: adminCookie })).json() as any;

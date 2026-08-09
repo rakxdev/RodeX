@@ -7,6 +7,7 @@ import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
 import ViewKey from "@/components/ViewKey";
+import Loader from "@/components/Loader";
 import { FoldButton } from "@/components/FoldButton";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
@@ -105,8 +106,8 @@ export default function AppDetailPage() {
   }
   if (!app) {
     return (
-      <motion.div {...pageTransition} className="font-mono text-[12px] tracking-[0.14em] text-inkdim animate-pulse">
-        LOADING INSTRUMENT…
+      <motion.div {...pageTransition}>
+        <Loader label="LOADING INSTRUMENT" />
       </motion.div>
     );
   }
@@ -201,7 +202,7 @@ export default function AppDetailPage() {
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">app_id</dt><dd className="flex items-center gap-2"><span className="truncate">{app.app_id}</span><CopyCell value={app.app_id} label="COPY" /></dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{istDate(app.created_at)} IST</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">status</dt><dd className="uppercase">{app.status}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">storage</dt><dd>500 MB BUDGET · FREE-TIER GUARD</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">storage</dt><dd>NO PER-APP CAP · 25 GB ACCOUNT WIDE</dd></div>
             {app.description && (
               <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">note</dt><dd className="text-inkdim">{app.description}</dd></div>
             )}

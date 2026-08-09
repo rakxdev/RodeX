@@ -32,8 +32,10 @@ export default function ViewKey({ appId, recoverableUntil }: { appId: string; re
 
   if (!inWindow) {
     return (
-      <div className="font-mono text-[11px] tracking-[0.1em] text-inkdim">
-        KEY RECOVERY EXPIRED — <span className="text-gold">ROTATE</span> TO ISSUE A NEW KEY
+      <div className="font-mono text-[11px] tracking-[0.08em] text-inkdim leading-relaxed">
+        KEY RECOVERY EXPIRED — 48 H WINDOW PASSED, ONLY THE HASH REMAINS.
+        <br />
+        <span className="text-gold">ROTATE</span> FOR A FRESH KEY · THE OLD KEY DIES ON ROTATE.
       </div>
     );
   }

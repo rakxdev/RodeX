@@ -14,7 +14,7 @@ describe("registry — lifecycle", () => {
     const s = new MockStorage();
     const { app, api_key } = await createApp(s, SECRET, "mybot");
     expect(app.status).toBe("active");
-    expect(api_key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(api_key).toMatch(/^rok_[A-Za-z0-9_-]{43}$/);
     const row = await s.getApp(app.app_id);
     expect(row?.keyHash).not.toContain(api_key);
     expect(row?.keyPrefix).toBe(api_key.slice(0, 6));
