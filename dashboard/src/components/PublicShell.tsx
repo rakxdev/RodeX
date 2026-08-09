@@ -5,6 +5,10 @@ import { FoldLink } from "@/components/FoldButton";
 
 /** Public chrome for documentation surfaces (docs + usage) — readable without signing in. */
 export function PublicHeader({ tag }: { tag: string }) {
+  const links = [
+    { to: "/docs", label: "DOCS" },
+    { to: "/usage", label: "USAGE" },
+  ];
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
       <Link to="/" className="flex items-center gap-3">
@@ -13,8 +17,24 @@ export function PublicHeader({ tag }: { tag: string }) {
           RODEX<em className="text-gold not-italic">DB</em>
         </span>
       </Link>
-      <span className="ml-2 font-mono text-[9px] tracking-[0.22em] text-inkdim hidden sm:inline">{tag}</span>
-      <div className="ml-auto">
+      <nav className="ml-2 hidden sm:flex items-center gap-1">
+        {links.map((l) => (
+          <Link
+            key={l.to}
+            to={l.to}
+            aria-current={tag === l.label ? "true" : undefined}
+            className={`font-mono text-[10.5px] tracking-[0.18em] px-2.5 py-1.5 rounded-md transition-colors ${
+              tag === l.label ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
+            }`}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </nav>
+      <div className="ml-auto flex items-center gap-2">
+        <Link to="/usage" className="sm:hidden font-mono text-[10px] tracking-[0.16em] text-inkdim hover:text-ink">
+          USAGE
+        </Link>
         <FoldLink to="/login" variant="ghost" size="sm">
           ENTER CONSOLE
         </FoldLink>

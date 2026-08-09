@@ -4,15 +4,14 @@ import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import { FoldLink } from "@/components/FoldButton";
-
-const GW_HEALTH = "https://rodex-gateway.rakxdev.workers.dev/v1/health";
+import { gatewayBase } from "@/api/client";
 const REPO = "https://github.com/rakxdev/RodeX";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
   useEffect(() => {
     let alive = true;
-    fetch(GW_HEALTH)
+    fetch(`${gatewayBase}/v1/health`)
       .then((r) => r.json())
       .then((b) => alive && setState(b?.ok ? "nominal" : "offline"))
       .catch(() => alive && setState("offline"));
@@ -107,12 +106,7 @@ export default function LandingPage() {
       <section className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-14 sm:pb-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <motion.div variants={stagger(0.06)} initial="hidden" animate="show">
-            <motion.div variants={fadeUp} className="flex items-center gap-2.5 mb-5">
-              <MarkSvg className="w-8 h-8" />
-              <span className="font-mono font-bold tracking-[0.22em] text-base">
-                RODEX<em className="text-gold not-italic">DB</em>
-              </span>
-            </motion.div>
+            {/* brand already lives in the header — no duplicate above the headline */}
             <motion.h1
               variants={fadeUp}
               className="font-mono text-2xl sm:text-[34px] font-bold tracking-[0.05em] leading-snug"
@@ -142,9 +136,9 @@ export default function LandingPage() {
           <motion.div variants={fadeUp} transition={{ delay: 0.15 }} className="hidden sm:block">
             <div className="nameplate overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
-                <span className="w-2 h-2 rounded-full bg-line" aria-hidden="true" />
-                <span className="w-2 h-2 rounded-full bg-line" aria-hidden="true" />
-                <span className="w-2 h-2 rounded-full bg-line" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full dot-red" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full dot-amber" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full dot-ok" aria-hidden="true" />
                 <span className="ml-2 font-mono text-[9px] tracking-[0.2em] text-inkdim">RODEX GATEWAY — LIVE CONTRACT</span>
               </div>
               <pre className="p-4 sm:p-5 font-mono text-[10.5px] sm:text-[11px] leading-[1.8] overflow-x-auto no-scrollbar">

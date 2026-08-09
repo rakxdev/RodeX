@@ -92,7 +92,7 @@ export default function DocsPage() {
 
   return (
     <motion.div {...pageTransition}>
-      <PublicShell tag="API REFERENCE">
+      <PublicShell tag="DOCS">
       <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         API <span className="text-gold">REFERENCE</span>
       </h1>
@@ -105,7 +105,7 @@ export default function DocsPage() {
 
       {/* mobile section chips — sticky so the map is always reachable */}
       <nav
-        className="lg:hidden sticky top-[57px] z-30 -mx-1 px-1 bg-bg/95 backdrop-blur flex gap-1.5 overflow-x-auto no-scrollbar pb-3 mb-1"
+        className="lg:hidden sticky top-[53px] z-30 -mx-1 px-1 bg-bg/95 backdrop-blur flex gap-1.5 overflow-x-auto no-scrollbar pb-3 mb-1"
         aria-label="Documentation sections"
       >
         {toc.map((t) => (

@@ -267,6 +267,36 @@ body {
 }
 
 /* code blocks for docs */
+/* ── themed scrollbars: thin, dark, never white ────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a2f37;
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3a4149;
+}
+
+/* terminal status dots */
+@keyframes dotpulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.dot-red { background: var(--red); animation: dotpulse 2.4s ease-in-out infinite; }
+.dot-amber { background: var(--amber); animation: dotpulse 2.4s ease-in-out 0.4s infinite; }
+.dot-ok { background: var(--ok); animation: dotpulse 2.4s ease-in-out 0.8s infinite; }
+
 .no-scrollbar {
   scrollbar-width: none; /* firefox */
   -ms-overflow-style: none;

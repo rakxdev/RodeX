@@ -179,6 +179,7 @@ export interface AppInfo {
   tables: string[];
   key_prefix: string;
   purge_at?: number;
+  description?: string;
   api_key?: string; // present only at creation / rotation
 }
 

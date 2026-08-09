@@ -28,7 +28,7 @@ const groups = [
 export default function UsagePage() {
   return (
     <motion.div {...pageTransition}>
-      <PublicShell tag="USAGE & LIMITS">
+      <PublicShell tag="USAGE">
       <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         USAGE & <span className="text-gold">LIMITS</span>
       </h1>

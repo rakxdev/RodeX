@@ -26,6 +26,8 @@ export interface AppRow {
   rotatedAt?: number;
   /** logical table names this app owns */
   tables: string[];
+  /** optional human note (≤ 200 chars), free-form */
+  description?: string;
 }
 
 export interface StoredItem {

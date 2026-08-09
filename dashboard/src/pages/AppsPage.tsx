@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Search, X } from "lucide-react";
 import { api, ApiError, gatewayBase, type AppInfo, type AppStatus } from "@/api/client";
 import { pageTransition, fadeUp, stagger, springLift } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
@@ -42,9 +42,103 @@ function statusStamp(status: AppStatus) {
   }
 }
 
+/** FABRICATE dialog — name + optional note. */
+function FabricateModal({ open, busy, onClose, onCreate }: { open: boolean; busy: boolean; onClose: () => void; onCreate: (name: string, description?: string) => void }) {
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setNote("");
+    }
+  }, [open]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || busy) return;
+    onCreate(name.trim(), note.trim() || undefined);
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm px-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="nameplate w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Fabricate a new app"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="font-mono text-[10px] tracking-[0.22em] text-gold">FABRICATE NEW INSTRUMENT</div>
+              <button type="button" onClick={onClose} className="text-inkdim hover:text-ink" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={submit} className="space-y-3">
+              <div>
+                <label htmlFor="fab-name" className="font-mono text-[9.5px] tracking-[0.2em] text-inkdim block mb-1.5">
+                  APP NAME
+                </label>
+                <input
+                  id="fab-name"
+                  name="app-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. weather-bot"
+                  autoFocus
+                  className="w-full font-mono text-[12px] tracking-[0.06em] px-3 py-2.5 rounded-lg bg-panel2 border border-line text-ink placeholder:text-inkdim focus:outline-none focus:border-gold"
+                />
+                <div className="font-mono text-[8.5px] tracking-[0.12em] text-inkdim mt-1">
+                  {"^[a-z0-9][a-z0-9_-]{0,39}$ · LOWERCASE, DASHES, UNDERSCORES"}
+                </div>
+              </div>
+              <div>
+                <label htmlFor="fab-note" className="font-mono text-[9.5px] tracking-[0.2em] text-inkdim block mb-1.5">
+                  NOTE <span className="text-inkdim/60">(OPTIONAL · ≤200 CHARS)</span>
+                </label>
+                <input
+                  id="fab-note"
+                  name="app-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="what is this app for?"
+                  maxLength={200}
+                  className="w-full font-mono text-[12px] tracking-[0.06em] px-3 py-2.5 rounded-lg bg-panel2 border border-line text-ink placeholder:text-inkdim focus:outline-none focus:border-gold"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <FoldButton type="button" variant="ghost" size="sm" className="flex-1" onClick={onClose}>
+                  CANCEL
+                </FoldButton>
+                <FoldButton size="sm" className="flex-1" disabled={busy || !name.trim()}>
+                  {busy ? "FABRICATING…" : "＋ FABRICATE"}
+                </FoldButton>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function AppsPage() {
   const [apps, setApps] = useState<AppInfo[] | null>(null);
-  const [name, setName] = useState("");
+  const [query, setQuery] = useState("");
+  const [fabOpen, setFabOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fresh, setFresh] = useState<AppInfo | null>(null);
@@ -52,7 +146,7 @@ export default function AppsPage() {
   async function load() {
     try {
       const r = await api.get<{ apps: AppInfo[] }>("/v1/admin/apps");
-      setApps(r.apps);
+      setApps((r.apps ?? []).filter((a) => a && typeof a === "object"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load apps");
       setApps([]);
@@ -63,15 +157,25 @@ export default function AppsPage() {
     load();
   }, []);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const visible = useMemo(() => {
+    if (!apps) return null;
+    const q = query.trim().toLowerCase();
+    if (!q) return apps;
+    return apps.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.app_id.toLowerCase().includes(q) ||
+        (a.description ?? "").toLowerCase().includes(q),
+    );
+  }, [apps, query]);
+
+  async function create(name: string, description?: string) {
     setBusy(true);
     setError(null);
     try {
-      const app = await api.post<AppInfo>("/v1/admin/apps", { name: name.trim() });
+      const app = await api.post<AppInfo>("/v1/admin/apps", { name, description });
       setFresh(app);
-      setName("");
+      setFabOpen(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Create failed");
@@ -91,19 +195,24 @@ export default function AppsPage() {
             INSTRUMENTS REGISTERED · {apps ? apps.length : "…"}
           </div>
         </div>
-        <form onSubmit={create} className="flex gap-2 items-center w-full sm:w-auto">
-          <input
-            id="app-name"
-            name="app-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="app name (e.g. weather-bot)"
-            className="flex-1 sm:flex-none font-mono text-[12px] tracking-[0.06em] px-3 py-2.5 rounded-lg bg-panel2 border border-line text-ink placeholder:text-inkdim focus:outline-none focus:border-gold sm:w-56"
-          />
-          <FoldButton size="sm" className="shrink-0" disabled={busy || !name.trim()}>
+        <div className="flex gap-2 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-inkdim" aria-hidden="true" />
+            <input
+              id="app-search"
+              name="app-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="search apps…"
+              aria-label="Search apps"
+              className="w-full sm:w-52 font-mono text-[11px] tracking-[0.06em] pl-9 pr-3 py-2.5 rounded-lg bg-panel2 border border-line text-ink placeholder:text-inkdim focus:outline-none focus:border-gold"
+            />
+          </div>
+          <FoldButton size="sm" className="shrink-0" onClick={() => setFabOpen(true)}>
             ＋ Fabricate
           </FoldButton>
-        </form>
+        </div>
       </div>
 
       {error && (
@@ -111,6 +220,8 @@ export default function AppsPage() {
           {error}
         </motion.div>
       )}
+
+      <FabricateModal open={fabOpen} busy={busy} onClose={() => setFabOpen(false)} onCreate={create} />
 
       <AnimatePresence>
         {fresh && (
@@ -154,9 +265,9 @@ export default function AppsPage() {
                   <span className="cmt"># both credentials are needed, every request</span>{"\n"}
                   <span className="cmt"># X-App-Id: {fresh.app_id}</span>{"\n"}
                   <span className="cmt"># X-Api-Key: the key above (copy before leaving)</span>{"\n"}
-                  {`curl -X POST ${gatewayBase}/v1/item/put \\`}{"\n"}
-                  {`  -H "X-App-Id: ${fresh.app_id}" \\`}{"\n"}
-                  {`  -H "X-Api-Key: YOUR_KEY" \\`}{"\n"}
+                  {`curl -X POST ${gatewayBase}/v1/item/put \\\\`}{"\n"}
+                  {`  -H "X-App-Id: ${fresh.app_id}" \\\\`}{"\n"}
+                  {`  -H "X-Api-Key: YOUR_KEY" \\\\`}{"\n"}
                   {`  -d '{"table":"t","item":{"pk":"K#1"}}'`}
                 </code>
               </pre>
@@ -169,9 +280,9 @@ export default function AppsPage() {
         variants={stagger(0.05)}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start"
       >
-        {apps?.map((app) => (
+        {(visible ?? []).map((app) => (
           <motion.div key={app.app_id} variants={fadeUp}>
             <Link to={`/apps/${app.app_id}`} className="block">
               <motion.div whileHover={{ y: -3 }} transition={springLift} className="nameplate p-4 hover:border-gold/50 transition-colors">
@@ -179,6 +290,9 @@ export default function AppsPage() {
                   <h3 className="font-mono text-[14px] tracking-[0.04em] truncate">{app.name}</h3>
                   <span className="ml-auto shrink-0">{statusStamp(app.status)}</span>
                 </div>
+                {app.description && (
+                  <div className="font-mono text-[10.5px] leading-relaxed text-inkdim mb-2 line-clamp-2">{app.description}</div>
+                )}
                 <div className="serial truncate">S/N {app.app_id}</div>
                 <div className="foldline my-3" />
                 <div className="flex justify-between font-mono text-[10.5px] text-inkdim">
@@ -186,25 +300,27 @@ export default function AppsPage() {
                     KEY <b className="text-ink font-medium">{app.key_prefix}…</b>
                   </span>
                   <span>
-                    TABLES <b className="text-ink font-medium">{app.tables.length}</b>
+                    TABLES <b className="text-ink font-medium">{(app.tables ?? []).length}</b>
                   </span>
                 </div>
               </motion.div>
             </Link>
           </motion.div>
         ))}
-        {apps && apps.length === 0 && (
+        {apps && (visible ?? []).length === 0 && (
           <motion.div variants={fadeUp} className="col-span-full">
             <div className="nameplate p-10 text-center">
               <div className="font-mono text-[12px] tracking-[0.14em] text-inkdim">
-                NO INSTRUMENTS REGISTERED — FABRICATE YOUR FIRST APP
+                {query.trim()
+                  ? `NO MATCHES FOR “${query.trim()}”`
+                  : "NO INSTRUMENTS REGISTERED — FABRICATE YOUR FIRST APP"}
               </div>
               <div className="mt-3">
                 <button
-                  onClick={() => document.getElementById("app-name")?.focus()}
+                  onClick={() => (query.trim() ? setQuery("") : setFabOpen(true))}
                   className="font-mono text-[10px] tracking-[0.18em] text-gold hover:underline underline-offset-4"
                 >
-                  CREATE ONE ABOVE ↑
+                  {query.trim() ? "CLEAR SEARCH" : "FABRICATE ONE"}
                 </button>
               </div>
             </div>

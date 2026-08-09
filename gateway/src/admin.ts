@@ -49,11 +49,15 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
-    const body = (await c.req.json().catch(() => null)) as { name?: string } | null;
+    const body = (await c.req.json().catch(() => null)) as { name?: string; description?: string } | null;
     const name = body?.name;
     if (!name || !APP_NAME_PATTERN.test(name)) throw badRequest("name must match ^[a-z0-9][a-z0-9_-]{0,39}$");
+    const description = body?.description?.trim();
+    if (description !== undefined && (description.length > 200 || description.length < 1)) {
+      throw badRequest("description must be 1–200 characters");
+    }
     if ((await storage.listApps()).length >= MAX_APPS) throw forbidden(`Max ${MAX_APPS} apps (free-tier guard)`);
-    const { app, api_key } = await createApp(storage, sessionSecret(c.env), name);
+    const { app, api_key } = await createApp(storage, sessionSecret(c.env), name, description || undefined);
     return c.json({ ok: true, result: { ...app, api_key } }); // key shown ONCE
   });
 

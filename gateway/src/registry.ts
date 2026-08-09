@@ -18,6 +18,7 @@ export interface PublicApp {
   tables: string[];
   key_prefix: string;
   purge_at?: number;
+  description?: string;
 }
 
 export function toPublic(row: AppRow): PublicApp {
@@ -29,6 +30,7 @@ export function toPublic(row: AppRow): PublicApp {
     tables: [...row.tables],
     key_prefix: row.keyPrefix,
     ...(row.purgeAt !== undefined ? { purge_at: row.purgeAt } : {}),
+    ...(row.description ? { description: row.description } : {}),
   };
 }
 
@@ -38,7 +40,12 @@ function newAppId(): string {
 }
 
 /** Create an app; returns the app row AND the one-time raw API key. */
-export async function createApp(storage: Storage, secret: string, name: string): Promise<{ app: PublicApp; api_key: string }> {
+export async function createApp(
+  storage: Storage,
+  secret: string,
+  name: string,
+  description?: string,
+): Promise<{ app: PublicApp; api_key: string }> {
   const appId = newAppId();
   const apiKey = generateApiKey();
   const keyHash = await hashKey(secret, apiKey);
@@ -50,6 +57,7 @@ export async function createApp(storage: Storage, secret: string, name: string):
     status: "active",
     createdAt: Math.floor(Date.now() / 1000),
     tables: [],
+    ...(description ? { description } : {}),
   };
   await storage.createApp(row); // 409 on astronomically-unlikely collision
   return { app: toPublic(row), api_key: apiKey };

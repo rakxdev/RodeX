@@ -132,6 +132,14 @@ describe("admin app management", () => {
     expect(list.result.apps.map((a: any) => a.name)).toContain("weather-bot");
   });
 
+  it("create app accepts an optional description (1–200 chars)", async () => {
+    const ok = await call("POST", "/v1/admin/apps", { name: "desc-app", description: "  weather pipeline  " }, { Cookie: adminCookie });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).result.description).toBe("weather pipeline");
+    const bad = await call("POST", "/v1/admin/apps", { name: "desc-bad", description: "x".repeat(201) }, { Cookie: adminCookie });
+    expect(bad.status).toBe(400);
+  });
+
   it("rejects invalid names and over-limit apps", async () => {
     const bad = await call("POST", "/v1/admin/apps", { name: "Bad Name" }, { Cookie: adminCookie });
     expect(bad.status).toBe(400);

@@ -4,15 +4,9 @@ import { motion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
 import { api, ApiError, type AppInfo } from "@/api/client";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
+import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
 import { FoldButton } from "@/components/FoldButton";
-
-/** Render a unix-seconds date defensively — a missing/invalid value never crashes the page. */
-function safeDate(ts?: number): string {
-  if (!ts || ts <= 0) return "—";
-  const d = new Date(ts * 1000);
-  return Number.isNaN(d.getTime()) ? "—" : d.toISOString().replace("T", " ").slice(0, 16);
-}
 
 function CopyCell({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -86,11 +80,14 @@ export default function AppDetailPage() {
         // the rotate response carries the full app; re-fetch if anything is missing
         if (result.app_id) setApp(result);
         else await load();
+      } else if (action === "force-delete") {
+        // do NOT re-render the detail page with the purge response — leave it
+        setToast("APP PURGED PERMANENTLY");
+        navigate("/apps");
       } else {
         setApp(result);
       }
       setArm(null);
-      if (action === "force-delete") navigate("/apps");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Action failed");
     } finally {
@@ -115,7 +112,6 @@ export default function AppDetailPage() {
 
   const deleting = app.status === "deleting";
   const suspended = app.status === "suspended";
-
   const actionBtn = (key: string, label: string, onClick: () => void, danger = false) => (
     <FoldButton
       disabled={busy !== null}
@@ -129,14 +125,53 @@ export default function AppDetailPage() {
 
   return (
     <motion.div {...pageTransition}>
-      <Link to="/apps" className="font-mono text-[11px] tracking-[0.14em] text-inkdim hover:text-ink">
-        ← APP BOARD
-      </Link>
-      <div className="flex flex-wrap items-center gap-3 mt-3 mb-6">
-        <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em]">{app.name}</h1>
-        <span className={`stamp ${deleting ? "stamp-deleting" : suspended ? "stamp-suspended" : "stamp-active"}`}>
-          {app.status}
-        </span>
+      {/* pinned control head: back link, title, stamp, actions, explainer */}
+      <div className="sticky top-[53px] z-30 -mx-4 sm:-mx-5 px-4 sm:px-5 py-3 border-b border-line bg-bg/90 backdrop-blur mb-6">
+        <Link to="/apps" className="font-mono text-[11px] tracking-[0.14em] text-inkdim hover:text-ink">
+          ← APP BOARD
+        </Link>
+        <div className="flex flex-wrap items-center gap-3 mt-2">
+          <h1 className="font-mono text-lg sm:text-xl tracking-[0.05em]">{app.name}</h1>
+          <span className={`stamp ${deleting ? "stamp-deleting" : suspended ? "stamp-suspended" : "stamp-active"}`}>
+            {app.status}
+          </span>
+          {app.purge_at !== undefined && (
+            <span className="font-mono text-[10px] tracking-[0.14em] text-redx">
+              PURGE AT {istDate(app.purge_at)} IST
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {deleting ? (
+            <>
+              {actionBtn("recover", "RECOVER", () => act("recover"))}
+              {arm === "purge" ? (
+                <FoldButton onClick={() => act("force-delete")} variant="red" size="sm">
+                  CONFIRM PURGE — IRREVERSIBLE
+                </FoldButton>
+              ) : (
+                actionBtn("arm-purge", "PURGE NOW", () => setArm("purge"), true)
+              )}
+            </>
+          ) : (
+            <>
+              {actionBtn(suspended ? "resume" : "suspend", suspended ? "RESUME" : "SUSPEND", () => act(suspended ? "resume" : "suspend"))}
+              {actionBtn("rotate-key", "ROTATE KEY", () => act("rotate-key"))}
+              {arm === "delete" ? (
+                <FoldButton onClick={() => act("delete")} variant="red" size="sm">
+                  CONFIRM DELETE — 5 MIN WINDOW
+                </FoldButton>
+              ) : (
+                actionBtn("arm-delete", "DELETE", () => setArm("delete"), true)
+              )}
+            </>
+          )}
+        </div>
+        <div className="mt-2 font-mono text-[9px] sm:text-[9.5px] tracking-[0.12em] text-inkdim leading-relaxed">
+          SUSPEND <span className="text-ink/70">→ traffic replies 403</span> · RESUME{" "}
+          <span className="text-ink/70">→ traffic restored</span> · DELETE <span className="text-ink/70">→ 5-min recovery window</span> ·
+          ROTATE KEY <span className="text-ink/70">→ old key dies instantly</span>
+        </div>
       </div>
 
       {error && (
@@ -156,55 +191,18 @@ export default function AppDetailPage() {
         </motion.div>
       )}
 
-      {/* actions strip */}
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center gap-2 mb-6">
-        {deleting ? (
-          <>
-            {actionBtn("recover", "RECOVER", () => act("recover"))}
-            {arm === "purge" ? (
-              <FoldButton onClick={() => act("force-delete")} variant="red" size="sm">
-                CONFIRM PURGE — IRREVERSIBLE
-              </FoldButton>
-            ) : (
-              actionBtn("arm-purge", "PURGE NOW", () => setArm("purge"), true)
-            )}
-          </>
-        ) : (
-          <>
-            {actionBtn(suspended ? "resume" : "suspend", suspended ? "RESUME" : "SUSPEND", () => act(suspended ? "resume" : "suspend"))}
-            {actionBtn("rotate-key", "ROTATE KEY", () => act("rotate-key"))}
-            {arm === "delete" ? (
-              <FoldButton onClick={() => act("delete")} variant="red" size="sm">
-                CONFIRM DELETE — 5 MIN WINDOW
-              </FoldButton>
-            ) : (
-              actionBtn("arm-delete", "DELETE", () => setArm("delete"), true)
-            )}
-          </>
-        )}
-        {app.purge_at && (
-          <span className="font-mono text-[10px] tracking-[0.14em] text-redx">
-            PURGE AT {safeDate(app.purge_at)}
-          </span>
-        )}
-      </motion.div>
-
-      {/* what the actions mean */}
-      <div className="mb-6 font-mono text-[9.5px] sm:text-[10px] tracking-[0.12em] text-inkdim leading-relaxed">
-        SUSPEND <span className="text-ink/70">→ traffic replies 403</span> · RESUME <span className="text-ink/70">→ traffic restored</span> ·
-        DELETE <span className="text-ink/70">→ 5-minute recovery window, then purge</span> · ROTATE KEY{" "}
-        <span className="text-ink/70">→ old key dies instantly</span>
-      </div>
-
-      <motion.div variants={stagger(0.06)} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <motion.div variants={stagger(0.06)} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
         <motion.div variants={foldIn} className="sheet-panel p-5">
           <h4 className="mb-4">
             <b>CELL 01</b> · OVERVIEW
           </h4>
           <dl className="space-y-2 font-mono text-[12px] break-all">
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">app_id</dt><dd className="flex items-center gap-2"><span className="truncate">{app.app_id}</span><CopyCell value={app.app_id} label="COPY" /></dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{safeDate(app.created_at)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{istDate(app.created_at)} IST</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">status</dt><dd className="uppercase">{app.status}</dd></div>
+            {app.description && (
+              <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">note</dt><dd className="text-inkdim">{app.description}</dd></div>
+            )}
           </dl>
         </motion.div>
 
@@ -226,11 +224,11 @@ export default function AppDetailPage() {
           <h4 className="mb-4">
             <b>CELL 03</b> · TABLES
           </h4>
-          {app.tables.length === 0 ? (
+          {(app.tables ?? []).length === 0 ? (
             <div className="font-mono text-[11px] tracking-[0.1em] text-inkdim">NO TABLES — CREATE VIA API (SEE DOCS)</div>
           ) : (
             <ul className="space-y-2 font-mono text-[12px] break-all">
-              {app.tables.map((t) => (
+              {(app.tables ?? []).map((t) => (
                 <li key={t} className="flex justify-between gap-3">
                   <span className="shrink-0">{t}</span>
                   <span className="text-inkdim">app_{app.app_id}_{t}</span>
