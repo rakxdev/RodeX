@@ -28,8 +28,10 @@ function marshal(item: Record<string, unknown>): DdbItem {
   for (const [k, v] of Object.entries(item)) {
     if (typeof v === "string") out[k] = { S: v };
     else if (typeof v === "number") out[k] = { N: String(v) };
-    else if (Array.isArray(v)) out[k] = { SS: v.map(String) };
-    else if (v === undefined) continue;
+    else if (Array.isArray(v)) {
+      // DynamoDB rejects EMPTY string sets (SS: []) — omit instead.
+      if (v.length > 0) out[k] = { SS: v.map(String) };
+    } else if (v === undefined) continue;
     else throw new Error(`Unsupported attribute type for ${k}`);
   }
   return out;
