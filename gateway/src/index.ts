@@ -63,11 +63,29 @@ app.use("/v1/admin/*", async (c, next) => {
 app.options("*", (c) => c.body(null, 204));
 
 // ── strict JSON bodies on POST (415 otherwise) ───────────────────────────────
+// Only enforced when a body is actually present — bodyless POSTs (e.g. logout)
+// must not be rejected. Content-Type-missing + body → 415; wrong Content-Type
+// → 415; bodyless → pass.
 app.use("*", async (c, next) => {
   if (c.req.method === "POST") {
     const ct = (c.req.header("content-type") || "").toLowerCase();
-    if (!ct.startsWith("application/json")) {
-      throw new HttpError(415, "Content-Type must be application/json");
+    if (ct) {
+      if (!ct.startsWith("application/json")) {
+        throw new HttpError(415, "Content-Type must be application/json");
+      }
+    } else {
+      // No content-type header: reject only if there is a real body (some
+      // runtimes omit content-length, so peek at a clone without consuming).
+      const cl = Number(c.req.header("content-length") || "0");
+      let hasBody = cl > 0 || /chunked/i.test(c.req.header("transfer-encoding") || "");
+      if (!hasBody) {
+        try {
+          await c.req.raw.clone().text();
+        } catch {
+          hasBody = true;
+        }
+      }
+      if (hasBody) throw new HttpError(415, "Content-Type must be application/json");
     }
   }
   await next();
