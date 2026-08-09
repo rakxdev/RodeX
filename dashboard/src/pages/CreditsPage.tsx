@@ -49,7 +49,7 @@ export default function CreditsPage() {
               THE MAKER · THE PRODUCT · THE STACK
             </motion.div>
             <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }} className="flex justify-center mb-8">
-              <SplitFlap text="RAKXDEV" className="text-4xl sm:text-6xl" delay={500} />
+              <SplitFlap messages={["RAKXDEV", "RODEX DB", "GATEWAY", "INSTRUMENT"]} className="text-3xl sm:text-5xl" delay={500} />
             </motion.div>
             <motion.p variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.2 }} className="mx-auto max-w-xl font-mono text-[12.5px] sm:text-[14px] leading-relaxed text-ink/80">
               RodeX DB — a personal gateway platform built to full production grade,
@@ -70,18 +70,18 @@ export default function CreditsPage() {
           </div>
         </section>
 
-        {/* rolling strip */}
+        {/* rolling strip — long track, slow drift */}
         <div className="marquee my-10" aria-hidden="true">
           <div className="marquee-track">
             <span>
-              {MARQUEE.map((m) => (
+              {[...MARQUEE, ...MARQUEE, ...MARQUEE].map((m) => (
                 <span key={m} className="mx-6">
                   <b>◆</b> {m}
                 </span>
               ))}
             </span>
             <span>
-              {MARQUEE.map((m) => (
+              {[...MARQUEE, ...MARQUEE, ...MARQUEE].map((m) => (
                 <span key={m} className="mx-6">
                   <b>◆</b> {m}
                 </span>

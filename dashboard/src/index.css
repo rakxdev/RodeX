@@ -454,7 +454,7 @@ body {
   display: flex;
   flex-shrink: 0;
   min-width: 200%;
-  animation: marquee 55s linear infinite;
+  animation: marquee 110s linear infinite;
 }
 .marquee-track span {
   font-family: var(--font-mono);
@@ -469,33 +469,77 @@ body {
   font-weight: 600;
 }
 
-/* split-flap cells (Vestaboard-style) */
-.flap-cell {
+/* split-flap board (Aceternity TextFlippingBoard mechanics, Instrument-Packet look) */
+.fb-board {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.05em;
+  flex-direction: column;
+  gap: 3px;
+  vertical-align: middle;
+}
+.fb-row {
+  display: flex;
+  gap: 3px;
+}
+.fb-cell {
+  position: relative;
+  width: 1.05em;
   height: 1.3em;
-  background: linear-gradient(180deg, #14171c, #101318);
+  background: linear-gradient(180deg, #161a20, #101318);
   border: 1px solid var(--line);
   border-top: 2px solid #343a44;
   border-radius: 3px;
   overflow: hidden;
-  perspective: 240px;
+  perspective: 420px;
   box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04);
+  transform-style: preserve-3d;
 }
-.flap-char {
+/* the glyph is 1.3em tall — exactly twice a half — so halves show true top/bottom slices */
+.fb-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0.65em;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fb-top { top: 0; }
+.fb-bot { bottom: 0; }
+.fb-glyph {
   display: block;
+  text-align: center;
   font-family: var(--font-mono);
   font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  transform-style: preserve-3d;
+  font-size: 1.3em;
+  line-height: 1;
   color: var(--gold);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
-.flap-char-landed {
-  color: var(--ink);
+.fb-top .fb-glyph { transform: translateY(0); }
+.fb-bot .fb-glyph { transform: translateY(-0.65em); }
+/* flipping flaps: old top half drops, new bottom half rises */
+.fb-flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0.65em;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.fb-topflap { top: 0; transform-origin: 50% 100%; }
+.fb-botflap { bottom: 0; transform-origin: 50% 0%; }
+.fb-topflap .fb-glyph { transform: translateY(0); }
+.fb-botflap .fb-glyph { transform: translateY(-0.65em); }
+/* split line */
+.fb-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .no-scrollbar {

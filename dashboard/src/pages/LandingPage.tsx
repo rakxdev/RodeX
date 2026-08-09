@@ -136,7 +136,7 @@ export default function LandingPage() {
               variants={fadeUp}
               className="font-mono text-2xl sm:text-[34px] font-bold tracking-[0.05em] leading-snug"
             >
-              THE DATABASE <SplitFlap text="GATEWAY" />
+              THE DATABASE <SplitFlap messages={["GATEWAY", "CONSOLE", "PLATFORM", "API"]} delay={900} />
               <br />
               <span className="text-inkdim font-semibold">FOR INDEPENDENT APPS</span>
             </motion.h1>
