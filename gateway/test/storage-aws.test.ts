@@ -12,6 +12,20 @@ const s = new AwsStorage({ AWS_ACCESS_KEY_ID: "x", AWS_SECRET_ACCESS_KEY: "y" })
   call: (op: string, params: Record<string, unknown>) => Promise<unknown>;
 };
 
+// a DynamoDB item as the wire format delivers it (attribute maps)
+const marshalRow = {
+  appId: { S: "app_x" },
+  name: { S: "n" },
+  keyHash: { S: "h" },
+  keyPrefix: { S: "p" },
+  status: { S: "active" },
+  createdAt: { N: "1" },
+  tables: { L: [] },
+  description: { S: "weather pipeline" },
+  keyCipher: { S: "ivB64.ctB64" },
+  keyCipherUntil: { N: "1786480151" },
+};
+
 describe("AwsStorage marshaling rules", () => {
   it("never emits an empty string set (DynamoDB rejects SS: [])", async () => {
     let captured: any = null;
@@ -66,5 +80,19 @@ describe("AwsStorage marshaling rules", () => {
       throw badRequest("boom");
     };
     await expect((s as any).createApp({ tables: [] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("round-trips newer AppRow fields (description/keyCipher/keyCipherUntil) — regression: view-key 'expired' on read", async () => {
+    (s as any).call = async (op: string) => {
+      if (op === "GetItem") {
+        // simulate DynamoDB returning every attribute the row was written with
+        return { Item: marshalRow };
+      }
+      return {};
+    };
+    const row = await (s as any).getApp("app_x");
+    expect(row.description).toBe("weather pipeline");
+    expect(row.keyCipher).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    expect(row.keyCipherUntil).toBe(1786480151);
   });
 });
