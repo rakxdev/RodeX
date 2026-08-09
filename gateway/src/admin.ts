@@ -8,13 +8,15 @@
  *     `Authorization: Bearer <token>` (browsers that block third-party cookies)
  */
 import type { Hono } from "hono";
-import { constantTimeEqual, createSessionCookie, requireSession } from "./auth";
+import { constantTimeEqual, createSessionCookie, decryptKey, hashKey, requireSession } from "./auth";
 import { allowedUsers, sessionSecret, type Env } from "./env";
 import { badRequest, forbidden, serviceUnavailable, unauthorized } from "./errors";
 import { APP_NAME_PATTERN, MAX_APPS } from "./limits";
 import { gateAdminRequest } from "./rate";
 import { createApp, forceDelete, getApp, purgeDue, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { createStorage } from "./storage";
+
+const SETTING_ADMIN_HASH = "admin_password_hash";
 
 export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── auth ────────────────────────────────────────────────────────────────────
@@ -25,11 +27,36 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     if (!secret || secret.length < 12) throw serviceUnavailable("ADMIN_PASSWORD not set (min 12 chars)");
     const body = (await c.req.json().catch(() => null)) as { password?: string } | null;
     if (!body?.password) throw badRequest("password is required");
-    if (!constantTimeEqual(body.password, secret)) throw unauthorized("Wrong password");
+    const storage = createStorage(c.env);
+    const storedHash = await storage.getSetting(SETTING_ADMIN_HASH).catch(() => null);
+    const passwordOk = storedHash
+      ? constantTimeEqual(await hashKey(sessionSecret(c.env), body.password), storedHash)
+      : constantTimeEqual(body.password, secret);
+    if (!passwordOk) throw unauthorized("Wrong password");
     const secure = new URL(c.req.url).protocol === "https:";
     const session = await createSessionCookie(sessionSecret(c.env));
     c.header("Set-Cookie", `rodex_session=${session}; Path=/; HttpOnly; Max-Age=43200; SameSite=${secure ? "None" : "Lax"}${secure ? "; Secure" : ""}`);
     return c.json({ ok: true, result: { user: "admin", login_method: "password", session } });
+  });
+
+  app.post("/v1/admin/change-password", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const body = (await c.req.json().catch(() => null)) as { old_password?: string; new_password?: string } | null;
+    const oldPassword = body?.old_password ?? "";
+    const newPassword = body?.new_password ?? "";
+    if (newPassword.length < 12) throw badRequest("New password must be at least 12 characters");
+    if (newPassword.length > 200) throw badRequest("New password too long");
+    const storage = createStorage(c.env);
+    const storedHash = await storage.getSetting(SETTING_ADMIN_HASH).catch(() => null);
+    const current = c.env.ADMIN_PASSWORD;
+    const oldOk = storedHash
+      ? constantTimeEqual(await hashKey(sessionSecret(c.env), oldPassword), storedHash)
+      : !!current && constantTimeEqual(oldPassword, current);
+    if (!oldOk) throw unauthorized("Old password is wrong");
+    if (oldPassword === newPassword) throw badRequest("New password must differ from the old one");
+    await storage.putSetting(SETTING_ADMIN_HASH, await hashKey(sessionSecret(c.env), newPassword));
+    return c.json({ ok: true, result: { changed: true } });
   });
 
   app.post("/v1/admin/logout", async (c) => {
@@ -49,11 +76,15 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
-    const body = (await c.req.json().catch(() => null)) as { name?: string } | null;
+    const body = (await c.req.json().catch(() => null)) as { name?: string; description?: string } | null;
     const name = body?.name;
     if (!name || !APP_NAME_PATTERN.test(name)) throw badRequest("name must match ^[a-z0-9][a-z0-9_-]{0,39}$");
+    const description = body?.description?.trim();
+    if (description !== undefined && (description.length > 200 || description.length < 1)) {
+      throw badRequest("description must be 1–200 characters");
+    }
     if ((await storage.listApps()).length >= MAX_APPS) throw forbidden(`Max ${MAX_APPS} apps (free-tier guard)`);
-    const { app, api_key } = await createApp(storage, sessionSecret(c.env), name);
+    const { app, api_key } = await createApp(storage, sessionSecret(c.env), name, description || undefined);
     return c.json({ ok: true, result: { ...app, api_key } }); // key shown ONCE
   });
 
@@ -76,8 +107,9 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
-    const { api_key, key_prefix } = await rotateKey(storage, sessionSecret(c.env), c.req.param("id"));
-    return c.json({ ok: true, result: { api_key, key_prefix } }); // shown once
+    // returns the new key (shown once) + the full app so the detail page re-renders
+    const rotated = await rotateKey(storage, sessionSecret(c.env), c.req.param("id"));
+    return c.json({ ok: true, result: rotated });
   });
 
   app.post("/v1/admin/apps/:id/suspend", async (c) => {
@@ -99,6 +131,27 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await softDelete(createStorage(c.env), c.req.param("id"));
     return c.json({ ok: true, result: app });
+  });
+
+  // alias for dashboard bundles that POST to /delete (soft delete, same contract)
+  app.post("/v1/admin/apps/:id/delete", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const app = await softDelete(createStorage(c.env), c.req.param("id"));
+    return c.json({ ok: true, result: app });
+  });
+
+  // view the RAW key inside the recovery window (encrypted at rest, hash otherwise)
+  app.post("/v1/admin/apps/:id/view-key", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const row = await getApp(createStorage(c.env), c.req.param("id"));
+    if (!row.keyCipher || !row.keyCipherUntil || row.keyCipherUntil < Math.floor(Date.now() / 1000)) {
+      throw forbidden("Key recovery window expired — rotate to issue a new key");
+    }
+    const apiKey = await decryptKey(sessionSecret(c.env), row.keyCipher);
+    if (!apiKey) throw forbidden("Key recovery failed — rotate to issue a new key");
+    return c.json({ ok: true, result: { app_id: row.appId, api_key: apiKey, recoverable_until: row.keyCipherUntil } });
   });
 
   app.post("/v1/admin/apps/:id/recover", async (c) => {

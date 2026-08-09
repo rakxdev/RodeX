@@ -26,6 +26,12 @@ export interface AppRow {
   rotatedAt?: number;
   /** logical table names this app owns */
   tables: string[];
+  /** optional human note (≤ 200 chars), free-form */
+  description?: string;
+  /** AES-GCM ciphertext of the raw key (viewable inside the recovery window only) */
+  keyCipher?: string;
+  /** unix seconds until which keyCipher may be decrypted */
+  keyCipherUntil?: number;
 }
 
 export interface StoredItem {
@@ -69,6 +75,10 @@ export interface Storage {
   idemGet(requestId: string): Promise<string | null>; // stored response JSON
   /** true if stored; false if requestId already exists (caller must idemGet) */
   idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<boolean>;
+
+  // platform settings (admin password hash lives here; env ADMIN_PASSWORD is fallback)
+  getSetting(key: string): Promise<string | null>;
+  putSetting(key: string, value: string): Promise<void>;
 
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
   ensureTable(physical: string): Promise<void>; // create if missing; 409→ok

@@ -5,9 +5,9 @@
  *   deleting ──recover──▶ active        deleting ──force-delete──▶ gone
  *   deleting ──(cron: purge_at passed)──▶ gone
  */
-import { constantTimeEqual, generateApiKey, hashKey } from "./auth";
+import { constantTimeEqual, generateApiKey, hashKey, encryptKey } from "./auth";
 import { conflict, forbidden, notFound, unauthorized } from "./errors";
-import { SOFT_DELETE_WINDOW_MINUTES } from "./limits";
+import { KEY_RECOVERY_WINDOW_SECONDS, SOFT_DELETE_WINDOW_MINUTES } from "./limits";
 import type { AppRow, Storage } from "./storage";
 
 export interface PublicApp {
@@ -18,6 +18,9 @@ export interface PublicApp {
   tables: string[];
   key_prefix: string;
   purge_at?: number;
+  description?: string;
+  /** unix seconds until which the raw key may be viewed again (48 h window) */
+  key_recoverable_until?: number;
 }
 
 export function toPublic(row: AppRow): PublicApp {
@@ -29,6 +32,8 @@ export function toPublic(row: AppRow): PublicApp {
     tables: [...row.tables],
     key_prefix: row.keyPrefix,
     ...(row.purgeAt !== undefined ? { purge_at: row.purgeAt } : {}),
+    ...(row.description ? { description: row.description } : {}),
+    ...(row.keyCipherUntil !== undefined ? { key_recoverable_until: row.keyCipherUntil } : {}),
   };
 }
 
@@ -38,10 +43,16 @@ function newAppId(): string {
 }
 
 /** Create an app; returns the app row AND the one-time raw API key. */
-export async function createApp(storage: Storage, secret: string, name: string): Promise<{ app: PublicApp; api_key: string }> {
+export async function createApp(
+  storage: Storage,
+  secret: string,
+  name: string,
+  description?: string,
+): Promise<{ app: PublicApp; api_key: string }> {
   const appId = newAppId();
   const apiKey = generateApiKey();
   const keyHash = await hashKey(secret, apiKey);
+  const keyCipher = await encryptKey(secret, apiKey);
   const row: AppRow = {
     appId,
     name,
@@ -50,6 +61,9 @@ export async function createApp(storage: Storage, secret: string, name: string):
     status: "active",
     createdAt: Math.floor(Date.now() / 1000),
     tables: [],
+    ...(description ? { description } : {}),
+    // raw key stays recoverable for a short window, then only the hash remains
+    ...(keyCipher ? { keyCipher, keyCipherUntil: Math.floor(Date.now() / 1000) + KEY_RECOVERY_WINDOW_SECONDS } : {}),
   };
   await storage.createApp(row); // 409 on astronomically-unlikely collision
   return { app: toPublic(row), api_key: apiKey };
@@ -79,14 +93,20 @@ export async function authenticateApp(
 }
 
 /** Rotate key: new key returned once; old one stops working immediately. */
-export async function rotateKey(storage: Storage, secret: string, appId: string): Promise<{ api_key: string; key_prefix: string }> {
+export async function rotateKey(storage: Storage, secret: string, appId: string): Promise<{ api_key: string; key_prefix: string } & PublicApp> {
   const row = await getApp(storage, appId);
   const apiKey = generateApiKey();
   row.keyHash = await hashKey(secret, apiKey);
   row.keyPrefix = apiKey.slice(0, 6);
   row.rotatedAt = Math.floor(Date.now() / 1000);
+  const keyCipher = await encryptKey(secret, apiKey);
+  if (keyCipher) {
+    row.keyCipher = keyCipher;
+    row.keyCipherUntil = Math.floor(Date.now() / 1000) + KEY_RECOVERY_WINDOW_SECONDS;
+  }
   await storage.putApp(row);
-  return { api_key: apiKey, key_prefix: row.keyPrefix };
+  // flatten the full public app so clients can re-render the detail page
+  return { api_key: apiKey, ...toPublic(row) };
 }
 
 export async function setStatus(storage: Storage, appId: string, status: AppRow["status"]): Promise<PublicApp> {

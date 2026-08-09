@@ -24,6 +24,7 @@ export function resetMockStorage(): void {
 export class MockStorage implements Storage {
   private apps = new Map<string, AppRow>();
   private idem = new Map<string, { resp: string; exp: number }>();
+  private settings = new Map<string, string>();
   private tables = new Map<string, Map<string, StoredItem>>();
 
   private table(name: string): Map<string, StoredItem> {
@@ -66,6 +67,15 @@ export class MockStorage implements Storage {
     const a = this.apps.get(appId);
     if (!a) return;
     a.tables = a.tables.filter((t) => t !== logical);
+  }
+
+  // ── settings ────────────────────────────────────────────────────────────────
+  async getSetting(key: string): Promise<string | null> {
+    return this.settings.get(key) ?? null;
+  }
+
+  async putSetting(key: string, value: string): Promise<void> {
+    this.settings.set(key, value);
   }
 
   // ── idempotency ─────────────────────────────────────────────────────────────

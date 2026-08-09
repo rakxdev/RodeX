@@ -12,6 +12,66 @@ const BASE = (import.meta.env.VITE_GATEWAY_URL as string | undefined) ?? "https:
 // token, sent as `Authorization: Bearer <token>` on every request.
 const SESSION_KEY = "rodex_session";
 
+// ── session-state cache ───────────────────────────────────────────────────────
+// /v1/admin/me is verified ONCE per page load; every guard reads the cached
+// result, so switching tabs never re-verifies (no VERIFYING SESSION flash).
+// Login/logout invalidate the cache through setSessionToken/clearSessionToken.
+let authed: boolean | null = null;
+let checkPromise: Promise<void> | null = null;
+const authListeners = new Set<(v: boolean) => void>();
+// Set by logout(); PublicOnly renders /login without re-verifying, so a stale
+// cookie can never bounce the user back to the board. Persisted in
+// sessionStorage so a refresh after EXIT cannot re-enter the console either.
+let explicitLogout = false;
+const LOGOUT_KEY = "rodex_logged_out";
+
+export function isExplicitLogout(): boolean {
+  if (explicitLogout) return true;
+  try {
+    return sessionStorage.getItem(LOGOUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markExplicitLogout(): void {
+  explicitLogout = true;
+  invalidateSession();
+  try {
+    sessionStorage.setItem(LOGOUT_KEY, "1");
+  } catch {
+    /* sessionStorage unavailable — in-memory flag still guards this page */
+  }
+}
+
+function setAuthed(v: boolean): void {
+  authed = v;
+  authListeners.forEach((l) => l(v));
+}
+
+export function getAuthedState(): boolean | null {
+  return authed;
+}
+
+export function invalidateSession(): void {
+  authed = null;
+  checkPromise = null;
+}
+
+export function ensureSessionChecked(): Promise<void> {
+  if (checkPromise) return checkPromise;
+  checkPromise = api
+    .get<MeResult>("/v1/admin/me")
+    .then((r) => setAuthed(r.authenticated))
+    .catch(() => setAuthed(false));
+  return checkPromise;
+}
+
+export function subscribeAuthed(listener: (v: boolean) => void): () => void {
+  authListeners.add(listener);
+  return () => authListeners.delete(listener);
+}
+
 export function getSessionToken(): string | null {
   try {
     return localStorage.getItem(SESSION_KEY);
@@ -21,7 +81,10 @@ export function getSessionToken(): string | null {
 }
 
 export function setSessionToken(token: string): void {
+  explicitLogout = false;
+  invalidateSession();
   try {
+    sessionStorage.removeItem(LOGOUT_KEY);
     localStorage.setItem(SESSION_KEY, token);
   } catch {
     /* storage unavailable — cookie channel still covers most browsers */
@@ -29,6 +92,7 @@ export function setSessionToken(token: string): void {
 }
 
 export function clearSessionToken(): void {
+  invalidateSession();
   try {
     localStorage.removeItem(SESSION_KEY);
   } catch {
@@ -48,13 +112,15 @@ export function ingestUrlSession(): void {
   window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
 }
 
-export interface ApiError {
+export interface ApiErrorShape {
   status: number;
   message: string;
   retryAfter?: number;
 }
 
-export class ApiError extends Error {
+export class ApiError extends Error implements ApiErrorShape {
+  status: number;
+  retryAfter?: number;
   constructor(status: number, message: string, retryAfter?: number) {
     super(message);
     this.status = status;
@@ -86,6 +152,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(0, "Gateway unreachable — check your connection");
   }
   const data = (await res.json().catch(() => null)) as GatewayResponse<T> | null;
+  // debug visibility: every call is logged with its server answer
+  console.debug(`[rodex] ${method} ${path} → ${res.status}`, data?.error?.message ?? "");
   if (!res.ok || !data?.ok) {
     throw new ApiError(data?.error?.code ?? res.status, data?.error?.message ?? `HTTP ${res.status}`, data?.error?.retry_after);
   }
@@ -111,6 +179,9 @@ export interface AppInfo {
   tables: string[];
   key_prefix: string;
   purge_at?: number;
+  description?: string;
+  /** unix seconds until which the raw key may be viewed again (48 h window) */
+  key_recoverable_until?: number;
   api_key?: string; // present only at creation / rotation
 }
 

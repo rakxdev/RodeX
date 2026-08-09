@@ -15,6 +15,7 @@ const API = "DynamoDB_20120810";
 
 const APPS_TABLE = "rodex_apps";
 const IDEM_TABLE = "rodex_idem";
+const META_TABLE = "rodex_meta";
 
 interface AwsCreds {
   AWS_ACCESS_KEY_ID: string;
@@ -175,7 +176,87 @@ export class AwsStorage implements Storage {
     });
   }
 
+  // ── settings (rodex_meta) ───────────────────────────────────────────────────
+  private metaTableReady: Promise<void> | null = null;
+
+  private ensureMetaTable(): Promise<void> {
+    if (!this.metaTableReady) {
+      this.metaTableReady = this.ensureMetaTableInner().catch((e) => {
+        this.metaTableReady = null;
+        throw e;
+      });
+    }
+    return this.metaTableReady;
+  }
+
+  private async ensureMetaTableInner(): Promise<void> {
+    try {
+      await this.call("DescribeTable", { TableName: META_TABLE });
+    } catch {
+      await this.call("CreateTable", {
+        TableName: META_TABLE,
+        KeySchema: [{ AttributeName: "k", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "k", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      });
+    }
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    await this.ensureMetaTable();
+    const out = await this.call<{ Item?: DdbItem }>("GetItem", { TableName: META_TABLE, Key: marshal({ k: key }) });
+    if (!out.Item) return null;
+    return (unmarshal(out.Item).v as string) ?? null;
+  }
+
+  async putSetting(key: string, value: string): Promise<void> {
+    await this.ensureMetaTable();
+    await this.call("PutItem", { TableName: META_TABLE, Item: marshal({ k: key, v: value }) });
+  }
+
   // ── idempotency ─────────────────────────────────────────────────────────────
+
+  private idemTableReady: Promise<void> | null = null;
+
+  /**
+   * Lazy one-time bootstrap: ensure the idempotency table exists AND that
+   * DynamoDB TTL is enabled on the `exp` attribute. TTL deletion is free and
+   * consumes no write capacity — without it, expired idempotency records would
+   * linger in storage forever (verified against official AWS docs).
+   */
+  private ensureIdemTable(): Promise<void> {
+    if (!this.idemTableReady) {
+      this.idemTableReady = this.ensureIdemTableInner().catch((e) => {
+        this.idemTableReady = null; // allow retry on next call
+        throw e;
+      });
+    }
+    return this.idemTableReady;
+  }
+
+  private async ensureIdemTableInner(): Promise<void> {
+    let ttl: { TimeToLiveDescription?: { TimeToLiveStatus?: string; AttributeName?: string } } | null = null;
+    try {
+      ttl = await this.call("DescribeTimeToLive", { TableName: IDEM_TABLE });
+    } catch {
+      // table missing — created below
+    }
+    if (!ttl) {
+      await this.call("CreateTable", {
+        TableName: IDEM_TABLE,
+        KeySchema: [{ AttributeName: "requestId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "requestId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      });
+    }
+    const status = ttl?.TimeToLiveDescription?.TimeToLiveStatus;
+    if (status !== "ENABLED" || ttl?.TimeToLiveDescription?.AttributeName !== "exp") {
+      await this.call("UpdateTimeToLive", {
+        TableName: IDEM_TABLE,
+        TimeToLiveSpecification: { Enabled: true, AttributeName: "exp" },
+      });
+    }
+  }
 
   async idemGet(requestId: string): Promise<string | null> {
     const out = await this.call<{ Item?: DdbItem }>("GetItem", {
@@ -190,6 +271,7 @@ export class AwsStorage implements Storage {
   }
 
   async idemPut(requestId: string, responseJson: string, ttlSeconds = IDEMPOTENCY_TTL_SECONDS): Promise<boolean> {
+    await this.ensureIdemTable();
     try {
       await this.call("PutItem", {
         TableName: IDEM_TABLE,

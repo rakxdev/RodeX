@@ -101,6 +101,33 @@ describe("password login", () => {
     expect(sc.toLowerCase()).toContain("max-age=0");
   });
 
+  it("change-password: wrong old → 401; too short → 400; valid → login switches to the new password", async () => {
+    const wrong = await call("POST", "/v1/admin/change-password", { old_password: "nope", new_password: "brand-new-secret-123" }, { Cookie: adminCookie });
+    expect(wrong.status).toBe(401);
+
+    const short = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "tiny" }, { Cookie: adminCookie });
+    expect(short.status).toBe(400);
+
+    const same = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: ADMIN_PW }, { Cookie: adminCookie });
+    expect(same.status).toBe(400);
+
+    const ok = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "brand-new-secret-123" }, { Cookie: adminCookie });
+    expect(ok.status).toBe(200);
+
+    // old password now fails, new one works
+    expect((await call("POST", "/v1/admin/login", { password: ADMIN_PW })).status).toBe(401);
+    expect((await call("POST", "/v1/admin/login", { password: "brand-new-secret-123" })).status).toBe(200);
+
+    // restore the original password so later tests keep logging in
+    const fresh = await call("POST", "/v1/admin/login", { password: "brand-new-secret-123" });
+    await call("POST", "/v1/admin/change-password", { old_password: "brand-new-secret-123", new_password: ADMIN_PW }, { Cookie: cookieOf(fresh) });
+  });
+
+  it("change-password requires a session (401 anonymous)", async () => {
+    const r = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "brand-new-secret-123" });
+    expect(r.status).toBe(401);
+  });
+
   it("logout also accepts a JSON body (SPA sends {}) without error", async () => {
     const r = await call("POST", "/v1/admin/logout", {});
     expect(r.status).toBe(200);
@@ -125,11 +152,20 @@ describe("admin app management", () => {
     const r = await call("POST", "/v1/admin/apps", { name: "weather-bot" }, { Cookie: adminCookie });
     expect(r.status).toBe(200);
     const body = (await r.json()) as any;
-    expect(body.result.api_key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(body.result.api_key).toMatch(/^rok_[A-Za-z0-9_-]{43}$/);
+    expect(body.result.key_prefix).toMatch(/^rok_/);
     expect(body.result.status).toBe("active");
 
     const list = await (await call("GET", "/v1/admin/apps", undefined, { Cookie: adminCookie })).json() as any;
     expect(list.result.apps.map((a: any) => a.name)).toContain("weather-bot");
+  });
+
+  it("create app accepts an optional description (1–200 chars)", async () => {
+    const ok = await call("POST", "/v1/admin/apps", { name: "desc-app", description: "  weather pipeline  " }, { Cookie: adminCookie });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).result.description).toBe("weather pipeline");
+    const bad = await call("POST", "/v1/admin/apps", { name: "desc-bad", description: "x".repeat(201) }, { Cookie: adminCookie });
+    expect(bad.status).toBe(400);
   });
 
   it("rejects invalid names and over-limit apps", async () => {
@@ -141,6 +177,13 @@ describe("admin app management", () => {
     const created = await (await call("POST", "/v1/admin/apps", { name: "rot" }, { Cookie: adminCookie })).json() as any;
     const { app_id, api_key } = created.result;
     const rotated = await (await call("POST", `/v1/admin/apps/${app_id}/rotate-key`, {}, { Cookie: adminCookie })).json() as any;
+
+    // regression: rotate must return the FULL app so the detail page can re-render
+    expect(rotated.result.app_id).toBe(app_id);
+    expect(rotated.result.name).toBe("rot");
+    expect(rotated.result.status).toBe("active");
+    expect(typeof rotated.result.created_at).toBe("number");
+    expect(Array.isArray(rotated.result.tables)).toBe(true);
 
     const oldKey = await call("POST", "/v1/query", { table: "t", pk: "x" }, { "X-App-Id": app_id, "X-Api-Key": api_key });
     expect(oldKey.status).toBe(401);
@@ -178,17 +221,63 @@ describe("admin app management", () => {
     const list = await (await call("GET", "/v1/admin/apps", undefined, { Cookie: adminCookie })).json() as any;
     expect(list.result.apps.map((a: any) => a.app_id)).not.toContain(app_id);
   });
+
+  it("soft delete via POST /delete alias (older dashboard bundles)", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "alias" }, { Cookie: adminCookie })).json() as any;
+    const { app_id } = created.result;
+    const del = await call("POST", `/v1/admin/apps/${app_id}/delete`, {}, { Cookie: adminCookie });
+    expect(del.status).toBe(200);
+    expect(((await del.json()) as any).result.status).toBe("deleting");
+  });
+
+  it("view-key returns the same raw key inside the recovery window", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "viewer" }, { Cookie: adminCookie })).json() as any;
+    const { app_id, api_key } = created.result;
+    expect(created.result.key_recoverable_until).toBeGreaterThan(0);
+    const viewed = await (await call("POST", `/v1/admin/apps/${app_id}/view-key`, {}, { Cookie: adminCookie })).json() as any;
+    expect(viewed.result.api_key).toBe(api_key);
+  });
+
+  it("view-key after rotate returns the NEW key", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "viewer2" }, { Cookie: adminCookie })).json() as any;
+    const { app_id } = created.result;
+    const rotated = await (await call("POST", `/v1/admin/apps/${app_id}/rotate-key`, {}, { Cookie: adminCookie })).json() as any;
+    const viewed = await (await call("POST", `/v1/admin/apps/${app_id}/view-key`, {}, { Cookie: adminCookie })).json() as any;
+    expect(viewed.result.api_key).toBe(rotated.result.api_key);
+  });
+
+  it("view-key expired → 403 with a clear message (old keys are hash-only)", async () => {
+    vi.useFakeTimers();
+    try {
+      const created = await (await call("POST", "/v1/admin/apps", { name: "expired" }, { Cookie: adminCookie })).json() as any;
+      vi.setSystemTime(new Date(Date.now() + 49 * 3600 * 1000));
+      const fresh = await call("POST", "/v1/admin/login", { password: ADMIN_PW });
+      const r = await call("POST", `/v1/admin/apps/${created.result.app_id}/view-key`, {}, { Cookie: cookieOf(fresh) });
+      expect(r.status).toBe(403);
+      expect(((await r.json()) as any).error.message).toContain("expired");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("GitHub OAuth", () => {
-  function stubGithub(login: string | null) {
-    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+  function stubGithub(login: string | null, userStatus = 200) {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("access_token")) {
         return new Response(JSON.stringify({ access_token: "tok_123" }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (url.includes("api.github.com/user")) {
-        return new Response(JSON.stringify(login ? { login } : {}), { status: 200, headers: { "Content-Type": "application/json" } });
+        // GitHub API hard-requires a User-Agent; regression: missing UA → 403 → "user '?'"
+        const h = new Headers(init?.headers);
+        if (!h.get("user-agent")) {
+          throw new Error("User-Agent header missing on api.github.com/user request");
+        }
+        if (h.get("authorization") !== "Bearer tok_123") {
+          throw new Error("Bearer token missing on api.github.com/user request");
+        }
+        return new Response(JSON.stringify(login ? { login } : {}), { status: userStatus, headers: { "Content-Type": "application/json" } });
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -226,6 +315,24 @@ describe("GitHub OAuth", () => {
     stubGithub("rakxdev");
     const r = await call("GET", "/v1/auth/github/callback?code=c1&state=forged");
     expect(r.status).toBe(400);
+  });
+
+  it("callback sends User-Agent to the GitHub API (regression: 403 'user ?')", async () => {
+    stubGithub("rakxdev");
+    const start = await call("GET", "/v1/auth/github/start");
+    const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
+    const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, { Cookie: `rodex_oauth_state=${state}` });
+    expect(r.status).toBe(302);
+  });
+
+  it("callback reports GitHub API failures honestly (503, not 'user ?')", async () => {
+    stubGithub(null, 403);
+    const start = await call("GET", "/v1/auth/github/start");
+    const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
+    const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, { Cookie: `rodex_oauth_state=${state}` });
+    expect(r.status).toBe(503);
+    const body = (await r.json()) as any;
+    expect(body.error.message).toContain("GitHub user lookup failed");
   });
 
   it("state embedded in ANOTHER cookie's value must NOT pass (substring spoof)", async () => {
