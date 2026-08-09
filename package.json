@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "RodeX v1 — personal database gateway platform (DynamoDB + Cloudflare)",
   "workspaces": [
-    "gateway"
+    "gateway",
+    "dashboard"
   ],
   "scripts": {
     "dev": "npm run dev -w gateway",
@@ -12,13 +13,17 @@
     "test": "npm run test -w gateway",
     "typecheck": "npm run typecheck -w gateway",
     "deploy:gateway": "npm run deploy -w gateway",
-    "deploy:dashboard": "wrangler pages deploy dashboard --project-name rodexdb",
-    "lint": "eslint gateway/src gateway/test"
+    "deploy:dashboard": "npm run build -w dashboard && wrangler pages deploy dashboard/dist --project-name rodexdb",
+    "lint": "eslint gateway/src gateway/test",
+    "dev:dashboard": "npm run dev -w dashboard",
+    "build:dashboard": "npm run build -w dashboard"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260809.1",
     "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
-    "typescript-eslint": "^8.66.0"
+    "typescript-eslint": "^8.66.0",
+    "vite": "^6.4.3"
   }
 }

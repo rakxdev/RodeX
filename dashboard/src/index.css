@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* ── RodeX Instrument-Packet tokens (locked world) ─────────────── */
+:root {
+  --bg: #0e1013;
+  --panel: #171a1f;
+  --panel2: #1d2127;
+  --line: #2a2f37;
+  --ink: #e8e4da;
+  --ink-dim: #8a9184;
+  --red: #e8452c;
+  --amber: #d9a441;
+  --gold: #d9b64a;
+  --gold-deep: #b8952f;
+  --paper: #f2efe6;
+  --ash: #9aa0a6;
+  --ok: #35d07f;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-inkdim: var(--ink-dim);
+  --color-redx: var(--red);
+  --color-amberx: var(--amber);
+  --color-gold: var(--gold);
+  --color-golddeep: var(--gold-deep);
+  --color-paper: var(--paper);
+  --color-ash: var(--ash);
+  --color-ok: var(--ok);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  min-height: 100%;
+}
+
+/* machined ground */
+body {
+  background-image:
+    radial-gradient(1000px 460px at 72% -10%, #26241c 0%, transparent 55%),
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(255, 255, 255, 0.015) 31px 32px);
+}
+
+/* ── world primitives ─────────────────────────────────────────── */
+.nameplate {
+  position: relative;
+  background: linear-gradient(155deg, var(--panel2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.nameplate::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(255, 255, 255, 0.055);
+  border-radius: 7px;
+  pointer-events: none;
+}
+.foldline {
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
+}
+.stamp {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  text-transform: uppercase;
+}
+.stamp-active { color: var(--amber); border-color: rgba(217, 164, 65, 0.55); background: rgba(217, 164, 65, 0.08); }
+.stamp-suspended { color: var(--ink-dim); border-color: var(--line); }
+.stamp-deleting {
+  color: var(--red);
+  border-color: rgba(232, 69, 44, 0.6);
+  background: repeating-linear-gradient(-45deg, transparent 0 3px, rgba(232, 69, 44, 0.22) 3px 4px);
+}
+.serial {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+}
+.gold-seal {
+  background: linear-gradient(140deg, #e3c96a, #b8952f 55%, #8f7420);
+  color: #1a1508;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 2px rgba(26, 21, 8, 0.25), 0 6px 18px rgba(217, 182, 74, 0.18);
+}
+.action-red {
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 8px 20px rgba(232, 69, 44, 0.22);
+}
+.action-red:hover { filter: brightness(1.08); }
+.action-red:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* scanline sheet panels */
+.sheet-panel {
+  background: #14171c;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sheet-panel h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+.sheet-panel h4 b { color: var(--gold); font-weight: 600; }

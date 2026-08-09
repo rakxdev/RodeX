@@ -1,52 +1,28 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RodeX — Sign in</title>
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
-  <main class="auth-box">
-    <div class="card">
-      <h1>RodeX <span style="color:var(--accent)">DB</span></h1>
-      <p class="muted small" style="margin-top:-8px">Your personal database gateway — Version 1</p>
-
-      <a class="github-btn" id="ghLogin" href="#">Sign in with GitHub</a>
-      <div class="divider">— or password —</div>
-
-      <form id="pwForm">
-        <label for="password">Admin password</label>
-        <input type="password" id="password" name="password" autocomplete="current-password" required />
-        <div style="margin-top:14px">
-          <button type="submit" style="width:100%">Sign in</button>
-        </div>
-      </form>
-      <div class="msg" id="msg" hidden></div>
-    </div>
-  </main>
-  <script src="js/api.js"></script>
-  <script>
-    // already logged in? go straight to the dashboard
-    api("GET", "/v1/admin/me")
-      .then((r) => { if (r.authenticated) window.location.href = "apps.html"; })
-      .catch(() => {});
-
-    document.getElementById("ghLogin").href = CONFIG.GATEWAY + "/v1/auth/github/start";
-
-    document.getElementById("pwForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = e.target.querySelector("button");
-      const msg = document.getElementById("msg");
-      btn.disabled = true;
-      try {
-        await api("POST", "/v1/admin/login", { password: document.getElementById("password").value });
-        window.location.href = "apps.html";
-      } catch (err) {
-        showMsg(msg, "Login failed: " + err.message, false);
-        btn.disabled = false;
-      }
-    });
-  </script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0e1013" />
+    <link rel="icon" type="image/svg+xml" href="/rodex-mark-mono.svg" />
+    <title>RodeX DB — Database Gateway Console</title>
+  </head>
+  <body>
+    <!--
+      THESIS: the database gateway as a precision instrument room — every app a sealed packet,
+              every key a one-time gold-foil reveal; refuses the generic SaaS admin default.
+      OWN-WORLD: machined carbon surfaces, engraved engineering mono, gold foil reserved for
+              seals and reveals, amber for state, one red for action; packet/fold motion.
+      STORY: the visitor manages their apps as instruments: serial, stamp, key, tables —
+              inspectable, operable, sealed.
+      FIRST VIEWPORT: the app board — sealed packet cards with serials and state stamps,
+              one red "Fabricate app" action, gold tabs on sealed keys.
+      FORM: Instrument Packet — fusion of Machine-Shop Nameplate (01) and Miura Fold (02);
+              logo R3-14 Packet-Reticle-Key; seed 7695a64d.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
+              review, the verdict, and DESIGN.md
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
