@@ -57,8 +57,15 @@ cd dashboard && python3 -m http.server 8788       # dashboard (dev DASHBOARD_ORI
 - [docs/rate-limits.md](docs/rate-limits.md) — the capacity math behind every limit
 - [docs/aws-setup.md](docs/aws-setup.md) — IAM + tables
 - [docs/testing.md](docs/testing.md) — tests + live runbook
+- [docs/ci-cd.md](docs/ci-cd.md) — CI gates, deploy, rollback
 - [docs/research-validation.md](docs/research-validation.md) — verified sources
 - [tasks/](tasks/) — plan + task list (Version 1 scope)
+
+## CI
+
+Quality gates (lint → typecheck → tests → bundle → audit) run on every push/PR
+via GitHub Actions (`.github/workflows/ci.yml`). Opt-in auto-deploy to Cloudflare
+and rollback runbook: [docs/ci-cd.md](docs/ci-cd.md).
 
 ## Security invariants (tested, non-negotiable)
 
