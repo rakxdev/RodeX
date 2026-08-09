@@ -267,6 +267,14 @@ body {
 }
 
 /* code blocks for docs */
+.no-scrollbar {
+  scrollbar-width: none; /* firefox */
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .code-block {
   background: #111418;
   border: 1px solid var(--line);

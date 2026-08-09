@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { pageTransition, fadeUp, stagger, foldIn } from "@/lib/motion";
+import PublicShell from "@/components/PublicShell";
 
 const writes = [
   { k: "writes / min", v: "120", note: "per app — put / update / delete" },
@@ -27,6 +28,7 @@ const groups = [
 export default function UsagePage() {
   return (
     <motion.div {...pageTransition}>
+      <PublicShell tag="USAGE & LIMITS">
       <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         USAGE & <span className="text-gold">LIMITS</span>
       </h1>
@@ -97,6 +99,7 @@ export default function UsagePage() {
       <p className="font-mono text-[10px] sm:text-[10.5px] tracking-[0.1em] text-inkdim mt-5">
         REAL-TIME PER-APP METERS SHIP WITH THE OBSERVABILITY PHASE — THE BUDGET TABLE ABOVE IS THE CONTRACT TODAY.
       </p>
+      </PublicShell>
     </motion.div>
   );
 }

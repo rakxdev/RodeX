@@ -152,6 +152,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(0, "Gateway unreachable — check your connection");
   }
   const data = (await res.json().catch(() => null)) as GatewayResponse<T> | null;
+  // debug visibility: every call is logged with its server answer
+  console.debug(`[rodex] ${method} ${path} → ${res.status}`, data?.error?.message ?? "");
   if (!res.ok || !data?.ok) {
     throw new ApiError(data?.error?.code ?? res.status, data?.error?.message ?? `HTTP ${res.status}`, data?.error?.retry_after);
   }

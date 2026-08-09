@@ -102,6 +102,14 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     return c.json({ ok: true, result: app });
   });
 
+  // alias for dashboard bundles that POST to /delete (soft delete, same contract)
+  app.post("/v1/admin/apps/:id/delete", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const app = await softDelete(createStorage(c.env), c.req.param("id"));
+    return c.json({ ok: true, result: app });
+  });
+
   app.post("/v1/admin/apps/:id/recover", async (c) => {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));

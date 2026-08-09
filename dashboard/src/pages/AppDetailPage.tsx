@@ -46,6 +46,7 @@ export default function AppDetailPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [arm, setArm] = useState<"delete" | "purge" | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
@@ -60,14 +61,28 @@ export default function AppDetailPage() {
     load();
   }, [id]);
 
+  // auto-dismiss the rotate toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   async function act(action: string, body?: unknown) {
     if (!id) return;
     setBusy(action);
     setError(null);
     try {
-      const result = await api.post<AppInfo & { api_key?: string }>(`/v1/admin/apps/${id}/${action}`, body);
+      let result: AppInfo & { api_key?: string };
+      if (action === "delete") {
+        // soft delete is an HTTP DELETE on the app resource
+        result = await api.delete<AppInfo>(`/v1/admin/apps/${id}`);
+      } else {
+        result = await api.post<AppInfo & { api_key?: string }>(`/v1/admin/apps/${id}/${action}`, body);
+      }
       if (action === "rotate-key") {
         if (result.api_key) setNewKey(result.api_key);
+        setToast("OLD KEY INVALIDATED — NEW KEY ISSUED");
         // the rotate response carries the full app; re-fetch if anything is missing
         if (result.app_id) setApp(result);
         else await load();
@@ -130,6 +145,17 @@ export default function AppDetailPage() {
         </motion.div>
       )}
 
+      {toast && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 inline-flex items-center gap-2 font-mono text-[10px] tracking-[0.16em] text-amberx border border-amberx/40 bg-amberx/5 px-3 py-2 rounded-md"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amberx inline-block" aria-hidden="true" />
+          {toast}
+        </motion.div>
+      )}
+
       {/* actions strip */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center gap-2 mb-6">
         {deleting ? (
@@ -163,6 +189,13 @@ export default function AppDetailPage() {
         )}
       </motion.div>
 
+      {/* what the actions mean */}
+      <div className="mb-6 font-mono text-[9.5px] sm:text-[10px] tracking-[0.12em] text-inkdim leading-relaxed">
+        SUSPEND <span className="text-ink/70">→ traffic replies 403</span> · RESUME <span className="text-ink/70">→ traffic restored</span> ·
+        DELETE <span className="text-ink/70">→ 5-minute recovery window, then purge</span> · ROTATE KEY{" "}
+        <span className="text-ink/70">→ old key dies instantly</span>
+      </div>
+
       <motion.div variants={stagger(0.06)} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <motion.div variants={foldIn} className="sheet-panel p-5">
           <h4 className="mb-4">
@@ -180,7 +213,7 @@ export default function AppDetailPage() {
             <b>CELL 02</b> · CREDENTIALS
           </h4>
           {newKey ? (
-            <KeyReveal apiKey={newKey} label="NEW API KEY" />
+            <KeyReveal key={newKey} apiKey={newKey} label="NEW API KEY" />
           ) : (
             <dl className="space-y-2 font-mono text-[12px]">
               <div className="flex justify-between"><dt className="text-inkdim">key_prefix</dt><dd>{app.key_prefix}…</dd></div>

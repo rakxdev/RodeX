@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
-import { FoldLink } from "@/components/FoldButton";
-import { Mark } from "@/App";
+import PublicShell from "@/components/PublicShell";
 import type { ReactNode } from "react";
 
 const GW = "https://rodex-gateway.rakxdev.workers.dev";
@@ -93,24 +91,8 @@ export default function DocsPage() {
   }, []);
 
   return (
-    <motion.div {...pageTransition} className="min-h-screen flex flex-col">
-      {/* public chrome — docs are readable without signing in */}
-      <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
-        <Link to="/" className="flex items-center gap-3">
-          <Mark />
-          <span className="font-mono font-bold tracking-[0.22em] text-sm">
-            RODEX<em className="text-gold not-italic">DB</em>
-          </span>
-        </Link>
-        <span className="ml-2 font-mono text-[9px] tracking-[0.22em] text-inkdim hidden sm:inline">API REFERENCE</span>
-        <div className="ml-auto">
-          <FoldLink to="/login" variant="ghost" size="sm">
-            ENTER CONSOLE
-          </FoldLink>
-        </div>
-      </header>
-
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-5 py-8 flex-1">
+    <motion.div {...pageTransition}>
+      <PublicShell tag="API REFERENCE">
       <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         API <span className="text-gold">REFERENCE</span>
       </h1>
@@ -121,8 +103,11 @@ export default function DocsPage() {
         BASE <span className="text-ink">—</span> <span className="text-gold">{GW}</span>
       </div>
 
-      {/* mobile section chips */}
-      <nav className="lg:hidden flex gap-1.5 overflow-x-auto pb-3 mb-1 -mx-1 px-1" aria-label="Documentation sections">
+      {/* mobile section chips — sticky so the map is always reachable */}
+      <nav
+        className="lg:hidden sticky top-[57px] z-30 -mx-1 px-1 bg-bg/95 backdrop-blur flex gap-1.5 overflow-x-auto no-scrollbar pb-3 mb-1"
+        aria-label="Documentation sections"
+      >
         {toc.map((t) => (
           <a
             key={t.a}
@@ -459,13 +444,7 @@ curl -X POST $GW/v1/table/create \\
           </div>
         </motion.div>
       </div>
-      </main>
-
-      <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
-        <span>RODEX DB — GATEWAY CONSOLE</span>
-        <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
-        <span>rodexdb.pages.dev</span>
-      </footer>
+      </PublicShell>
     </motion.div>
   );
 }

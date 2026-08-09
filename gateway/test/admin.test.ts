@@ -185,6 +185,14 @@ describe("admin app management", () => {
     const list = await (await call("GET", "/v1/admin/apps", undefined, { Cookie: adminCookie })).json() as any;
     expect(list.result.apps.map((a: any) => a.app_id)).not.toContain(app_id);
   });
+
+  it("soft delete via POST /delete alias (older dashboard bundles)", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "alias" }, { Cookie: adminCookie })).json() as any;
+    const { app_id } = created.result;
+    const del = await call("POST", `/v1/admin/apps/${app_id}/delete`, {}, { Cookie: adminCookie });
+    expect(del.status).toBe(200);
+    expect(((await del.json()) as any).result.status).toBe("deleting");
+  });
 });
 
 describe("GitHub OAuth", () => {

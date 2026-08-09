@@ -177,6 +177,48 @@ export class AwsStorage implements Storage {
 
   // ── idempotency ─────────────────────────────────────────────────────────────
 
+  private idemTableReady: Promise<void> | null = null;
+
+  /**
+   * Lazy one-time bootstrap: ensure the idempotency table exists AND that
+   * DynamoDB TTL is enabled on the `exp` attribute. TTL deletion is free and
+   * consumes no write capacity — without it, expired idempotency records would
+   * linger in storage forever (verified against official AWS docs).
+   */
+  private ensureIdemTable(): Promise<void> {
+    if (!this.idemTableReady) {
+      this.idemTableReady = this.ensureIdemTableInner().catch((e) => {
+        this.idemTableReady = null; // allow retry on next call
+        throw e;
+      });
+    }
+    return this.idemTableReady;
+  }
+
+  private async ensureIdemTableInner(): Promise<void> {
+    let ttl: { TimeToLiveDescription?: { TimeToLiveStatus?: string; AttributeName?: string } } | null = null;
+    try {
+      ttl = await this.call("DescribeTimeToLive", { TableName: IDEM_TABLE });
+    } catch {
+      // table missing — created below
+    }
+    if (!ttl) {
+      await this.call("CreateTable", {
+        TableName: IDEM_TABLE,
+        KeySchema: [{ AttributeName: "requestId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "requestId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      });
+    }
+    const status = ttl?.TimeToLiveDescription?.TimeToLiveStatus;
+    if (status !== "ENABLED" || ttl?.TimeToLiveDescription?.AttributeName !== "exp") {
+      await this.call("UpdateTimeToLive", {
+        TableName: IDEM_TABLE,
+        TimeToLiveSpecification: { Enabled: true, AttributeName: "exp" },
+      });
+    }
+  }
+
   async idemGet(requestId: string): Promise<string | null> {
     const out = await this.call<{ Item?: DdbItem }>("GetItem", {
       TableName: IDEM_TABLE,
@@ -190,6 +232,7 @@ export class AwsStorage implements Storage {
   }
 
   async idemPut(requestId: string, responseJson: string, ttlSeconds = IDEMPOTENCY_TTL_SECONDS): Promise<boolean> {
+    await this.ensureIdemTable();
     try {
       await this.call("PutItem", {
         TableName: IDEM_TABLE,
