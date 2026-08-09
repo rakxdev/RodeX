@@ -10,7 +10,7 @@ crons = ["* * * * *"]
 
 # ── Vars (non-secret config) ────────────────────────────────────────────────
 [vars]
-STORAGE = "mock" # "mock" (no AWS needed) | "aws" (real DynamoDB)
+STORAGE = "aws" # "mock" (no AWS needed) | "aws" (real DynamoDB)
 DASHBOARD_ORIGIN = "https://rodexdb.pages.dev" # CORS + cookie target
 GITHUB_ALLOWED_USERS = "rakxdev,newylbot,luminoxpp"
 
