@@ -6,6 +6,9 @@ import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import { FoldButton, FoldLink } from "@/components/FoldButton";
 import { api, clearSessionToken, gatewayBase, markExplicitLogout } from "@/api/client";
 import { useSession } from "@/components/SessionGate";
+import TypeTerminal from "@/components/TypeTerminal";
+import TiltCard from "@/components/TiltCard";
+import Magnetic from "@/components/Magnetic";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -124,8 +127,9 @@ export default function LandingPage() {
       </header>
 
       {/* hero — SaaS layout: pitch left, product panel right */}
-      <section className="max-w-6xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-14 sm:pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+      <section className="relative max-w-6xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-14 sm:pb-20">
+        <div className="ambient" aria-hidden="true" />
+        <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <motion.div variants={stagger(0.06)} initial="hidden" animate="show">
             {/* brand already lives in the header — no duplicate above the headline */}
             <motion.h1
@@ -143,46 +147,38 @@ export default function LandingPage() {
             <motion.div variants={fadeUp} transition={{ delay: 0.09 }} className="mt-6">
               <GatewayStatus />
             </motion.div>
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-3 mt-4">
               {authed && (
                 <FoldButton variant="ghost" size="sm" onClick={exit}>
                   EXIT
                 </FoldButton>
               )}
-              <FoldLink to={authed ? "/apps" : "/login"} variant="red" size="lg">
-                {authed ? "OPEN BOARD" : "ENTER CONSOLE"} <ArrowRight className="w-4 h-4" />
-              </FoldLink>
-              <FoldLink to="/docs" variant="ghost" size="lg">
-                VIEW DOCS <BookOpen className="w-4 h-4" />
-              </FoldLink>
+              <Magnetic>
+                <FoldLink to={authed ? "/apps" : "/login"} variant="red" size="lg">
+                  {authed ? "OPEN BOARD" : "ENTER CONSOLE"} <ArrowRight className="w-4 h-4" />
+                </FoldLink>
+              </Magnetic>
+              <Magnetic strength={0.2}>
+                <FoldLink to="/docs" variant="ghost" size="lg">
+                  VIEW DOCS <BookOpen className="w-4 h-4" />
+                </FoldLink>
+              </Magnetic>
             </div>
           </motion.div>
 
-          {/* product panel — the API in action */}
+          {/* product panel — the API in action (typewriter terminal) */}
           <motion.div variants={fadeUp} transition={{ delay: 0.15 }} className="hidden sm:block">
-            <div className="nameplate overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
-                <span className="w-2 h-2 rounded-full dot-red" aria-hidden="true" />
-                <span className="w-2 h-2 rounded-full dot-amber" aria-hidden="true" />
-                <span className="w-2 h-2 rounded-full dot-ok" aria-hidden="true" />
-                <span className="ml-2 font-mono text-[9px] tracking-[0.2em] text-inkdim">RODEX GATEWAY — LIVE CONTRACT</span>
+            <TiltCard maxDeg={4}>
+              <div className="nameplate overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-line">
+                  <span className="w-2 h-2 rounded-full dot-red" aria-hidden="true" />
+                  <span className="w-2 h-2 rounded-full dot-amber" aria-hidden="true" />
+                  <span className="w-2 h-2 rounded-full dot-ok" aria-hidden="true" />
+                  <span className="ml-2 font-mono text-[9px] tracking-[0.2em] text-inkdim">RODEX GATEWAY — LIVE CONTRACT</span>
+                </div>
+                <TypeTerminal />
               </div>
-              <pre className="p-4 sm:p-5 font-mono text-[10.5px] sm:text-[11px] leading-[1.8] overflow-x-auto no-scrollbar">
-                <code>
-                  {`$ curl -X POST /v1/table/create
-  -H "X-App-Id: app_7f2c…" \\
-  -H "X-Api-Key: **********" \\
-  -d '{"name":"users"}'
-$ curl -X POST /v1/item/put
-  -d '{"table":"users","item":{"pk":"USER#1"}}'
-→ 200 ok:true version:1
-$ curl -X POST /v1/query
-  -d '{"table":"users","pk":"USER#1","limit":50}'
-→ items:1 has_more:false
-# one contract · every app · free tier`}
-                </code>
-              </pre>
-            </div>
+            </TiltCard>
           </motion.div>
         </div>
       </section>
@@ -196,10 +192,14 @@ $ curl -X POST /v1/query
         </div>
         <motion.div variants={stagger(0.07)} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {features.map((f) => (
-            <motion.div key={f.title} variants={fadeUp} className="sheet-panel p-5">
-              <f.icon className="w-5 h-5 text-amberx mb-3" aria-hidden="true" />
-              <h3 className="font-mono text-[12px] tracking-[0.12em] mb-2">{f.title}</h3>
-              <p className="font-mono text-[12px] leading-relaxed text-inkdim">{f.body}</p>
+            <motion.div key={f.title} variants={fadeUp}>
+              <TiltCard>
+                <div className="sheet-panel p-5 h-full">
+                  <f.icon className="w-5 h-5 text-amberx mb-3" aria-hidden="true" />
+                  <h3 className="font-mono text-[12px] tracking-[0.12em] mb-2">{f.title}</h3>
+                  <p className="font-mono text-[12px] leading-relaxed text-inkdim">{f.body}</p>
+                </div>
+              </TiltCard>
             </motion.div>
           ))}
         </motion.div>
