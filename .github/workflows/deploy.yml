@@ -2,10 +2,10 @@ name: Deploy Gateway
 
 # Auto-deploys the gateway worker to Cloudflare after CI passes on main.
 # Enabled by adding two repo SECRETS (Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN   (the cfut_... API token — never commit it)
+#   CLOUDFLARE_API_TOKEN   (the cfut_... API token - never commit it)
 #   CLOUDFLARE_ACCOUNT_ID
-# While secrets are absent the deploy step is skipped with a notice and the
-# run stays GREEN (deploys remain manual — docs/ci-cd.md).
+# While secrets are absent the deploy step prints a notice and exits clean
+# (run stays GREEN; deploys remain manual - docs/ci-cd.md).
 # Rollback: `npx wrangler rollback`.
 
 on:
@@ -35,15 +35,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Auto-deploy disabled notice
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
-        run: echo "::notice::Auto-deploy disabled — add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets (docs/ci-cd.md)."
-
-      - name: Deploy gateway worker
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: gateway
-          command: deploy
+      - name: Deploy gateway worker (or notice when disabled)
+        working-directory: gateway
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::Auto-deploy disabled - add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets (docs/ci-cd.md)."
+            exit 0
+          fi
+          npx wrangler deploy
