@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowUpRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
+import { ArrowRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import { FoldButton, FoldLink } from "@/components/FoldButton";
 import { api, clearSessionToken, gatewayBase, markExplicitLogout } from "@/api/client";
@@ -10,7 +10,6 @@ import TypeTerminal from "@/components/TypeTerminal";
 import TiltCard from "@/components/TiltCard";
 import Magnetic from "@/components/Magnetic";
 import SplitFlap from "@/components/SplitFlap";
-import CreditContent from "@/components/CreditContent";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -113,7 +112,9 @@ export default function LandingPage() {
             <a href="#features" className="text-inkdim hover:text-ink transition-colors">FEATURES</a>
             <a href="#how" className="text-inkdim hover:text-ink transition-colors">HOW IT WORKS</a>
             <a href="#contract" className="text-inkdim hover:text-ink transition-colors">THE CONTRACT</a>
-            <a href="#credits" className="text-inkdim hover:text-gold transition-colors">RAKXDEV</a>
+            <Link to="/credits" className="text-inkdim hover:text-ink transition-colors">
+              <span className="glow-text">RAKXDEV</span>
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-2 sm:ml-5">
             {authed && (
@@ -240,31 +241,13 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* credits — the maker's section */}
-      <section id="credits" className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-16 scroll-mt-20">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="nameplate p-8 sm:p-12"
-        >
-          <CreditContent />
-          <div className="mt-6 text-center">
-            <FoldLink to="/credits" variant="ghost" size="sm">
-              FULL CREDITS <ArrowUpRight className="w-3.5 h-3.5" />
-            </FoldLink>
-          </div>
-        </motion.div>
-      </section>
-
       {/* footer */}
       <footer className="border-t border-line">
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-5 flex flex-wrap gap-x-6 gap-y-2 justify-between items-center font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
           <span>RODEX DB — GATEWAY CONSOLE · REV F</span>
           <span className="hidden md:inline">INSTRUMENT PACKET</span>
           <span className="flex items-center gap-2">
-            BUILT BY <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="text-gold hover:underline">RAKXDEV</a>
+            BUILT BY <span className="glow-text">RAKXDEV</span>
             <span className="text-inkdim/60">·</span>
             <a href="https://github.com/rakxdev/RodeX" target="_blank" rel="noreferrer" className="text-inkdim hover:text-gold transition-colors">SOURCE</a>
           </span>

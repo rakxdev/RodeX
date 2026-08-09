@@ -55,7 +55,7 @@ export function PublicFooter() {
       <span>RODEX DB — GATEWAY CONSOLE</span>
       <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        BUILT BY <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="text-gold hover:underline">RAKXDEV</a>
+        BUILT BY <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="glow-text">RAKXDEV</a>
         <span className="text-inkdim/60">·</span>
         <a href="https://github.com/rakxdev/RodeX" target="_blank" rel="noreferrer" className="hover:text-gold transition-colors">SOURCE</a>
         <span className="text-inkdim/60">·</span>

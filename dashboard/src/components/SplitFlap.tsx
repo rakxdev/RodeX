@@ -3,12 +3,11 @@ import { motion } from "framer-motion";
 
 /**
  * SplitFlap — Aceternity "text flipping board" (Vestaboard-style), tuned to
- * the Instrument-Packet world. Each character cycles through random glyphs in
- * a flip cell, then lands on its target.
+ * the Instrument-Packet world. Loops FOREVER: lands on the target, holds,
+ * flips away and lands again — an endless wave.
  *
- * The flip starts when the board scrolls INTO the viewport (once) — this also
- * guarantees the animation is visible: it never runs while the parent is still
- * fading in. Respects prefers-reduced-motion.
+ * The flip starts when the board scrolls INTO the viewport. Respects
+ * prefers-reduced-motion (static text).
  */
 const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_$#@";
 
@@ -16,7 +15,17 @@ function randomGlyph(): string {
   return GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
 }
 
-function FlapChar({ char, delay, duration, start }: { char: string; delay: number; duration: number; start: boolean }) {
+function FlapChar({
+  char,
+  delay,
+  duration,
+  cycle,
+}: {
+  char: string;
+  delay: number;
+  duration: number;
+  cycle: number; // 0 = static (not yet armed); >=1 = flip wave number
+}) {
   const [display, setDisplay] = useState(char);
   const [live, setLive] = useState(false);
   const reduced = useRef(false);
@@ -27,7 +36,7 @@ function FlapChar({ char, delay, duration, start }: { char: string; delay: numbe
   }, [char]);
 
   useEffect(() => {
-    if (!start || reduced.current) return;
+    if (cycle < 1 || reduced.current) return;
     const startAt = Date.now() + delay;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let alive = true;
@@ -48,7 +57,7 @@ function FlapChar({ char, delay, duration, start }: { char: string; delay: numbe
       alive = false;
       if (timer) clearTimeout(timer);
     };
-  }, [start, char, delay, duration]);
+  }, [cycle, char, delay, duration]);
 
   return (
     <span className="flap-cell" aria-hidden="true">
@@ -68,20 +77,26 @@ function FlapChar({ char, delay, duration, start }: { char: string; delay: numbe
 export default function SplitFlap({
   text,
   className = "",
-  charDelay = 55,
-  duration = 850,
+  charDelay = 70,
+  duration = 1100,
   delay = 0,
+  holdMs = 2800,
 }: {
   text: string;
   className?: string;
+  /** ms between each character's flip start (wave) */
   charDelay?: number;
+  /** per-character flip duration (ms) */
   duration?: number;
-  /** extra wait before the flip starts (ms) — lets parent entrances settle */
+  /** extra wait before the first flip (ms) */
   delay?: number;
+  /** how long the landed word stays before flipping away again */
+  holdMs?: number;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [inView, setInView] = useState(false);
   const [armed, setArmed] = useState(false);
+  const [cycle, setCycle] = useState(0);
 
   // arm once visible, then flip after `delay`
   useEffect(() => {
@@ -106,13 +121,21 @@ export default function SplitFlap({
     return () => clearTimeout(t);
   }, [inView, delay]);
 
+  // endless loop: once armed, schedule the next flip wave after landing + hold
+  useEffect(() => {
+    if (!armed) return;
+    const waveMs = duration + text.length * charDelay + holdMs;
+    const t = setTimeout(() => setCycle((c) => c + 1), waveMs);
+    return () => clearTimeout(t);
+  }, [armed, cycle, duration, text.length, charDelay, holdMs]);
+
   return (
     <span ref={ref} className={`inline-flex gap-[3px] ${className}`} role="text" aria-label={text}>
       {text.split("").map((ch, i) =>
         ch === " " ? (
           <span key={i} className="w-[0.6em]" aria-hidden="true" />
         ) : (
-          <FlapChar key={i} char={ch} delay={i * charDelay} duration={duration} start={armed} />
+          <FlapChar key={i} char={ch} delay={i * charDelay} duration={duration} cycle={armed ? cycle + 1 : 0} />
         ),
       )}
     </span>

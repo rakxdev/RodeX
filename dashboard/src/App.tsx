@@ -132,7 +132,11 @@ export default function AppShell() {
         <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
           <span>RODEX DB — GATEWAY CONSOLE</span>
           <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
-          <span>rodexdb.pages.dev</span>
+          <span className="flex items-center gap-2">
+            <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="glow-text">RAKXDEV</a>
+            <span className="text-inkdim/60">·</span>
+            <span>rodexdb.pages.dev</span>
+          </span>
         </footer>
       </div>
     </MotionConfig>
