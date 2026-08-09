@@ -37,7 +37,6 @@ interface FoldButtonProps extends Omit<HTMLMotionProps<"button">, "children">, F
 export function FoldButton({ variant = "red", size = "md", className = "", children, ...rest }: FoldButtonProps) {
   return (
     <motion.button
-      type="button"
       whileTap={{ scale: 0.96 }}
       className={`fold-btn ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}

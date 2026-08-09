@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import { api, clearSessionToken } from "@/api/client";
+import { api, clearSessionToken, markExplicitLogout } from "@/api/client";
 import { springLift } from "@/lib/motion";
 import { FoldButton } from "@/components/FoldButton";
 
@@ -30,11 +30,12 @@ export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   async function logout() {
+    markExplicitLogout();
     clearSessionToken();
     try {
       await api.post("/v1/admin/logout", {});
     } catch {
-      /* best effort — session token is already cleared client-side */
+      /* best effort — the explicit-logout flag already keeps the login page up */
     }
     navigate("/login");
   }

@@ -29,6 +29,7 @@ export default function AppRoutes() {
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/docs" element={<DocsPage />} />
         <Route
           path="/login"
           element={
@@ -46,7 +47,6 @@ export default function AppRoutes() {
         >
           <Route path="/apps" element={<AppsPage />} />
           <Route path="/apps/:id" element={<AppDetailPage />} />
-          <Route path="/docs" element={<DocsPage />} />
           <Route path="/usage" element={<UsagePage />} />
         </Route>
         <Route path="*" element={<NotFound />} />

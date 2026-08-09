@@ -181,14 +181,22 @@ describe("admin app management", () => {
 });
 
 describe("GitHub OAuth", () => {
-  function stubGithub(login: string | null) {
-    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+  function stubGithub(login: string | null, userStatus = 200) {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("access_token")) {
         return new Response(JSON.stringify({ access_token: "tok_123" }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (url.includes("api.github.com/user")) {
-        return new Response(JSON.stringify(login ? { login } : {}), { status: 200, headers: { "Content-Type": "application/json" } });
+        // GitHub API hard-requires a User-Agent; regression: missing UA → 403 → "user '?'"
+        const h = new Headers(init?.headers);
+        if (!h.get("user-agent")) {
+          throw new Error("User-Agent header missing on api.github.com/user request");
+        }
+        if (h.get("authorization") !== "Bearer tok_123") {
+          throw new Error("Bearer token missing on api.github.com/user request");
+        }
+        return new Response(JSON.stringify(login ? { login } : {}), { status: userStatus, headers: { "Content-Type": "application/json" } });
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -226,6 +234,24 @@ describe("GitHub OAuth", () => {
     stubGithub("rakxdev");
     const r = await call("GET", "/v1/auth/github/callback?code=c1&state=forged");
     expect(r.status).toBe(400);
+  });
+
+  it("callback sends User-Agent to the GitHub API (regression: 403 'user ?')", async () => {
+    stubGithub("rakxdev");
+    const start = await call("GET", "/v1/auth/github/start");
+    const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
+    const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, { Cookie: `rodex_oauth_state=${state}` });
+    expect(r.status).toBe(302);
+  });
+
+  it("callback reports GitHub API failures honestly (503, not 'user ?')", async () => {
+    stubGithub(null, 403);
+    const start = await call("GET", "/v1/auth/github/start");
+    const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
+    const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, { Cookie: `rodex_oauth_state=${state}` });
+    expect(r.status).toBe(503);
+    const body = (await r.json()) as any;
+    expect(body.error.message).toContain("GitHub user lookup failed");
   });
 
   it("state embedded in ANOTHER cookie's value must NOT pass (substring spoof)", async () => {

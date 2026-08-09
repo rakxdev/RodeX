@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { ensureSessionChecked, getAuthedState, subscribeAuthed } from "@/api/client";
+import { ensureSessionChecked, getAuthedState, isExplicitLogout, subscribeAuthed } from "@/api/client";
 
 type SessionState = "checking" | "authed" | "anon";
 
@@ -10,11 +10,14 @@ type SessionState = "checking" | "authed" | "anon";
  */
 function useSession(): SessionState {
   const [state, setState] = useState<SessionState>(() => {
+    // A fresh explicit logout must NEVER bounce back — show /login immediately.
+    if (isExplicitLogout()) return "anon";
     const a = getAuthedState();
     return a === null ? "checking" : a ? "authed" : "anon";
   });
 
   useEffect(() => {
+    if (isExplicitLogout()) return;
     if (getAuthedState() !== null) return;
     const unsub = subscribeAuthed((v) => setState(v ? "authed" : "anon"));
     ensureSessionChecked();

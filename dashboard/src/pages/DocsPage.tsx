@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
+import { FoldLink } from "@/components/FoldButton";
+import { Mark } from "@/App";
 import type { ReactNode } from "react";
 
 const GW = "https://rodex-gateway.rakxdev.workers.dev";
@@ -63,8 +67,50 @@ const toc = [
 ];
 
 export default function DocsPage() {
+  const [active, setActive] = useState<string>(toc[0].a);
+
+  // scroll-spy: highlight the TOC entry for the section currently in view
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const mid = window.scrollY + window.innerHeight * 0.35;
+        let current = toc[0].a;
+        for (const t of toc) {
+          const el = document.getElementById(t.a);
+          if (el && el.getBoundingClientRect().top + window.scrollY <= mid) current = t.a;
+        }
+        setActive(current);
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
   return (
-    <motion.div {...pageTransition}>
+    <motion.div {...pageTransition} className="min-h-screen flex flex-col">
+      {/* public chrome — docs are readable without signing in */}
+      <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
+        <Link to="/" className="flex items-center gap-3">
+          <Mark />
+          <span className="font-mono font-bold tracking-[0.22em] text-sm">
+            RODEX<em className="text-gold not-italic">DB</em>
+          </span>
+        </Link>
+        <span className="ml-2 font-mono text-[9px] tracking-[0.22em] text-inkdim hidden sm:inline">API REFERENCE</span>
+        <div className="ml-auto">
+          <FoldLink to="/login" variant="ghost" size="sm">
+            ENTER CONSOLE
+          </FoldLink>
+        </div>
+      </header>
+
+      <main className="w-full max-w-6xl mx-auto px-4 sm:px-5 py-8 flex-1">
       <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         API <span className="text-gold">REFERENCE</span>
       </h1>
@@ -74,6 +120,22 @@ export default function DocsPage() {
       <div className="font-mono text-[10px] sm:text-[11px] tracking-[0.16em] text-inkdim mb-6">
         BASE <span className="text-ink">—</span> <span className="text-gold">{GW}</span>
       </div>
+
+      {/* mobile section chips */}
+      <nav className="lg:hidden flex gap-1.5 overflow-x-auto pb-3 mb-1 -mx-1 px-1" aria-label="Documentation sections">
+        {toc.map((t) => (
+          <a
+            key={t.a}
+            href={`#${t.a}`}
+            aria-current={active === t.a ? "true" : undefined}
+            className={`shrink-0 font-mono text-[9.5px] tracking-[0.14em] px-2.5 py-1.5 rounded-md border transition-colors ${
+              active === t.a ? "text-gold border-gold/50 bg-gold/5" : "text-inkdim border-line hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </a>
+        ))}
+      </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-[190px_1fr] gap-6">
         {/* TOC (desktop) */}
@@ -85,8 +147,12 @@ export default function DocsPage() {
                 key={t.a}
                 variants={foldIn}
                 href={`#${t.a}`}
-                className="font-mono text-[10.5px] tracking-[0.16em] text-inkdim hover:text-gold py-1 transition-colors"
+                aria-current={active === t.a ? "true" : undefined}
+                className={`font-mono text-[10.5px] tracking-[0.16em] py-1 transition-colors ${
+                  active === t.a ? "text-gold" : "text-inkdim hover:text-ink"
+                }`}
               >
+                {active === t.a ? "▸ " : ""}
                 {t.label}
               </motion.a>
             ))}
@@ -393,6 +459,13 @@ curl -X POST $GW/v1/table/create \\
           </div>
         </motion.div>
       </div>
+      </main>
+
+      <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
+        <span>RODEX DB — GATEWAY CONSOLE</span>
+        <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
+        <span>rodexdb.pages.dev</span>
+      </footer>
     </motion.div>
   );
 }

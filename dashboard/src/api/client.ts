@@ -19,6 +19,18 @@ const SESSION_KEY = "rodex_session";
 let authed: boolean | null = null;
 let checkPromise: Promise<void> | null = null;
 const authListeners = new Set<(v: boolean) => void>();
+// Set by logout(); PublicOnly renders /login without re-verifying, so a stale
+// cookie can never bounce the user back to the board.
+let explicitLogout = false;
+
+export function isExplicitLogout(): boolean {
+  return explicitLogout;
+}
+
+export function markExplicitLogout(): void {
+  explicitLogout = true;
+  invalidateSession();
+}
 
 function setAuthed(v: boolean): void {
   authed = v;
@@ -57,6 +69,7 @@ export function getSessionToken(): string | null {
 }
 
 export function setSessionToken(token: string): void {
+  explicitLogout = false;
   invalidateSession();
   try {
     localStorage.setItem(SESSION_KEY, token);

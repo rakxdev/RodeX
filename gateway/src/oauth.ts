@@ -87,7 +87,11 @@ export async function completeGitHubOAuth(c: Context<{ Bindings: Env }>) {
   // 1) exchange code for token
   const tokenRes = await fetch(GH_TOKEN, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "rodex-gateway/1.0",
+    },
     body: JSON.stringify({
       client_id: env.GITHUB_CLIENT_ID,
       client_secret: env.GITHUB_CLIENT_SECRET,
@@ -100,10 +104,18 @@ export async function completeGitHubOAuth(c: Context<{ Bindings: Env }>) {
     throw badRequest("GitHub authorization failed");
   }
 
-  // 2) fetch the user's login
+  // 2) fetch the user's login (GitHub API REQUIRES a User-Agent header)
   const userRes = await fetch(GH_USER, {
-    headers: { Accept: "application/json", Authorization: `Bearer ${tokenBody.access_token}` },
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${tokenBody.access_token}`,
+      "User-Agent": "rodex-gateway/1.0",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
   });
+  if (!userRes.ok) {
+    throw serviceUnavailable(`GitHub user lookup failed (status ${userRes.status})`);
+  }
   const user = (await userRes.json().catch(() => ({}))) as GitHubUser;
   const login = (user.login || "").toLowerCase();
 
