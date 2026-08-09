@@ -31,9 +31,9 @@ export default function AppShell() {
   async function logout() {
     clearSessionToken();
     try {
-      await api.post("/v1/admin/logout");
+      await api.post("/v1/admin/logout", {});
     } catch {
-      /* best effort */
+      /* best effort — session token is already cleared client-side */
     }
     navigate("/login");
   }

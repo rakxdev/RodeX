@@ -92,6 +92,20 @@ describe("password login", () => {
     expect(via.result.authenticated).toBe(true);
   });
 
+  it("logout works bodyless and clears the session cookie (regression: 415)", async () => {
+    const r = await call("POST", "/v1/admin/logout");
+    expect(r.status).toBe(200);
+    expect((await r.json()) as any).toMatchObject({ ok: true });
+    const sc = r.headers.get("set-cookie") || "";
+    expect(sc).toContain("rodex_session=;");
+    expect(sc.toLowerCase()).toContain("max-age=0");
+  });
+
+  it("logout also accepts a JSON body (SPA sends {}) without error", async () => {
+    const r = await call("POST", "/v1/admin/logout", {});
+    expect(r.status).toBe(200);
+  });
+
   it("bearer token drives admin actions; garbage token → 401", async () => {
     const login = await (await call("POST", "/v1/admin/login", { password: ADMIN_PW })).json() as any;
     const created = await call("POST", "/v1/admin/apps", { name: "token-app" }, { Authorization: `Bearer ${login.result.session}` });
