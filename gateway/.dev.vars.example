@@ -1,0 +1,9 @@
+# Local dev secrets — copy to .dev.vars for `wrangler dev` only.
+# NEVER commit .dev.vars. Production uses `wrangler secret put`.
+ADMIN_PASSWORD=change-me-please-min-12-chars
+SESSION_SECRET=change-me-too-min-24-chars-1234567890
+GITHUB_CLIENT_ID=replace
+GITHUB_CLIENT_SECRET=replace
+# AWS (only needed for STORAGE=aws):
+AWS_ACCESS_KEY_ID=replace
+AWS_SECRET_ACCESS_KEY=replace

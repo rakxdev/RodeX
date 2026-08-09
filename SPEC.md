@@ -220,9 +220,13 @@ assume ≤ 10 apps; any excess returns 429 (never 500).
 - Deletion: **soft delete with 5-min recover window + force delete**.
 - Quality bar: production-grade, all skills applied, "unbeatable" error handling.
 
-## 13. Open Questions (remaining)
+## 13. Decisions (human answers, same session)
 
-1. Allowed GitHub usernames for dashboard login — just `rakxdev`? (env `GITHUB_ALLOWED_USERS`)
-2. Dashboard URL: use the free `rodex-dash.pages.dev`, or do you have a custom domain for it?
-3. GitHub OAuth callback: after deploy, the OAuth app on GitHub must allow the
-   Pages URL as callback — I'll give you the exact URL to paste. OK?
+1. **Allowed GitHub usernames:** `rakxdev`, `newylbot`, `luminoxpp`
+   (env `GITHUB_ALLOWED_USERS="rakxdev,newylbot,luminoxpp"`).
+2. **Dashboard URL:** Cloudflare Pages project `rodexdb` → `rodexdb.pages.dev`;
+   fallback if taken: `rodex-db.pages.dev`. Final OAuth callback URL = that
+   domain + `/v1/auth/github/callback` — Rakesh pastes it into GitHub OAuth app.
+3. **Auth notes:** cross-site session cookie (`SameSite=None; Secure`) between
+   gateway (workers.dev) and dashboard (pages.dev); CORS with credentials for
+   `DASHBOARD_ORIGIN`.

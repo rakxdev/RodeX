@@ -1,0 +1,17 @@
+{
+  "name": "rodex",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RodeX v1 — personal database gateway platform (DynamoDB + Cloudflare)",
+  "workspaces": [
+    "gateway"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w gateway",
+    "dev:real": "cross-env STORAGE=aws npm run dev -w gateway",
+    "test": "npm run test -w gateway",
+    "typecheck": "npm run typecheck -w gateway",
+    "deploy:gateway": "npm run deploy -w gateway",
+    "deploy:dashboard": "wrangler pages deploy dashboard --project-name rodexdb"
+  }
+}

@@ -1,0 +1,67 @@
+name = "rodex-gateway"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# ── Triggers ──────────────────────────────────────────────────────────────
+# Purge worker: finalizes scheduled (soft) deletions every minute.
+# NOTE: cron CPU on free plan is 10 ms — network waits do not count toward CPU.
+[triggers]
+crons = ["* * * * *"]
+
+# ── Vars (non-secret config) ────────────────────────────────────────────────
+[vars]
+STORAGE = "mock" # "mock" (no AWS needed) | "aws" (real DynamoDB)
+DASHBOARD_ORIGIN = "https://rodexdb.pages.dev" # CORS + cookie target
+GITHUB_ALLOWED_USERS = "rakxdev,newylbot,luminoxpp"
+
+# ── Secrets (wrangler secret put <NAME>): ───────────────────────────────────
+# ADMIN_PASSWORD            fallback dashboard login (min 12 chars)
+# SESSION_SECRET            HMAC secret for session cookies (min 24 chars)
+# GITHUB_CLIENT_ID          GitHub OAuth app client id
+# GITHUB_CLIENT_SECRET      GitHub OAuth app client secret
+# AWS_ACCESS_KEY_ID         IAM user with least-privilege policy (docs/iam.md)
+# AWS_SECRET_ACCESS_KEY     same
+
+# ── Rate limits (Workers Rate Limiting binding, GA) ─────────────────────────
+# Per unique key, PER CLOUDFLARE LOCATION (see docs/rate-limits.md).
+# namespace_id values must be unique per Cloudflare account:
+#   if "1001".."1005" conflict with an existing deployment, change them.
+[[ratelimits]]
+name = "RL_APP_TOTAL"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 600
+  period = 60
+
+[[ratelimits]]
+name = "RL_APP_WRITES"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+[[ratelimits]]
+name = "RL_APP_READS"
+namespace_id = "1003"
+
+  [ratelimits.simple]
+  limit = 240
+  period = 60
+
+[[ratelimits]]
+name = "RL_PLATFORM"
+namespace_id = "1004"
+
+  [ratelimits.simple]
+  limit = 1000
+  period = 60
+
+[[ratelimits]]
+name = "RL_ADMIN"
+namespace_id = "1005"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60
