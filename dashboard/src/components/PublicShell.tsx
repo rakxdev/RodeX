@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
 import { Mark } from "@/App";
 import { FoldLink } from "@/components/FoldButton";
-import CreditModal from "@/components/CreditModal";
 
 /** Public chrome for documentation surfaces (docs + usage) — readable without signing in. */
 export function PublicHeader({ tag }: { tag: string }) {
-  const [creditsOpen, setCreditsOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
       <Link to="/" className="flex items-center gap-3">
@@ -35,18 +32,19 @@ export function PublicHeader({ tag }: { tag: string }) {
         >
           USAGE
         </Link>
-        <button
-          type="button"
-          onClick={() => setCreditsOpen(true)}
-          className="font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md text-inkdim hover:text-gold transition-colors"
+        <Link
+          to="/credits"
+          aria-current={tag === "CREDITS" ? "true" : undefined}
+          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+            tag === "CREDITS" ? "text-gold bg-panel2" : "text-inkdim hover:text-gold"
+          }`}
         >
           CREDITS
-        </button>
+        </Link>
         <FoldLink to="/login" variant="ghost" size="sm">
           ENTER CONSOLE
         </FoldLink>
       </nav>
-      <CreditModal open={creditsOpen} onClose={() => setCreditsOpen(false)} />
     </header>
   );
 }

@@ -412,6 +412,41 @@ body {
   animation: cursorblink 1s steps(1) infinite;
 }
 
+/* rolling marquee strip */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee {
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(23, 26, 31, 0.55);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  min-width: 200%;
+  animation: marquee 28s linear infinite;
+}
+.marquee-track span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--ink-dim);
+  padding: 10px 0;
+  white-space: nowrap;
+}
+.marquee-track span b {
+  color: var(--amber);
+  font-weight: 600;
+}
+
 /* split-flap cells (Vestaboard-style) */
 .flap-cell {
   display: inline-flex;

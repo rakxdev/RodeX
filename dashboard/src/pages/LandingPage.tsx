@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import { FoldButton, FoldLink } from "@/components/FoldButton";
 import { api, clearSessionToken, gatewayBase, markExplicitLogout } from "@/api/client";
@@ -10,7 +10,7 @@ import TypeTerminal from "@/components/TypeTerminal";
 import TiltCard from "@/components/TiltCard";
 import Magnetic from "@/components/Magnetic";
 import SplitFlap from "@/components/SplitFlap";
-import { CreditContent } from "@/components/CreditModal";
+import CreditContent from "@/components/CreditContent";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -250,6 +250,11 @@ export default function LandingPage() {
           className="nameplate p-8 sm:p-12"
         >
           <CreditContent />
+          <div className="mt-6 text-center">
+            <FoldLink to="/credits" variant="ghost" size="sm">
+              FULL CREDITS <ArrowUpRight className="w-3.5 h-3.5" />
+            </FoldLink>
+          </div>
         </motion.div>
       </section>
 
