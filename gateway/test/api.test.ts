@@ -85,6 +85,32 @@ describe("auth & isolation", () => {
     expect(res.status).toBe(415);
   });
 
+  it("security headers present on every response", async () => {
+    const res = await handler.fetch(new Request("http://localhost/v1/health"), env(), {} as ExecutionContext);
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    expect(res.headers.get("strict-transport-security")).toBe("max-age=15552000");
+  });
+
+  it("admin routes reject foreign Origin (CSRF depth)", async () => {
+    const evil = await handler.fetch(
+      new Request("http://localhost/v1/admin/me", { headers: { Origin: "https://evil.example.com" } }),
+      env(),
+      {} as ExecutionContext,
+    );
+    expect(evil.status).toBe(403);
+    const good = await handler.fetch(
+      new Request("http://localhost/v1/admin/me", { headers: { Origin: "http://localhost:8787" } }),
+      env(),
+      {} as ExecutionContext,
+    );
+    expect(good.status).toBe(200); // origin matches DASHBOARD_ORIGIN in test env
+    const noOrigin = await handler.fetch(new Request("http://localhost/v1/admin/me"), env(), {} as ExecutionContext);
+    expect(noOrigin.status).toBe(200); // curl/CLI: no Origin header → allowed
+  });
+
   it("missing/wrong key → 401", async () => {
     const r1 = await post("/v1/query", null, {});
     expect(r1.status).toBe(401);

@@ -39,6 +39,27 @@ app.use("*", async (c, next) => {
   c.header("Vary", "Origin");
 });
 
+// ── security headers (every response) ───────────────────────────────────────
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  if (new URL(c.req.url).protocol === "https:") {
+    c.header("Strict-Transport-Security", "max-age=15552000");
+  }
+});
+
+// ── admin CSRF defense-in-depth: when a browser sends Origin, it must be ours ─
+app.use("/v1/admin/*", async (c, next) => {
+  const origin = c.req.header("origin");
+  if (origin && origin !== dashboardOrigin(c.env)) {
+    throw new HttpError(403, "Cross-origin request rejected");
+  }
+  await next();
+});
+
 app.options("*", (c) => c.body(null, 204));
 
 // ── strict JSON bodies on POST (415 otherwise) ───────────────────────────────
