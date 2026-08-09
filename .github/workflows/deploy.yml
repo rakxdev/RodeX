@@ -1,13 +1,12 @@
 name: Deploy Gateway
 
-# Auto-deploys the gateway worker to Cloudflare when quality gates pass on main.
-# ENABLE by setting a repository VARIABLE + two SECRETS
-# (Settings → Secrets and variables → Actions):
-#   Variable:  ENABLE_DEPLOY = true
-#   Secret:    CLOUDFLARE_API_TOKEN   (the cfut_... API token — never commit it)
-#   Secret:    CLOUDFLARE_ACCOUNT_ID
-# Until the variable is set, this job is skipped (green run, no deploy) and
-# deploys stay manual (docs/ci-cd.md). Rollback: `npx wrangler rollback`.
+# Auto-deploys the gateway worker to Cloudflare after CI passes on main.
+# Enabled by adding two repo SECRETS (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   (the cfut_... API token — never commit it)
+#   CLOUDFLARE_ACCOUNT_ID
+# While secrets are absent the deploy step is skipped with a notice and the
+# run stays GREEN (deploys remain manual — docs/ci-cd.md).
+# Rollback: `npx wrangler rollback`.
 
 on:
   push:
@@ -25,8 +24,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # NOTE: `secrets` context is NOT allowed in job-level if; use a variable.
-    if: ${{ vars.ENABLE_DEPLOY == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,13 +35,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fail loudly if secrets are missing
+      - name: Auto-deploy disabled notice
         if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
-        run: |
-          echo "::error::ENABLE_DEPLOY is true but CLOUDFLARE_API_TOKEN secret is missing — add it in repo settings, then re-run."
-          exit 1
+        run: echo "::notice::Auto-deploy disabled — add CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets (docs/ci-cd.md)."
 
       - name: Deploy gateway worker
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
