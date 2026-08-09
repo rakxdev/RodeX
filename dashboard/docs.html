@@ -81,7 +81,7 @@ GET  /v1/tables</pre>
         <tr><th>Item size</th><td>Max <b>20 KB</b> per row (free-tier write budget — keeps you never-throttled).</td></tr>
         <tr><th>Rate limits</th><td>600 req/min per app · 120 writes/min · 240 reads/min. Over → <code>429</code>.</td></tr>
         <tr><th>Retries</th><td>On <code>429</code>/<code>502</code>/<code>503</code>, wait <code>retry_after</code> (or 1s) and retry — writes are safe thanks to <code>request_id</code>.</td></tr>
-        <tr><th>Errors</th><td><code>400</code> bad request · <code>401</code> bad key · <code>403</code> not your table / app suspended · <code>404</code> missing row · <code>409</code> version conflict or duplicate · <code>413</code> too large · <code>429</code> rate limit · <code>502/503</code> retryable</td></tr>
+        <tr><th>Errors</th><td><code>400</code> bad request · <code>401</code> bad key · <code>403</code> not your table / app suspended · <code>404</code> missing row · <code>409</code> version conflict or duplicate · <code>413</code> too large · <code>415</code> send JSON · <code>429</code> rate limit · <code>502/503</code> retryable</td></tr>
       </table>
     </div>
 

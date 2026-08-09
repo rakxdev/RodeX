@@ -1,0 +1,590 @@
+openapi: 3.0.3
+info:
+  title: RodeX Gateway API
+  description: |
+    Personal database gateway — create isolated per-app databases on DynamoDB
+    through one HTTP API. Every app uses the same endpoints; only credentials
+    differ. Human docs: docs/api.md. Spec version 1.0.0.
+  version: 1.0.0
+servers:
+  - url: https://rodex-gateway.rakxdev.workers.dev
+    description: Production
+  - url: http://localhost:8787
+    description: Local dev (mock storage)
+
+tags:
+  - name: App API
+    description: Endpoints used by applications (X-App-Id + X-Api-Key headers)
+  - name: Admin API
+    description: Dashboard/owner endpoints (session cookie)
+  - name: Auth
+    description: Login flows
+
+paths:
+  /v1/health:
+    get:
+      tags: [App API]
+      summary: Liveness check
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  service: { type: string, example: rodex-gateway }
+                  version: { type: integer, example: 1 }
+
+  # ── App API ────────────────────────────────────────────────────────────────
+  /v1/table/create:
+    post:
+      tags: [App API]
+      summary: Create a table (stored as app_<app_id>_<name>)
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,41}$
+                request_id: { type: string }
+      responses:
+        "200":
+          description: Table ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      table: { type: string }
+                      status: { type: string, example: ready }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415": { $ref: "#/components/responses/UnsupportedMedia" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/tables:
+    get:
+      tags: [App API]
+      summary: List the app's tables
+      security: [{ appKey: [] }]
+      responses:
+        "200":
+          description: Table names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      tables:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: { type: string }
+
+  /v1/item/put:
+    post:
+      tags: [App API]
+      summary: Write one item (409 if exists unless overwrite)
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table, item]
+              properties:
+                table: { type: string }
+                item:
+                  type: object
+                  required: [pk]
+                  properties:
+                    pk: { type: string, maxLength: 500 }
+                    sk: { type: string, maxLength: 500, default: "~" }
+                  additionalProperties: true
+                overwrite: { type: boolean, default: false }
+                request_id: { type: string, description: "Idempotency key (24 h)" }
+      responses:
+        "200": { $ref: "#/components/responses/ItemResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415": { $ref: "#/components/responses/UnsupportedMedia" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/item/get:
+    post:
+      tags: [App API]
+      summary: Read one item (404 when missing)
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table, pk, sk]
+              properties:
+                table: { type: string }
+                pk: { type: string }
+                sk: { type: string }
+                strong: { type: boolean, default: false }
+      responses:
+        "200": { $ref: "#/components/responses/ItemResult" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/UnsupportedMedia" }
+
+  /v1/item/update:
+    post:
+      tags: [App API]
+      summary: Replace data payload; version-guarded when expected_version given
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table, pk, sk, data]
+              properties:
+                table: { type: string }
+                pk: { type: string }
+                sk: { type: string }
+                data: {}
+                expected_version: { type: integer }
+                request_id: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/ItemResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+
+  /v1/item/delete:
+    post:
+      tags: [App API]
+      summary: Delete one item (version-guarded when expected_version given)
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table, pk, sk]
+              properties:
+                table: { type: string }
+                pk: { type: string }
+                sk: { type: string }
+                expected_version: { type: integer }
+                request_id: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      deleted: { type: boolean, example: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/query:
+    post:
+      tags: [App API]
+      summary: Query by pk (+ optional sk prefix), paginated
+      security: [{ appKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [table, pk]
+              properties:
+                table: { type: string }
+                pk: { type: string }
+                sk_prefix: { type: string }
+                limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+                start_key: { type: string, description: "Opaque token from next_start_key" }
+                strong: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Page of items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/ItemOut" }
+                      has_more: { type: boolean }
+                      next_start_key: { type: string }
+
+  # ── Admin API ──────────────────────────────────────────────────────────────
+  /v1/admin/login:
+    post:
+      tags: [Admin API]
+      summary: Password login → session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        "200":
+          description: Session cookie set
+          headers:
+            Set-Cookie: { schema: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/admin/logout:
+    post:
+      tags: [Admin API]
+      summary: Destroy session
+      responses:
+        "200":
+          description: Logged out
+
+  /v1/admin/me:
+    get:
+      tags: [Admin API]
+      summary: Session state + allowed GitHub users
+      responses:
+        "200":
+          description: Auth state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      authenticated: { type: boolean }
+                      user: { type: string }
+                      allowed_users:
+                        type: array
+                        items: { type: string }
+
+  /v1/admin/apps:
+    post:
+      tags: [Admin API]
+      summary: Create app — api_key shown ONCE
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,39}$
+      responses:
+        "200":
+          description: App + one-time api_key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result: { $ref: "#/components/schemas/AppWithKey" }
+    get:
+      tags: [Admin API]
+      summary: List apps
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Apps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  result:
+                    type: object
+                    properties:
+                      apps:
+                        type: array
+                        items: { $ref: "#/components/schemas/AppInfo" }
+
+  /v1/admin/apps/{id}:
+    get:
+      tags: [Admin API]
+      summary: App detail
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: App info
+    delete:
+      tags: [Admin API]
+      summary: Soft delete (5-min recovery window)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: App now deleting
+
+  /v1/admin/apps/{id}/rotate-key:
+    post:
+      tags: [Admin API]
+      summary: New api_key (old invalid instantly; shown once)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: New key
+
+  /v1/admin/apps/{id}/suspend:
+    post:
+      tags: [Admin API]
+      summary: Block app traffic (403)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Suspended }
+
+  /v1/admin/apps/{id}/resume:
+    post:
+      tags: [Admin API]
+      summary: Unblock app traffic
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Resumed }
+
+  /v1/admin/apps/{id}/recover:
+    post:
+      tags: [Admin API]
+      summary: Cancel a soft delete (within window)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Recovered }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/admin/apps/{id}/force-delete:
+    post:
+      tags: [Admin API]
+      summary: Purge all tables + registry row NOW (irreversible)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/admin/purge/run:
+    get:
+      tags: [Admin API]
+      summary: Trigger pending purges manually (cron also runs 1/min)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Number finalized
+
+  # ── Auth ───────────────────────────────────────────────────────────────────
+  /v1/auth/github/start:
+    get:
+      tags: [Auth]
+      summary: Redirect to GitHub OAuth authorize
+      responses:
+        "302": { description: Redirect with state cookie }
+        "503": { description: GitHub login not configured }
+
+  /v1/auth/github/callback:
+    get:
+      tags: [Auth]
+      summary: OAuth callback → session cookie → redirect to dashboard
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "302": { description: Redirect to DASHBOARD_ORIGIN with session cookie }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    appKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: App secret key (created by admin; shown once). Pair with X-App-Id header.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: rodex_session
+      description: Admin session cookie from /v1/admin/login or GitHub OAuth.
+
+  schemas:
+    ItemOut:
+      type: object
+      properties:
+        pk: { type: string }
+        sk: { type: string }
+        data: { description: "The app payload (parsed JSON)" }
+        version: { type: integer }
+        created: { type: integer, description: "unix seconds" }
+        updated: { type: integer, description: "unix seconds" }
+
+    AppInfo:
+      type: object
+      properties:
+        app_id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [active, suspended, deleting] }
+        created_at: { type: integer }
+        tables:
+          type: array
+          items: { type: string }
+        key_prefix: { type: string }
+        purge_at: { type: integer }
+
+    AppWithKey:
+      allOf:
+        - $ref: "#/components/schemas/AppInfo"
+        - type: object
+          properties:
+            api_key: { type: string, description: "Shown once only" }
+
+    ErrorBody:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: integer, example: 401 }
+            message: { type: string }
+            retry_after: { type: integer, description: "Present on 429 only" }
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    Unauthorized:
+      description: Missing/invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    Forbidden:
+      description: Not allowed (unowned table, suspended app, disallowed user)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    Conflict:
+      description: Version mismatch, duplicate, or state conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    TooLarge:
+      description: Item exceeds 20 KB
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    UnsupportedMedia:
+      description: Content-Type must be application/json
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    RateLimited:
+      description: Rate limit exceeded or DynamoDB throttled
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorBody" }
+    ItemResult:
+      description: Item operation result
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean }
+              result: { $ref: "#/components/schemas/ItemOut" }

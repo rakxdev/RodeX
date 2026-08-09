@@ -71,8 +71,9 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 ## Error codes
 
 `400` malformed · `401` bad/missing credentials · `403` not your table / suspended ·
-`404` missing · `409` conflict (version, duplicate) · `413` too large · `429` rate
-limit/throttle (with `retry_after`) · `502/503` retryable infrastructure.
+`404` missing · `409` conflict (version, duplicate) · `413` too large ·
+`415` non-JSON body (POST requires `Content-Type: application/json`) ·
+`429` rate limit/throttle (with `retry_after`) · `502/503` retryable infrastructure.
 
 ## Retry guidance
 
