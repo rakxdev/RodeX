@@ -67,6 +67,8 @@ export default function AppsPage() {
         </div>
         <form onSubmit={create} className="flex gap-2 items-center w-full sm:w-auto">
           <input
+            id="app-name"
+            name="app-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="app name (e.g. weather-bot)"
