@@ -5,9 +5,11 @@
  */
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { registerAdminRoutes } from "./admin";
 import { HttpError, gatewayError } from "./errors";
 import type { Env } from "./env";
 import { dashboardOrigin, sessionSecret } from "./env";
+import { completeGitHubOAuth, startGitHubOAuth } from "./oauth";
 import { authenticateApp, purgeDue } from "./registry";
 import { createStorage } from "./storage";
 import {
@@ -41,6 +43,11 @@ app.options("*", (c) => c.body(null, 204));
 
 // ── public ───────────────────────────────────────────────────────────────────
 app.get("/v1/health", (c) => c.json({ ok: true, service: "rodex-gateway", version: 1 }));
+
+// ── admin auth (GitHub OAuth + password) ────────────────────────────────────
+app.get("/v1/auth/github/start", (c) => startGitHubOAuth(c));
+app.get("/v1/auth/github/callback", async (c) => completeGitHubOAuth(c));
+registerAdminRoutes(app);
 
 // ── app API ──────────────────────────────────────────────────────────────────
 async function appCtx(c: Context<{ Bindings: Env }>): Promise<AppContext> {
