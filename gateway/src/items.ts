@@ -182,7 +182,7 @@ export async function handleQuery(ctx: AppContext, body: Record<string, unknown>
   const pk = reqString(body, "pk");
   const skPrefix = body["sk_prefix"];
   if (skPrefix !== undefined && typeof skPrefix !== "string") throw badRequest("sk_prefix must be a string");
-  let limit = reqNumber(body, "limit") ?? 100;
+  const limit = reqNumber(body, "limit") ?? 100;
   if (limit < 1 || limit > 100) throw badRequest("limit must be between 1 and 100");
   const startKey = body["start_key"] as string | undefined;
   const out = await ctx.storage.queryItems(physicalName(ctx.appId, table), pk, skPrefix, limit, startKey);
