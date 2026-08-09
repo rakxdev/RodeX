@@ -4,6 +4,7 @@ import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { api, clearSessionToken } from "@/api/client";
 import { springLift } from "@/lib/motion";
+import { FoldButton } from "@/components/FoldButton";
 
 export function Mark({ className = "w-7 h-7" }: { className?: string }) {
   return (
@@ -61,9 +62,9 @@ export default function AppShell() {
                 {n.label}
               </NavLink>
             ))}
-            <button onClick={logout} className="font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2 ml-2">
+            <FoldButton onClick={logout} variant="ghost" size="sm" className="ml-2">
               EXIT
-            </button>
+            </FoldButton>
           </nav>
 
           {/* mobile menu toggle */}
@@ -92,9 +93,9 @@ export default function AppShell() {
                     {n.label}
                   </NavLink>
                 ))}
-                <button onClick={logout} className="text-left font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2">
+                <FoldButton onClick={logout} variant="ghost" size="sm" className="self-start mt-1">
                   EXIT
-                </button>
+                </FoldButton>
               </div>
             </motion.nav>
           )}

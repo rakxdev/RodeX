@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { api, ApiError, type AppInfo } from "@/api/client";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
+import { FoldButton } from "@/components/FoldButton";
 
 export default function AppDetailPage() {
   const { id } = useParams();
@@ -63,18 +64,14 @@ export default function AppDetailPage() {
   const suspended = app.status === "suspended";
 
   const actionBtn = (key: string, label: string, onClick: () => void, danger = false) => (
-    <motion.button
-      whileTap={{ scale: 0.96 }}
+    <FoldButton
       disabled={busy !== null}
       onClick={onClick}
-      className={`font-mono text-[10px] sm:text-[11px] tracking-[0.14em] px-3 py-2 rounded-lg border transition-colors disabled:opacity-40 ${
-        danger
-          ? "border-redx/60 text-redx hover:bg-redx/10"
-          : "border-line bg-panel2 text-ink hover:border-gold/60 hover:text-gold"
-      }`}
+      variant={danger ? "danger" : "ghost"}
+      size="sm"
     >
       {busy === key ? "…" : label}
-    </motion.button>
+    </FoldButton>
   );
 
   return (
@@ -101,9 +98,9 @@ export default function AppDetailPage() {
           <>
             {actionBtn("recover", "RECOVER", () => act("recover"))}
             {arm === "purge" ? (
-              <button onClick={() => act("force-delete")} className="font-mono text-[10px] sm:text-[11px] tracking-[0.14em] px-3 py-2 rounded-lg bg-redx text-white">
+              <FoldButton onClick={() => act("force-delete")} variant="red" size="sm">
                 CONFIRM PURGE — IRREVERSIBLE
-              </button>
+              </FoldButton>
             ) : (
               actionBtn("arm-purge", "PURGE NOW", () => setArm("purge"), true)
             )}
@@ -113,9 +110,9 @@ export default function AppDetailPage() {
             {actionBtn(suspended ? "resume" : "suspend", suspended ? "RESUME" : "SUSPEND", () => act(suspended ? "resume" : "suspend"))}
             {actionBtn("rotate-key", "ROTATE KEY", () => act("rotate-key"))}
             {arm === "delete" ? (
-              <button onClick={() => act("delete")} className="font-mono text-[10px] sm:text-[11px] tracking-[0.14em] px-3 py-2 rounded-lg bg-redx text-white">
+              <FoldButton onClick={() => act("delete")} variant="red" size="sm">
                 CONFIRM DELETE — 5 MIN WINDOW
-              </button>
+              </FoldButton>
             ) : (
               actionBtn("arm-delete", "DELETE", () => setArm("delete"), true)
             )}

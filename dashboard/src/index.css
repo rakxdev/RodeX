@@ -138,6 +138,197 @@ body {
 .action-red:hover { filter: brightness(1.08); }
 .action-red:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Miura-fold buttons (action surface) ────────────────────────────────
+   Pressed-metal plate, one diagonal facet crease, dog-eared corner flap,
+   zigzag crease line. Hover lifts the fold; press flattens it. */
+.fold-btn {
+  position: relative;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: #fff;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 0.15s ease;
+}
+.fold-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+
+.fold-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  clip-path: polygon(
+    0 0, 100% 0, 100% calc(100% - 14px),
+    calc(100% - 14px) 100%, 0 100%
+  );
+  background: linear-gradient(
+    104deg,
+    var(--fold-a) 0 56%,
+    var(--fold-b) 57% 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+  transition: filter 0.15s ease;
+}
+
+/* dog-eared flap folded under the corner */
+.fold-flap {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(315deg, var(--fold-flap), rgba(0, 0, 0, 0.08));
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  border-radius: 0 0 8px 0;
+  opacity: 0.9;
+  transition: opacity 0.15s ease;
+}
+
+/* Miura zigzag crease line above the fold */
+.fold-btn::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 17px;
+  bottom: 3px;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    repeating-linear-gradient(45deg, var(--fold-zig) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, var(--fold-zig) 0 2px, transparent 2px 6px);
+  transition: opacity 0.15s ease;
+}
+
+.fold-btn:hover:not(:disabled) .fold-surface { filter: brightness(1.08); }
+.fold-btn:hover:not(:disabled) .fold-flap { opacity: 1; }
+.fold-btn:hover:not(:disabled)::after { opacity: 0.85; }
+
+/* variants */
+.fold-red {
+  --fold-a: #e8452c;
+  --fold-b: #ff5a3d;
+  --fold-flap: rgba(0, 0, 0, 0.38);
+  --fold-zig: rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+.fold-red .fold-surface {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    0 10px 24px rgba(232, 69, 44, 0.2);
+}
+
+.fold-ghost {
+  --fold-a: #1d2127;
+  --fold-b: #262b34;
+  --fold-flap: rgba(0, 0, 0, 0.45);
+  --fold-zig: rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+}
+.fold-ghost .fold-surface {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.fold-ghost:hover:not(:disabled) .fold-surface {
+  box-shadow:
+    inset 0 0 0 1px rgba(217, 182, 74, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.fold-gold {
+  --fold-a: #c9a83c;
+  --fold-b: #e0c25c;
+  --fold-flap: rgba(26, 21, 8, 0.35);
+  --fold-zig: rgba(26, 21, 8, 0.28);
+  color: #1a1508;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.fold-danger {
+  --fold-a: rgba(232, 69, 44, 0.08);
+  --fold-b: rgba(232, 69, 44, 0.16);
+  --fold-flap: rgba(0, 0, 0, 0.5);
+  --fold-zig: rgba(232, 69, 44, 0.5);
+  color: var(--red);
+}
+.fold-danger .fold-surface {
+  box-shadow: inset 0 0 0 1px rgba(232, 69, 44, 0.55);
+}
+.fold-danger:hover:not(:disabled) .fold-surface {
+  box-shadow: inset 0 0 0 1px var(--red);
+}
+
+/* code blocks for docs */
+.code-block {
+  background: #111418;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  overflow-x: auto;
+  color: var(--paper);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.code-block .cmt { color: var(--ink-dim); }
+.code-block .k { color: var(--gold); }
+
+/* doc tables */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.doc-table th {
+  text-align: left;
+  color: var(--ink-dim);
+  letter-spacing: 0.16em;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.doc-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(42, 47, 55, 0.55);
+  color: var(--ink);
+  vertical-align: top;
+}
+.doc-table tr:last-child td { border-bottom: none; }
+.doc-table td code {
+  font-size: 10.5px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* endpoint method chips */
+.method-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  background: rgba(255, 255, 255, 0.02);
+}
+.method-chip.post { color: var(--amber); border-color: rgba(217, 164, 65, 0.4); }
+.method-chip.delete { color: var(--red); border-color: rgba(232, 69, 44, 0.5); }
+
 /* scanline sheet panels */
 .sheet-panel {
   background: #14171c;

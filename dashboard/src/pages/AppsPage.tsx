@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { api, ApiError, type AppInfo, type AppStatus } from "@/api/client";
 import { pageTransition, fadeUp, stagger, springLift } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
+import { FoldButton } from "@/components/FoldButton";
 
 function statusStamp(status: AppStatus) {
   switch (status) {
@@ -74,9 +75,9 @@ export default function AppsPage() {
             placeholder="app name (e.g. weather-bot)"
             className="flex-1 sm:flex-none font-mono text-[12px] tracking-[0.06em] px-3 py-2.5 rounded-lg bg-panel2 border border-line text-ink placeholder:text-inkdim focus:outline-none focus:border-gold sm:w-56"
           />
-          <motion.button whileTap={{ scale: 0.96 }} disabled={busy || !name.trim()} className="action-red px-4 sm:px-5 py-2.5 rounded-lg text-[11px] sm:text-[12px] shrink-0">
+          <FoldButton size="sm" className="shrink-0" disabled={busy || !name.trim()}>
             ＋ Fabricate
-          </motion.button>
+          </FoldButton>
         </form>
       </div>
 
@@ -140,8 +141,20 @@ export default function AppsPage() {
           </motion.div>
         ))}
         {apps && apps.length === 0 && (
-          <motion.div variants={fadeUp} className="col-span-full nameplate p-10 text-center font-mono text-[12px] tracking-[0.14em] text-inkdim">
-            NO INSTRUMENTS REGISTERED — FABRICATE YOUR FIRST APP
+          <motion.div variants={fadeUp} className="col-span-full">
+            <div className="nameplate p-10 text-center">
+              <div className="font-mono text-[12px] tracking-[0.14em] text-inkdim">
+                NO INSTRUMENTS REGISTERED — FABRICATE YOUR FIRST APP
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={() => document.getElementById("app-name")?.focus()}
+                  className="font-mono text-[10px] tracking-[0.18em] text-gold hover:underline underline-offset-4"
+                >
+                  CREATE ONE ABOVE ↑
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </motion.div>

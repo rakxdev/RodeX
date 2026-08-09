@@ -1,7 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
+import { FoldLink } from "@/components/FoldButton";
+
+const GW_HEALTH = "https://rodex-gateway.rakxdev.workers.dev/v1/health";
+
+function GatewayStatus() {
+  const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
+  useEffect(() => {
+    let alive = true;
+    fetch(GW_HEALTH)
+      .then((r) => r.json())
+      .then((b) => alive && setState(b?.ok ? "nominal" : "offline"))
+      .catch(() => alive && setState("offline"));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return (
+    <span className="inline-flex items-center gap-2 font-mono text-[9.5px] tracking-[0.2em]">
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          state === "nominal" ? "bg-ok" : state === "offline" ? "bg-redx" : "bg-inkdim animate-pulse"
+        }`}
+        aria-hidden="true"
+      />
+      {state === "nominal" ? "GATEWAY NOMINAL" : state === "offline" ? "GATEWAY OFFLINE" : "LINK TEST…"}
+    </span>
+  );
+}
 
 const cells = [
   {
@@ -42,9 +71,11 @@ export default function LandingPage() {
         </span>
         <Link
           to="/login"
-          className="ml-auto sm:ml-4 font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md border border-line bg-panel2 text-ink hover:border-gold/60 hover:text-gold transition-colors"
+          className="ml-auto sm:ml-4"
         >
-          ENTER CONSOLE
+          <span className="inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md border border-line bg-panel2 text-ink hover:border-gold/60 hover:text-gold transition-colors">
+            ENTER CONSOLE
+          </span>
         </Link>
       </header>
 
@@ -99,15 +130,22 @@ export default function LandingPage() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
+          transition={{ delay: 0.16 }}
+          className="mt-5"
+        >
+          <GatewayStatus />
+        </motion.div>
+
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
           transition={{ delay: 0.18 }}
           className="mt-8 flex flex-col sm:flex-row items-center gap-3"
         >
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.18em] px-6 py-3 rounded-lg border border-gold/70 bg-gold/10 text-gold hover:bg-gold/20 transition-colors"
-          >
+          <FoldLink to="/login" variant="red" size="lg">
             ENTER CONSOLE <ArrowRight className="w-4 h-4" />
-          </Link>
+          </FoldLink>
           <a
             href="#spec"
             className="inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.18em] px-5 py-3 rounded-lg text-inkdim hover:text-ink transition-colors"
@@ -136,12 +174,9 @@ export default function LandingPage() {
           ))}
         </motion.div>
         <div className="mt-10 text-center">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 font-mono text-[12px] tracking-[0.18em] px-6 py-3 rounded-lg border border-line bg-panel2 text-ink hover:border-gold/60 hover:text-gold transition-colors"
-          >
+          <FoldLink to="/login" variant="ghost" size="md">
             ENTER CONSOLE <ArrowRight className="w-4 h-4" />
-          </Link>
+          </FoldLink>
         </div>
       </section>
 

@@ -12,6 +12,42 @@ const BASE = (import.meta.env.VITE_GATEWAY_URL as string | undefined) ?? "https:
 // token, sent as `Authorization: Bearer <token>` on every request.
 const SESSION_KEY = "rodex_session";
 
+// ── session-state cache ───────────────────────────────────────────────────────
+// /v1/admin/me is verified ONCE per page load; every guard reads the cached
+// result, so switching tabs never re-verifies (no VERIFYING SESSION flash).
+// Login/logout invalidate the cache through setSessionToken/clearSessionToken.
+let authed: boolean | null = null;
+let checkPromise: Promise<void> | null = null;
+const authListeners = new Set<(v: boolean) => void>();
+
+function setAuthed(v: boolean): void {
+  authed = v;
+  authListeners.forEach((l) => l(v));
+}
+
+export function getAuthedState(): boolean | null {
+  return authed;
+}
+
+export function invalidateSession(): void {
+  authed = null;
+  checkPromise = null;
+}
+
+export function ensureSessionChecked(): Promise<void> {
+  if (checkPromise) return checkPromise;
+  checkPromise = api
+    .get<MeResult>("/v1/admin/me")
+    .then((r) => setAuthed(r.authenticated))
+    .catch(() => setAuthed(false));
+  return checkPromise;
+}
+
+export function subscribeAuthed(listener: (v: boolean) => void): () => void {
+  authListeners.add(listener);
+  return () => authListeners.delete(listener);
+}
+
 export function getSessionToken(): string | null {
   try {
     return localStorage.getItem(SESSION_KEY);
@@ -21,6 +57,7 @@ export function getSessionToken(): string | null {
 }
 
 export function setSessionToken(token: string): void {
+  invalidateSession();
   try {
     localStorage.setItem(SESSION_KEY, token);
   } catch {
@@ -29,6 +66,7 @@ export function setSessionToken(token: string): void {
 }
 
 export function clearSessionToken(): void {
+  invalidateSession();
   try {
     localStorage.removeItem(SESSION_KEY);
   } catch {
@@ -48,13 +86,15 @@ export function ingestUrlSession(): void {
   window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
 }
 
-export interface ApiError {
+export interface ApiErrorShape {
   status: number;
   message: string;
   retryAfter?: number;
 }
 
-export class ApiError extends Error {
+export class ApiError extends Error implements ApiErrorShape {
+  status: number;
+  retryAfter?: number;
   constructor(status: number, message: string, retryAfter?: number) {
     super(message);
     this.status = status;
