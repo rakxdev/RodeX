@@ -46,24 +46,19 @@ describe("AwsStorage marshaling rules", () => {
   });
 
   it("ensureTable waits for ACTIVE before returning (CREATING race)", async () => {
-    let mode = "create";
+    let describes = 0;
     (s as any).call = async (op: string) => {
       if (op.includes("DescribeTable")) {
-        if (mode === "create") {
-          throw new HttpError(404, "not found yet");
-        }
-        return { Table: { TableStatus: mode === "creating" ? "CREATING" : "ACTIVE" } };
+        describes++;
+        if (describes === 1) throw new HttpError(404, "not found yet"); // doesn't exist → create below
+        if (describes === 2) return { Table: { TableStatus: "CREATING" } }; // created, still warming
+        return { Table: { TableStatus: "ACTIVE" } }; // ready on the next poll
       }
-      if (op.includes("CreateTable")) {
-        mode = "creating";
-        return {};
-      }
+      if (op.includes("CreateTable")) return {};
       return {};
     };
     await expect((s as any).ensureTable("t")).resolves.toBeUndefined();
-    expect(mode).toBe("creating");
-    mode = "active";
-    await expect((s as any).ensureTable("t")).resolves.toBeUndefined();
+    expect(describes).toBeGreaterThanOrEqual(3);
   });
 
   it("maps DynamoDB validation errors to 400", async () => {
