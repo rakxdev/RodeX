@@ -163,6 +163,9 @@ export async function runPurge(env: Env): Promise<number> {
   return purgeDue(storage, Math.floor(Date.now() / 1000), 5);
 }
 
+// Durable Object required by the strict rate limiter (wrangler [[durable_objects.bindings]])
+export { RateLimiterDO } from "./rate-do";
+
 export default {
   fetch: app.fetch,
   async scheduled(_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) {

@@ -22,46 +22,13 @@ GITHUB_ALLOWED_USERS = "rakxdev,newylbot,luminoxpp"
 # AWS_ACCESS_KEY_ID         IAM user with least-privilege policy (docs/iam.md)
 # AWS_SECRET_ACCESS_KEY     same
 
-# ── Rate limits (Workers Rate Limiting binding, GA) ─────────────────────────
-# Per unique key, PER CLOUDFLARE LOCATION (see docs/rate-limits.md).
-# namespace_id values must be unique per Cloudflare account:
-#   if "1001".."1005" conflict with an existing deployment, change them.
-[[ratelimits]]
-name = "RL_APP_TOTAL"
-namespace_id = "1001"
+# ── Strict rate limiting (single-point Durable Object counters) ─────────────
+# One shared RateLimiterDO owns every budget: no edge lag, no burst tolerance.
+# Limits live in src/limits.ts (RATE_*); counters reset at each 60 s window.
+[[durable_objects.bindings]]
+name = "RL_DO"
+class_name = "RateLimiterDO"
 
-  [ratelimits.simple]
-  limit = 600
-  period = 60
-
-[[ratelimits]]
-name = "RL_APP_WRITES"
-namespace_id = "1002"
-
-  [ratelimits.simple]
-  limit = 120
-  period = 60
-
-[[ratelimits]]
-name = "RL_APP_READS"
-namespace_id = "1003"
-
-  [ratelimits.simple]
-  limit = 240
-  period = 60
-
-[[ratelimits]]
-name = "RL_PLATFORM"
-namespace_id = "1004"
-
-  [ratelimits.simple]
-  limit = 1000
-  period = 60
-
-[[ratelimits]]
-name = "RL_ADMIN"
-namespace_id = "1005"
-
-  [ratelimits.simple]
-  limit = 60
-  period = 60
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiterDO"]

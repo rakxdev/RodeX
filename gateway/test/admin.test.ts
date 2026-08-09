@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import { resetMockStorage } from "../src/storage-mock";
+import { resetRateCounters } from "../src/rate";
 import handler from "../src/index";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -47,6 +48,7 @@ let adminCookie = "";
 
 beforeEach(async () => {
   resetMockStorage();
+  resetRateCounters();
   const login = await call("POST", "/v1/admin/login", { password: ADMIN_PW });
   adminCookie = cookieOf(login);
 });

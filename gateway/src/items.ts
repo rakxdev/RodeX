@@ -134,7 +134,9 @@ export async function handleGet(ctx: AppContext, body: Record<string, unknown>) 
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "read");
   const pk = reqString(body, "pk");
-  const sk = reqString(body, "sk");
+  // sk is optional and defaults to the same "~" sentinel put uses
+  const raw = body["sk"];
+  const sk = raw === undefined || raw === null ? "~" : reqString(body, "sk");
   const strong = body["strong"] === true;
   const item = await ctx.storage.getItem(physicalName(ctx.appId, table), pk, sk, strong);
   if (!item) throw notFound("Item not found");
