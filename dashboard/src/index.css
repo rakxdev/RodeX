@@ -412,6 +412,28 @@ body {
   animation: cursorblink 1s steps(1) infinite;
 }
 
+@keyframes textshine {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+/* RAKXDEV — the maker's unique mark: molten gold that endlessly travels the letters */
+.glow-text {
+  background: linear-gradient(
+    90deg,
+    var(--gold) 0%,
+    #f6e7a0 22%,
+    var(--gold) 45%,
+    #b8952f 70%,
+    var(--gold) 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: textshine 3.2s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(217, 182, 74, 0.28));
+}
+
 /* rolling marquee strip */
 @keyframes marquee {
   from { transform: translateX(0); }
@@ -432,7 +454,7 @@ body {
   display: flex;
   flex-shrink: 0;
   min-width: 200%;
-  animation: marquee 28s linear infinite;
+  animation: marquee 55s linear infinite;
 }
 .marquee-track span {
   font-family: var(--font-mono);
