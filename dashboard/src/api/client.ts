@@ -6,6 +6,48 @@
 
 const BASE = (import.meta.env.VITE_GATEWAY_URL as string | undefined) ?? "https://rodex-gateway.rakxdev.workers.dev";
 
+// ── session token channel ────────────────────────────────────────────────────
+// The gateway signs a 12 h token. Browsers that accept cross-site cookies use
+// the HttpOnly cookie; everyone else (third-party cookie blockers) uses this
+// token, sent as `Authorization: Bearer <token>` on every request.
+const SESSION_KEY = "rodex_session";
+
+export function getSessionToken(): string | null {
+  try {
+    return localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionToken(token: string): void {
+  try {
+    localStorage.setItem(SESSION_KEY, token);
+  } catch {
+    /* storage unavailable — cookie channel still covers most browsers */
+  }
+}
+
+export function clearSessionToken(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** OAuth callback lands on /login?session=<token> — store it and strip the URL. */
+export function ingestUrlSession(): void {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("session");
+  if (!token) return;
+  setSessionToken(token);
+  params.delete("session");
+  const qs = params.toString();
+  window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+}
+
 export interface ApiError {
   status: number;
   message: string;
@@ -29,11 +71,15 @@ interface GatewayResponse<T> {
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
+  const token = getSessionToken();
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   try {
     res = await fetch(BASE + path, {
       method,
       credentials: "include",
-      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {

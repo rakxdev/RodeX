@@ -2,7 +2,10 @@
  * admin.ts — dashboard-facing API. Two auth paths:
  *   1. password login (ADMIN_PASSWORD) — constant-time compare
  *   2. GitHub OAuth session cookie (oauth.ts)
- * Sessions: HMAC-signed HttpOnly cookie, 12 h TTL.
+ * Sessions: HMAC-signed token, 12 h TTL. Delivered two ways:
+ *   - HttpOnly cookie (browsers that accept cross-site cookies)
+ *   - returned in login JSON / OAuth redirect; SPA stores it and sends
+ *     `Authorization: Bearer <token>` (browsers that block third-party cookies)
  */
 import type { Hono } from "hono";
 import { constantTimeEqual, createSessionCookie, requireSession } from "./auth";
@@ -26,7 +29,7 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     const secure = new URL(c.req.url).protocol === "https:";
     const session = await createSessionCookie(sessionSecret(c.env));
     c.header("Set-Cookie", `rodex_session=${session}; Path=/; HttpOnly; Max-Age=43200; SameSite=${secure ? "None" : "Lax"}${secure ? "; Secure" : ""}`);
-    return c.json({ ok: true, result: { user: "admin", login_method: "password" } });
+    return c.json({ ok: true, result: { user: "admin", login_method: "password", session } });
   });
 
   app.post("/v1/admin/logout", async (c) => {
@@ -44,7 +47,7 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   app.post("/v1/admin/apps", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
     const body = (await c.req.json().catch(() => null)) as { name?: string } | null;
     const name = body?.name;
@@ -56,7 +59,7 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   app.get("/v1/admin/apps", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
     const rows = await storage.listApps();
     return c.json({ ok: true, result: { apps: rows.map(toPublic) } });
@@ -64,14 +67,14 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   app.get("/v1/admin/apps/:id", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const row = await getApp(createStorage(c.env), c.req.param("id"));
     return c.json({ ok: true, result: toPublic(row) });
   });
 
   app.post("/v1/admin/apps/:id/rotate-key", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
     const { api_key, key_prefix } = await rotateKey(storage, sessionSecret(c.env), c.req.param("id"));
     return c.json({ ok: true, result: { api_key, key_prefix } }); // shown once
@@ -79,35 +82,35 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   app.post("/v1/admin/apps/:id/suspend", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await setStatus(createStorage(c.env), c.req.param("id"), "suspended");
     return c.json({ ok: true, result: app });
   });
 
   app.post("/v1/admin/apps/:id/resume", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await setStatus(createStorage(c.env), c.req.param("id"), "active");
     return c.json({ ok: true, result: app });
   });
 
   app.delete("/v1/admin/apps/:id", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await softDelete(createStorage(c.env), c.req.param("id"));
     return c.json({ ok: true, result: app });
   });
 
   app.post("/v1/admin/apps/:id/recover", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await recover(createStorage(c.env), c.req.param("id"));
     return c.json({ ok: true, result: app });
   });
 
   app.post("/v1/admin/apps/:id/force-delete", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
     const id = c.req.param("id");
     await forceDelete(storage, id);
@@ -117,20 +120,28 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // lazy purge on admin list (belt-and-suspenders to the cron trigger)
   app.get("/v1/admin/purge/run", async (c) => {
     await gateAdminRequest(c.env);
-    await requireSession(sessionSecret(c.env), cookieOf(c));
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const n = await purgeDue(createStorage(c.env), Math.floor(Date.now() / 1000), 5);
     return c.json({ ok: true, result: { finalized: n } });
   });
 }
 
-function cookieOf(c: { req: { header(name: string): string | undefined } }): string | undefined {
+function sessionTokenOf(c: { req: { header(name: string): string | undefined } }): string | undefined {
+  // 1) Authorization: Bearer <token> (SPA token channel — works when third-party cookies are blocked)
+  const auth = c.req.header("authorization") || "";
+  const bearer = /^Bearer\s+(.+)$/i.exec(auth);
+  if (bearer) return bearer[1].trim();
+  // 2) X-Rodex-Session header (fallback token channel)
+  const x = c.req.header("x-rodex-session");
+  if (x) return x.trim();
+  // 3) rodex_session cookie
   const raw = c.req.header("cookie") || "";
   const m = /rodex_session=([^;]+)/.exec(raw);
-  return m ? m[1] : undefined; // bare token (no name= prefix)
+  return m ? m[1] : undefined;
 }
 
 async function verifySessionLoose(c: { env: Env; req: { header(name: string): string | undefined } }) {
-  const token = cookieOf(c);
+  const token = sessionTokenOf(c);
   if (!token) return null;
   return requireSession(sessionSecret(c.env), token).catch(() => null);
 }

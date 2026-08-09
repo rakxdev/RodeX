@@ -112,12 +112,24 @@ export async function completeGitHubOAuth(c: Context<{ Bindings: Env }>) {
     throw forbidden(`GitHub user '${login || "?"}' is not allowed — add them to GITHUB_ALLOWED_USERS`);
   }
 
-  // 4) create admin session + redirect to the dashboard
+  // 4) create admin session + redirect to the dashboard.
+  //    Token rides in the URL (SPA stores it and sends it as a header) AND in a
+  //    cookie (browsers that accept cross-site cookies). The SPA strips the URL
+  //    param immediately after storing.
   const session = await createSessionCookie(env.SESSION_SECRET || "dev-session-secret-change-me");
+  const base = env.DASHBOARD_ORIGIN || "/";
+  let target: URL;
+  try {
+    target = new URL(base);
+    target.pathname = target.pathname.replace(/\/$/, "") + "/login";
+  } catch {
+    target = new URL("https://rodexdb.pages.dev/login");
+  }
+  target.searchParams.set("session", session);
   return new Response(null, {
     status: 302,
     headers: {
-      Location: env.DASHBOARD_ORIGIN || "/",
+      Location: target.toString(),
       "Set-Cookie": `rodex_session=${session}; Path=/; HttpOnly; Max-Age=43200; SameSite=None; Secure`,
     },
   });
