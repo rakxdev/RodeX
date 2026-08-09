@@ -45,6 +45,29 @@ describe("AwsStorage marshaling rules", () => {
     expect(values[":t"]).toEqual({ SS: ["users"] });
   });
 
+  it("ensureTable waits for ACTIVE before returning (CREATING race)", async () => {
+    let mode = "create";
+    (s as any).call = async (op: string) => {
+      if (op.includes("DescribeTable")) {
+        if (mode === "create") {
+          const e = new Error("nope") as any;
+          e.status = 404;
+          throw Object.assign(e, { status: 404, name: "HttpError" });
+        }
+        return { Table: { TableStatus: mode === "creating" ? "CREATING" : "ACTIVE" } };
+      }
+      if (op.includes("CreateTable")) {
+        mode = "creating";
+        return {};
+      }
+      return {};
+    };
+    await expect((s as any).ensureTable("t")).resolves.toBeUndefined();
+    expect(mode).toBe("creating");
+    mode = "active";
+    await expect((s as any).ensureTable("t")).resolves.toBeUndefined();
+  });
+
   it("maps DynamoDB validation errors to 400", async () => {
     (s as any).call = async () => {
       throw badRequest("boom");

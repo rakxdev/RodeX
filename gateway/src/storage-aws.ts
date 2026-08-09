@@ -210,25 +210,42 @@ export class AwsStorage implements Storage {
   // ── data tables ─────────────────────────────────────────────────────────────
 
   async ensureTable(physical: string): Promise<void> {
-    try {
-      await this.call("DescribeTable", { TableName: physical });
-      return; // exists
-    } catch (e) {
-      if ((e as Error).name !== "HttpError" || ((e as { status?: number }).status ?? 0) !== 404) throw e;
+    const status = await this.tableStatus(physical);
+    if (status === "ACTIVE") return;
+    if (status === null) {
+      // create it, then poll until ACTIVE (data ops are rejected while CREATING)
+      await this.call("CreateTable", {
+        TableName: physical,
+        KeySchema: [
+          { AttributeName: "pk", KeyType: "HASH" },
+          { AttributeName: "sk", KeyType: "RANGE" },
+        ],
+        AttributeDefinitions: [
+          { AttributeName: "pk", AttributeType: "S" },
+          { AttributeName: "sk", AttributeType: "S" },
+        ],
+        BillingMode: "PROVISIONED",
+        ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 },
+      });
     }
-    await this.call("CreateTable", {
-      TableName: physical,
-      KeySchema: [
-        { AttributeName: "pk", KeyType: "HASH" },
-        { AttributeName: "sk", KeyType: "RANGE" },
-      ],
-      AttributeDefinitions: [
-        { AttributeName: "pk", AttributeType: "S" },
-        { AttributeName: "sk", AttributeType: "S" },
-      ],
-      BillingMode: "PROVISIONED",
-      ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 },
-    });
+    // poll up to ~20 s (max 10 extra subrequests — free-plan budget safe)
+    for (let i = 0; i < 10; i++) {
+      const s = await this.tableStatus(physical);
+      if (s === "ACTIVE") return;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    throw serviceUnavailable("Table did not become ready in time");
+  }
+
+  /** Returns "ACTIVE" / "CREATING" / … or null when the table doesn't exist. */
+  private async tableStatus(physical: string): Promise<string | null> {
+    try {
+      const out = await this.call<{ Table?: { TableStatus?: string } }>("DescribeTable", { TableName: physical });
+      return out.Table?.TableStatus ?? null;
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 404) return null;
+      throw e;
+    }
   }
 
   async dropTable(physical: string): Promise<void> {
@@ -298,7 +315,9 @@ export class AwsStorage implements Storage {
     const out = await this.call<{ Attributes?: DdbItem }>("UpdateItem", {
       TableName: physical,
       Key: marshal({ pk, sk }),
-      UpdateExpression: "SET data = :d, updated = :u, v = v + :one",
+      // `data` and `updated` are DynamoDB RESERVED WORDS → alias with #d/#u
+      UpdateExpression: "SET #d = :d, #u = :u, v = v + :one",
+      ExpressionAttributeNames: { "#d": "data", "#u": "updated" },
       ConditionExpression: condition,
       ExpressionAttributeValues: values,
       ReturnValues: "ALL_NEW",
