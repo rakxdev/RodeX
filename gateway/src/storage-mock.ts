@@ -11,6 +11,19 @@ interface MockItem extends StoredItem {}
 
 const KEY_SEP = "\u0000";
 
+// Singleton: mock mode behaves like a long-lived dev server (state persists
+// across requests within the process). Tests call resetMockStorage().
+let singleton: MockStorage | null = null;
+
+export function getMockSingleton(): MockStorage {
+  if (!singleton) singleton = new MockStorage();
+  return singleton;
+}
+
+export function resetMockStorage(): void {
+  singleton = null;
+}
+
 export class MockStorage implements Storage {
   private apps = new Map<string, AppRow>();
   private idem = new Map<string, { resp: string; exp: number }>();
@@ -68,8 +81,11 @@ export class MockStorage implements Storage {
     }
     return r.resp;
   }
-  async idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<void> {
+  async idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<boolean> {
+    const existing = this.idem.get(requestId);
+    if (existing && existing.exp >= Date.now() / 1000) return false; // already stored
     this.idem.set(requestId, { resp: responseJson, exp: Date.now() / 1000 + ttlSeconds });
+    return true;
   }
 
   // ── tables ──────────────────────────────────────────────────────────────────

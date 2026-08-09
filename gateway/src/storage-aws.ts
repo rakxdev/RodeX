@@ -5,7 +5,7 @@
  * error contract as MockStorage (409/404/429/413).
  */
 import { AwsClient } from "aws4fetch";
-import { badRequest, conflict, forbidden, gatewayError, notFound, serviceUnavailable, tooManyRequests } from "./errors";
+import { badRequest, conflict, forbidden, gatewayError, HttpError, notFound, serviceUnavailable, tooManyRequests } from "./errors";
 import { IDEMPOTENCY_TTL_SECONDS } from "./limits";
 import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
@@ -187,15 +187,22 @@ export class AwsStorage implements Storage {
     return u.response as string;
   }
 
-  async idemPut(requestId: string, responseJson: string, ttlSeconds = IDEMPOTENCY_TTL_SECONDS): Promise<void> {
-    await this.call("PutItem", {
-      TableName: IDEM_TABLE,
-      Item: marshal({
-        requestId,
-        response: responseJson,
-        exp: Math.floor(Date.now() / 1000) + ttlSeconds,
-      }),
-    });
+  async idemPut(requestId: string, responseJson: string, ttlSeconds = IDEMPOTENCY_TTL_SECONDS): Promise<boolean> {
+    try {
+      await this.call("PutItem", {
+        TableName: IDEM_TABLE,
+        Item: marshal({
+          requestId,
+          response: responseJson,
+          exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+        }),
+        ConditionExpression: "attribute_not_exists(requestId)",
+      });
+      return true;
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 409) return false; // raced: winner stored it
+      throw e;
+    }
   }
 
   // ── data tables ─────────────────────────────────────────────────────────────

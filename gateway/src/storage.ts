@@ -6,7 +6,7 @@
  */
 import type { Env } from "./env";
 import { AwsStorage } from "./storage-aws";
-import { MockStorage } from "./storage-mock";
+import { getMockSingleton } from "./storage-mock";
 
 // ── Records ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,8 @@ export interface Storage {
 
   // idempotency (24 h TTL)
   idemGet(requestId: string): Promise<string | null>; // stored response JSON
-  idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<void>;
+  /** true if stored; false if requestId already exists (caller must idemGet) */
+  idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<boolean>;
 
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
   ensureTable(physical: string): Promise<void>; // create if missing; 409→ok
@@ -90,5 +91,5 @@ export function createStorage(env: Env): Storage {
     }
     return new AwsStorage(env as Required<Pick<Env, "AWS_ACCESS_KEY_ID" | "AWS_SECRET_ACCESS_KEY">>);
   }
-  return new MockStorage();
+  return getMockSingleton();
 }
