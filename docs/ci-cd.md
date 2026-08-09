@@ -22,13 +22,17 @@ npm audit --audit-level=high                  # supply chain
 ## Auto-deploy (opt-in, 2 minutes)
 
 `.github/workflows/deploy.yml` deploys the gateway to Cloudflare on every `main`
-push (after CI passes). It stays **disabled until you add two repo secrets**:
+push (after CI passes). It stays **disabled (skipped) until you configure three
+items** in the repo:
 
-1. GitHub → repo → **Settings → Secrets and variables → Actions → New repository secret**
-2. Add:
+1. GitHub → repo → **Settings → Secrets and variables → Actions**
+2. **Variables** tab → New repository variable: `ENABLE_DEPLOY` = `true`
+3. **Secrets** tab → New repository secret:
    - `CLOUDFLARE_API_TOKEN` = your `cfut_...` token
    - `CLOUDFLARE_ACCOUNT_ID` = `25bff71e7781196feac6d6e48b84e54c`
-3. Next push to main auto-deploys. Until then, deploys are manual (below).
+
+Next push to main auto-deploys. Until the variable is set, the deploy job is
+skipped (green run) and deploys are manual (below).
 
 ## Manual deploy (current)
 
