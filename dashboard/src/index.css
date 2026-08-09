@@ -50,6 +50,32 @@ body {
     repeating-linear-gradient(0deg, transparent 0 31px, rgba(255, 255, 255, 0.015) 31px 32px);
 }
 
+/* a11y: visible focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+::selection {
+  background: rgba(217, 182, 74, 0.35);
+}
+
+/* OS-level reduced motion fallback (belt to MotionConfig's suspenders) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* safe areas for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* ── world primitives ─────────────────────────────────────────── */
 .nameplate {
   position: relative;

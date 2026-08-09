@@ -1,3 +1,6 @@
+import { motion } from "framer-motion";
+import { pageTransition, foldIn, stagger } from "@/lib/motion";
+
 export default function DocsPage() {
   const sections = [
     { cell: "01", title: "AUTHENTICATION", body: "Send X-App-Id and X-Api-Key headers on every request. Keys are shown once at creation; rotate from the app board if leaked. Suspended or deleting apps return 403." },
@@ -9,21 +12,21 @@ export default function DocsPage() {
   ];
 
   return (
-    <div>
-      <h1 className="font-mono text-2xl tracking-[0.05em] mb-2">
+    <motion.div {...pageTransition}>
+      <h1 className="font-mono text-xl sm:text-2xl tracking-[0.05em] mb-2">
         API <span className="text-gold">REFERENCE</span>
       </h1>
-      <div className="font-mono text-[11px] tracking-[0.16em] text-inkdim mb-6">ONE CONTRACT · EVERY APP · DOCS/OPENAPI.YAML</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="font-mono text-[10px] sm:text-[11px] tracking-[0.16em] text-inkdim mb-6">ONE CONTRACT · EVERY APP · DOCS/OPENAPI.YAML</div>
+      <motion.div variants={stagger(0.05)} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sections.map((s) => (
-          <div key={s.cell} className="sheet-panel p-5">
+          <motion.div key={s.cell} variants={foldIn} className="sheet-panel p-5">
             <h4 className="mb-3">
               <b>CELL {s.cell}</b> · {s.title}
             </h4>
             <p className="font-mono text-[12px] leading-relaxed text-inkdim">{s.body}</p>
-          </div>
+          </motion.div>
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,5 +1,9 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
+import { Menu, X } from "lucide-react";
 import { api } from "@/api/client";
+import { springLift } from "@/lib/motion";
 
 export function Mark({ className = "w-7 h-7" }: { className?: string }) {
   return (
@@ -20,8 +24,9 @@ const nav = [
   { to: "/usage", label: "USAGE" },
 ];
 
-export default function App() {
+export default function AppShell() {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function logout() {
     try {
@@ -32,42 +37,80 @@ export default function App() {
     navigate("/login");
   }
 
+  const linkCls = ({ isActive }: { isActive: boolean }) =>
+    `font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md transition-colors ${
+      isActive ? "text-gold bg-panel2" : "text-inkdim hover:text-ink hover:bg-panel2"
+    }`;
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-line bg-bg/80 backdrop-blur">
-        <Link to="/apps" className="flex items-center gap-3">
-          <Mark />
-          <span className="font-mono font-bold tracking-[0.22em] text-sm">
-            RODEX<em className="text-gold not-italic">DB</em>
-          </span>
-        </Link>
-        <nav className="ml-auto flex items-center gap-1">
-          {nav.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              className={({ isActive }) =>
-                `font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md transition-colors ${
-                  isActive ? "text-gold bg-panel2" : "text-inkdim hover:text-ink hover:bg-panel2"
-                }`
-              }
-            >
-              {n.label}
-            </NavLink>
-          ))}
-          <button onClick={logout} className="font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2 ml-2">
-            EXIT
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen flex flex-col">
+        <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
+          <Link to="/apps" className="flex items-center gap-3">
+            <Mark />
+            <span className="font-mono font-bold tracking-[0.22em] text-sm">
+              RODEX<em className="text-gold not-italic">DB</em>
+            </span>
+          </Link>
+
+          {/* desktop nav */}
+          <nav className="ml-auto hidden sm:flex items-center gap-1">
+            {nav.map((n) => (
+              <NavLink key={n.to} to={n.to} className={linkCls}>
+                {n.label}
+              </NavLink>
+            ))}
+            <button onClick={logout} className="font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2 ml-2">
+              EXIT
+            </button>
+          </nav>
+
+          {/* mobile menu toggle */}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="ml-auto sm:hidden p-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-        </nav>
-      </header>
-      <main className="flex-1 w-full max-w-6xl mx-auto px-5 py-8">
-        <Outlet />
-      </main>
-      <footer className="px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[10px] tracking-[0.16em] text-inkdim">
-        <span>RODEX DB — GATEWAY CONSOLE</span>
-        <span>REV F · INSTRUMENT PACKET</span>
-        <span>rodexdb.pages.dev</span>
-      </footer>
-    </div>
+        </header>
+
+        {/* mobile nav panel */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.nav
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              className="sm:hidden border-b border-line bg-bg/95 overflow-hidden"
+            >
+              <div className="px-4 py-3 flex flex-col gap-1">
+                {nav.map((n) => (
+                  <NavLink key={n.to} to={n.to} onClick={() => setMenuOpen(false)} className={linkCls}>
+                    {n.label}
+                  </NavLink>
+                ))}
+                <button onClick={logout} className="text-left font-mono text-[11px] tracking-[0.18em] px-3 py-1.5 rounded-md text-inkdim hover:text-ink hover:bg-panel2">
+                  EXIT
+                </button>
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
+
+        <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
+          <Outlet />
+        </main>
+
+        <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
+          <span>RODEX DB — GATEWAY CONSOLE</span>
+          <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
+          <span>rodexdb.pages.dev</span>
+        </footer>
+      </div>
+    </MotionConfig>
   );
 }
+
+export { springLift };
