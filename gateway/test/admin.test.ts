@@ -71,6 +71,34 @@ describe("password login", () => {
     expect(auth.result.authenticated).toBe(true);
     expect(auth.result.allowed_users).toContain("rakxdev");
   });
+
+  it("login returns the session token for the SPA token channel", async () => {
+    const good = await call("POST", "/v1/admin/login", { password: ADMIN_PW });
+    const body = (await good.json()) as any;
+    expect(body.result.session).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/);
+  });
+
+  it("me accepts Authorization: Bearer token (third-party-cookie-free channel)", async () => {
+    const login = await (await call("POST", "/v1/admin/login", { password: ADMIN_PW })).json() as any;
+    const token = login.result.session;
+    const via = await (await call("GET", "/v1/admin/me", undefined, { Authorization: `Bearer ${token}` })).json() as any;
+    expect(via.result.authenticated).toBe(true);
+    expect(via.result.user).toBe("admin");
+  });
+
+  it("me accepts X-Rodex-Session header fallback", async () => {
+    const login = await (await call("POST", "/v1/admin/login", { password: ADMIN_PW })).json() as any;
+    const via = await (await call("GET", "/v1/admin/me", undefined, { "X-Rodex-Session": login.result.session })).json() as any;
+    expect(via.result.authenticated).toBe(true);
+  });
+
+  it("bearer token drives admin actions; garbage token → 401", async () => {
+    const login = await (await call("POST", "/v1/admin/login", { password: ADMIN_PW })).json() as any;
+    const created = await call("POST", "/v1/admin/apps", { name: "token-app" }, { Authorization: `Bearer ${login.result.session}` });
+    expect(created.status).toBe(200);
+    const bad = await call("GET", "/v1/admin/apps", undefined, { Authorization: "Bearer garbage" });
+    expect(bad.status).toBe(401);
+  });
 });
 
 describe("admin app management", () => {
@@ -167,7 +195,8 @@ describe("GitHub OAuth", () => {
     const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
     const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, { Cookie: `rodex_oauth_state=${state}` });
     expect(r.status).toBe(302);
-    expect(r.headers.get("location")).toBe("https://rodexdb.pages.dev");
+    const loc = r.headers.get("location") || "";
+    expect(loc.startsWith("https://rodexdb.pages.dev/login?session=")).toBe(true);
     expect(cookieOf(r)).toContain("rodex_session=");
   });
 

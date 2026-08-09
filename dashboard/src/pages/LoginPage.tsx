@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { api, gatewayBase, ApiError } from "@/api/client";
+import { api, setSessionToken, gatewayBase, ApiError } from "@/api/client";
 import { Mark } from "@/App";
 import { pageTransition } from "@/lib/motion";
 
@@ -16,7 +16,8 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/v1/admin/login", { password });
+      const result = await api.post<{ session?: string }>("/v1/admin/login", { password });
+      if (result.session) setSessionToken(result.session);
       navigate("/apps");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed");

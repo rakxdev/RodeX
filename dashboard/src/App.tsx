@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import { api } from "@/api/client";
+import { api, clearSessionToken } from "@/api/client";
 import { springLift } from "@/lib/motion";
 
 export function Mark({ className = "w-7 h-7" }: { className?: string }) {
@@ -29,6 +29,7 @@ export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   async function logout() {
+    clearSessionToken();
     try {
       await api.post("/v1/admin/logout");
     } catch {
