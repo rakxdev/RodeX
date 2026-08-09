@@ -68,6 +68,32 @@ export default function UsagePage() {
         </p>
       </motion.div>
 
+      {/* safety boundaries — how to never hit a limit */}
+      <motion.div variants={foldIn} initial="hidden" animate="show" className="sheet-panel p-5 mt-4">
+        <h4 className="mb-4">
+          <b>SAFETY BOUNDARIES</b> — HOW TO STAY UNDER, WITH REAL USE CASES
+        </h4>
+        <ol className="space-y-3">
+          {[
+            ["Keep rows small", "20 KB is the ceiling, not a target. A 4 KB row costs half the write budget of a 19 KB row — store big payloads as a URL/object key, not inline."],
+            ["Batch reads into queries", "Fetching 50 rows? One query with sk_prefix + limit 50 costs 1 read, not 50. Get-by-pk is for single lookups only."],
+            ["Strong reads are 2×", "strong:true costs 2 read units — use it only when a stale read would break the app (e.g. right after a critical write), never in hot loops."],
+            ["Writes are the scarce budget", "120 writes/min per app. Prefer update (replace data) over delete+put; coalesce bursts; queue writes client-side if a batch exceeds the budget."],
+            ["Retries are always safe", "Send request_id on every write and retry freely — the gateway dedupes for 24 h. On 429/502/503, back off retry_after seconds (default 1)."],
+            ["Guard against lost updates", "Read the version, update with expected_version, handle the 409 — your app never silently overwrites a concurrent change."],
+            ["Treat 429 as the meter", "If you ever see 429, you are at the boundary: hold 1-2 s and throttle to ~80% of the budget. The gateway is built so this should be rare, not routine."],
+          ].map(([k, v], i) => (
+            <li key={k} className="flex gap-3">
+              <span className="font-mono text-[10px] leading-6 text-gold shrink-0">{String(i + 1).padStart(2, "0")}</span>
+              <div>
+                <div className="font-mono text-[12px] text-ink">{k}</div>
+                <div className="font-mono text-[11px] leading-relaxed text-inkdim mt-0.5">{v}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </motion.div>
+
       <p className="font-mono text-[10px] sm:text-[10.5px] tracking-[0.1em] text-inkdim mt-5">
         REAL-TIME PER-APP METERS SHIP WITH THE OBSERVABILITY PHASE — THE BUDGET TABLE ABOVE IS THE CONTRACT TODAY.
       </p>

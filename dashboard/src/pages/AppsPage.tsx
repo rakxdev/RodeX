@@ -1,10 +1,35 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { api, ApiError, type AppInfo, type AppStatus } from "@/api/client";
+import { Check, Copy } from "lucide-react";
+import { api, ApiError, gatewayBase, type AppInfo, type AppStatus } from "@/api/client";
 import { pageTransition, fadeUp, stagger, springLift } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
 import { FoldButton } from "@/components/FoldButton";
+
+function CopyCell({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex items-center gap-1 font-mono text-[9.5px] tracking-[0.12em] text-inkdim hover:text-ink transition-colors"
+      aria-label={`Copy ${label}`}
+    >
+      {copied ? <Check className="w-3 h-3 text-ok" /> : <Copy className="w-3 h-3" />}
+      {copied ? "COPIED" : "COPY"}
+    </button>
+  );
+}
 
 function statusStamp(status: AppStatus) {
   switch (status) {
@@ -96,7 +121,7 @@ export default function AppsPage() {
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="nameplate p-5 mb-6 border-gold/50"
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <div className="font-mono text-[10px] tracking-[0.22em] text-gold">
                 NEW INSTRUMENT FABRICATED — {fresh.name}
               </div>
@@ -104,9 +129,37 @@ export default function AppsPage() {
                 DISMISS
               </button>
             </div>
+
+            {/* credentials — both halves of the key pair, copyable */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="flex-1 bg-panel2 border border-line rounded-lg px-3 py-2.5">
+                <div className="font-mono text-[9px] tracking-[0.2em] text-inkdim mb-1">X-APP-ID</div>
+                <div className="flex items-center gap-2 font-mono text-[12px] break-all">
+                  <span className="text-ink">{fresh.app_id}</span>
+                  <CopyCell value={fresh.app_id} label="app id" />
+                </div>
+              </div>
+              <div className="flex-1 bg-panel2 border border-line rounded-lg px-3 py-2.5">
+                <div className="font-mono text-[9px] tracking-[0.2em] text-inkdim mb-1">KEY PREFIX</div>
+                <div className="font-mono text-[12px] text-ink">{fresh.key_prefix}…</div>
+              </div>
+            </div>
+
             <KeyReveal apiKey={fresh.api_key ?? ""} label="API KEY" />
-            <div className="font-mono text-[10px] tracking-[0.14em] text-inkdim mt-3">
-              X-App-Id: {fresh.app_id} · KEY PREFIX {fresh.key_prefix}…
+
+            <div className="mt-4">
+              <div className="font-mono text-[9px] tracking-[0.2em] text-inkdim mb-2">CONNECT — FIRST WRITE</div>
+              <pre className="code-block whitespace-pre overflow-x-auto">
+                <code>
+                  <span className="cmt"># both credentials are needed, every request</span>{"\n"}
+                  <span className="cmt"># X-App-Id: {fresh.app_id}</span>{"\n"}
+                  <span className="cmt"># X-Api-Key: the key above (copy before leaving)</span>{"\n"}
+                  {`curl -X POST ${gatewayBase}/v1/item/put \\`}{"\n"}
+                  {`  -H "X-App-Id: ${fresh.app_id}" \\`}{"\n"}
+                  {`  -H "X-Api-Key: YOUR_KEY" \\`}{"\n"}
+                  {`  -d '{"table":"t","item":{"pk":"K#1"}}'`}
+                </code>
+              </pre>
             </div>
           </motion.div>
         )}

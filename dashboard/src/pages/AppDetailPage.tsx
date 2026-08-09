@@ -1,10 +1,42 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Check, Copy } from "lucide-react";
 import { api, ApiError, type AppInfo } from "@/api/client";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
 import { FoldButton } from "@/components/FoldButton";
+
+/** Render a unix-seconds date defensively — a missing/invalid value never crashes the page. */
+function safeDate(ts?: number): string {
+  if (!ts || ts <= 0) return "—";
+  const d = new Date(ts * 1000);
+  return Number.isNaN(d.getTime()) ? "—" : d.toISOString().replace("T", " ").slice(0, 16);
+}
+
+function CopyCell({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.12em] text-inkdim hover:text-ink transition-colors"
+      aria-label={`Copy ${label}`}
+    >
+      {copied ? <Check className="w-3 h-3 text-ok" /> : <Copy className="w-3 h-3" />}
+      {copied ? "COPIED" : label}
+    </button>
+  );
+}
 
 export default function AppDetailPage() {
   const { id } = useParams();
@@ -34,8 +66,14 @@ export default function AppDetailPage() {
     setError(null);
     try {
       const result = await api.post<AppInfo & { api_key?: string }>(`/v1/admin/apps/${id}/${action}`, body);
-      if (action === "rotate-key" && result.api_key) setNewKey(result.api_key);
-      setApp(result);
+      if (action === "rotate-key") {
+        if (result.api_key) setNewKey(result.api_key);
+        // the rotate response carries the full app; re-fetch if anything is missing
+        if (result.app_id) setApp(result);
+        else await load();
+      } else {
+        setApp(result);
+      }
       setArm(null);
       if (action === "force-delete") navigate("/apps");
     } catch (err) {
@@ -120,7 +158,7 @@ export default function AppDetailPage() {
         )}
         {app.purge_at && (
           <span className="font-mono text-[10px] tracking-[0.14em] text-redx">
-            PURGE AT {new Date(app.purge_at * 1000).toISOString().slice(0, 16)}
+            PURGE AT {safeDate(app.purge_at)}
           </span>
         )}
       </motion.div>
@@ -131,8 +169,8 @@ export default function AppDetailPage() {
             <b>CELL 01</b> · OVERVIEW
           </h4>
           <dl className="space-y-2 font-mono text-[12px] break-all">
-            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">app_id</dt><dd>{app.app_id}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{new Date(app.created_at * 1000).toISOString().slice(0, 10)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">app_id</dt><dd className="flex items-center gap-2"><span className="truncate">{app.app_id}</span><CopyCell value={app.app_id} label="COPY" /></dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{safeDate(app.created_at)}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">status</dt><dd className="uppercase">{app.status}</dd></div>
           </dl>
         </motion.div>

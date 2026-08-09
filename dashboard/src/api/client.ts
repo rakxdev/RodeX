@@ -20,16 +20,28 @@ let authed: boolean | null = null;
 let checkPromise: Promise<void> | null = null;
 const authListeners = new Set<(v: boolean) => void>();
 // Set by logout(); PublicOnly renders /login without re-verifying, so a stale
-// cookie can never bounce the user back to the board.
+// cookie can never bounce the user back to the board. Persisted in
+// sessionStorage so a refresh after EXIT cannot re-enter the console either.
 let explicitLogout = false;
+const LOGOUT_KEY = "rodex_logged_out";
 
 export function isExplicitLogout(): boolean {
-  return explicitLogout;
+  if (explicitLogout) return true;
+  try {
+    return sessionStorage.getItem(LOGOUT_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 export function markExplicitLogout(): void {
   explicitLogout = true;
   invalidateSession();
+  try {
+    sessionStorage.setItem(LOGOUT_KEY, "1");
+  } catch {
+    /* sessionStorage unavailable — in-memory flag still guards this page */
+  }
 }
 
 function setAuthed(v: boolean): void {
@@ -72,6 +84,7 @@ export function setSessionToken(token: string): void {
   explicitLogout = false;
   invalidateSession();
   try {
+    sessionStorage.removeItem(LOGOUT_KEY);
     localStorage.setItem(SESSION_KEY, token);
   } catch {
     /* storage unavailable — cookie channel still covers most browsers */

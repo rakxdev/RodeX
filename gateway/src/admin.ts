@@ -76,8 +76,9 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const storage = createStorage(c.env);
-    const { api_key, key_prefix } = await rotateKey(storage, sessionSecret(c.env), c.req.param("id"));
-    return c.json({ ok: true, result: { api_key, key_prefix } }); // shown once
+    // returns the new key (shown once) + the full app so the detail page re-renders
+    const rotated = await rotateKey(storage, sessionSecret(c.env), c.req.param("id"));
+    return c.json({ ok: true, result: rotated });
   });
 
   app.post("/v1/admin/apps/:id/suspend", async (c) => {

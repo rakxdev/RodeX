@@ -142,6 +142,13 @@ describe("admin app management", () => {
     const { app_id, api_key } = created.result;
     const rotated = await (await call("POST", `/v1/admin/apps/${app_id}/rotate-key`, {}, { Cookie: adminCookie })).json() as any;
 
+    // regression: rotate must return the FULL app so the detail page can re-render
+    expect(rotated.result.app_id).toBe(app_id);
+    expect(rotated.result.name).toBe("rot");
+    expect(rotated.result.status).toBe("active");
+    expect(typeof rotated.result.created_at).toBe("number");
+    expect(Array.isArray(rotated.result.tables)).toBe(true);
+
     const oldKey = await call("POST", "/v1/query", { table: "t", pk: "x" }, { "X-App-Id": app_id, "X-Api-Key": api_key });
     expect(oldKey.status).toBe(401);
     const newKey = await call("POST", "/v1/query", { table: "t", pk: "x" }, { "X-App-Id": app_id, "X-Api-Key": rotated.result.api_key });

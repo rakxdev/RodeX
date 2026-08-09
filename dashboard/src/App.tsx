@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { api, clearSessionToken, markExplicitLogout } from "@/api/client";
@@ -26,7 +26,6 @@ const nav = [
 ];
 
 export default function AppShell() {
-  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
   async function logout() {
@@ -37,7 +36,8 @@ export default function AppShell() {
     } catch {
       /* best effort — the explicit-logout flag already keeps the login page up */
     }
-    navigate("/login");
+    // hard navigation: wipes any cached app-board pages and module state
+    window.location.assign("/login");
   }
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>

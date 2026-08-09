@@ -79,14 +79,15 @@ export async function authenticateApp(
 }
 
 /** Rotate key: new key returned once; old one stops working immediately. */
-export async function rotateKey(storage: Storage, secret: string, appId: string): Promise<{ api_key: string; key_prefix: string }> {
+export async function rotateKey(storage: Storage, secret: string, appId: string): Promise<{ api_key: string; key_prefix: string } & PublicApp> {
   const row = await getApp(storage, appId);
   const apiKey = generateApiKey();
   row.keyHash = await hashKey(secret, apiKey);
   row.keyPrefix = apiKey.slice(0, 6);
   row.rotatedAt = Math.floor(Date.now() / 1000);
   await storage.putApp(row);
-  return { api_key: apiKey, key_prefix: row.keyPrefix };
+  // flatten the full public app so clients can re-render the detail page
+  return { api_key: apiKey, ...toPublic(row) };
 }
 
 export async function setStatus(storage: Storage, appId: string, status: AppRow["status"]): Promise<PublicApp> {
