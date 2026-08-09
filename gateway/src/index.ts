@@ -41,6 +41,17 @@ app.use("*", async (c, next) => {
 
 app.options("*", (c) => c.body(null, 204));
 
+// ── strict JSON bodies on POST (415 otherwise) ───────────────────────────────
+app.use("*", async (c, next) => {
+  if (c.req.method === "POST") {
+    const ct = (c.req.header("content-type") || "").toLowerCase();
+    if (!ct.startsWith("application/json")) {
+      throw new HttpError(415, "Content-Type must be application/json");
+    }
+  }
+  await next();
+});
+
 // ── public ───────────────────────────────────────────────────────────────────
 app.get("/v1/health", (c) => c.json({ ok: true, service: "rodex-gateway", version: 1 }));
 

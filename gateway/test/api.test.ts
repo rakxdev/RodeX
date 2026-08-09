@@ -72,6 +72,19 @@ describe("auth & isolation", () => {
     expect(r.status).toBe(200);
   });
 
+  it("non-JSON body → 415", async () => {
+    const res = await handler.fetch(
+      new Request("http://localhost/v1/query", {
+        method: "POST",
+        headers: { "X-App-Id": A.app_id, "X-Api-Key": A.api_key },
+        body: "plain text, not json",
+      }),
+      env(),
+      {} as ExecutionContext,
+    );
+    expect(res.status).toBe(415);
+  });
+
   it("missing/wrong key → 401", async () => {
     const r1 = await post("/v1/query", null, {});
     expect(r1.status).toBe(401);
