@@ -1,0 +1,12 @@
+name: Probe IfSecrets
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
+        run: echo "notice"
+      - name: Deploy
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: echo "deploy"
