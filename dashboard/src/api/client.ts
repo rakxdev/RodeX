@@ -180,6 +180,8 @@ export interface AppInfo {
   key_prefix: string;
   purge_at?: number;
   description?: string;
+  /** unix seconds until which the raw key may be viewed again (48 h window) */
+  key_recoverable_until?: number;
   api_key?: string; // present only at creation / rotation
 }
 

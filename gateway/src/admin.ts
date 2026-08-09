@@ -8,7 +8,7 @@
  *     `Authorization: Bearer <token>` (browsers that block third-party cookies)
  */
 import type { Hono } from "hono";
-import { constantTimeEqual, createSessionCookie, requireSession } from "./auth";
+import { constantTimeEqual, createSessionCookie, decryptKey, requireSession } from "./auth";
 import { allowedUsers, sessionSecret, type Env } from "./env";
 import { badRequest, forbidden, serviceUnavailable, unauthorized } from "./errors";
 import { APP_NAME_PATTERN, MAX_APPS } from "./limits";
@@ -112,6 +112,19 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
     const app = await softDelete(createStorage(c.env), c.req.param("id"));
     return c.json({ ok: true, result: app });
+  });
+
+  // view the RAW key inside the recovery window (encrypted at rest, hash otherwise)
+  app.post("/v1/admin/apps/:id/view-key", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const row = await getApp(createStorage(c.env), c.req.param("id"));
+    if (!row.keyCipher || !row.keyCipherUntil || row.keyCipherUntil < Math.floor(Date.now() / 1000)) {
+      throw forbidden("Key recovery window expired — rotate to issue a new key");
+    }
+    const apiKey = await decryptKey(sessionSecret(c.env), row.keyCipher);
+    if (!apiKey) throw forbidden("Key recovery failed — rotate to issue a new key");
+    return c.json({ ok: true, result: { app_id: row.appId, api_key: apiKey, recoverable_until: row.keyCipherUntil } });
   });
 
   app.post("/v1/admin/apps/:id/recover", async (c) => {

@@ -114,3 +114,40 @@ export function sessionCookieHeader(value: string, secure: boolean, domain?: str
   if (domain) parts.push(`Domain=${domain}`);
   return parts.join("; ");
 }
+
+// ── short-lived key cipher (VIEW-KEY recovery window) ────────────────────────
+// The raw API key is normally stored ONLY as an HMAC hash. For a short recovery
+// window after creation/rotation we additionally keep an AES-GCM copy so the
+// owner can view/reuse it; after the window the ciphertext is dead.
+
+async function aesKey(secret: string): Promise<CryptoKey> {
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(secret));
+  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+/** Returns "<iv-b64url>.<ciphertext-b64url>" or null on failure. */
+export async function encryptKey(secret: string, plaintext: string): Promise<string | null> {
+  try {
+    const key = await aesKey(secret);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plaintext));
+    return `${base64Url(iv)}.${base64Url(new Uint8Array(ct))}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Inverse of encryptKey; null on tamper/decrypt failure. */
+export async function decryptKey(secret: string, blob: string): Promise<string | null> {
+  try {
+    const [ivB64, ctB64] = blob.split(".");
+    if (!ivB64 || !ctB64) return null;
+    const iv = Uint8Array.from(atob(ivB64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+    const ct = Uint8Array.from(atob(ctB64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+    const key = await aesKey(secret);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+    return new TextDecoder().decode(pt);
+  } catch {
+    return null;
+  }
+}

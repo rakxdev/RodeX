@@ -302,6 +302,9 @@ export default function AppsPage() {
                   <span>
                     TABLES <b className="text-ink font-medium">{(app.tables ?? []).length}</b>
                   </span>
+                  <span>
+                    <b className="text-ink font-medium">500 MB</b>
+                  </span>
                 </div>
               </motion.div>
             </Link>

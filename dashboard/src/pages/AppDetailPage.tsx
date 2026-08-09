@@ -6,6 +6,7 @@ import { api, ApiError, type AppInfo } from "@/api/client";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
+import ViewKey from "@/components/ViewKey";
 import { FoldButton } from "@/components/FoldButton";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
@@ -200,6 +201,7 @@ export default function AppDetailPage() {
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">app_id</dt><dd className="flex items-center gap-2"><span className="truncate">{app.app_id}</span><CopyCell value={app.app_id} label="COPY" /></dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">created</dt><dd>{istDate(app.created_at)} IST</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">status</dt><dd className="uppercase">{app.status}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">storage</dt><dd>500 MB BUDGET · FREE-TIER GUARD</dd></div>
             {app.description && (
               <div className="flex justify-between gap-3"><dt className="text-inkdim shrink-0">note</dt><dd className="text-inkdim">{app.description}</dd></div>
             )}
@@ -213,10 +215,12 @@ export default function AppDetailPage() {
           {newKey ? (
             <KeyReveal key={newKey} apiKey={newKey} label="NEW API KEY" />
           ) : (
-            <dl className="space-y-2 font-mono text-[12px]">
-              <div className="flex justify-between"><dt className="text-inkdim">key_prefix</dt><dd>{app.key_prefix}…</dd></div>
-              <div className="flex justify-between"><dt className="text-inkdim">api_key</dt><dd className="text-gold">gold-sealed · rotate to reveal</dd></div>
-            </dl>
+            <div>
+              <dl className="space-y-2 font-mono text-[12px] mb-4">
+                <div className="flex justify-between"><dt className="text-inkdim">key_prefix</dt><dd>{app.key_prefix}…</dd></div>
+              </dl>
+              <ViewKey appId={app.app_id} recoverableUntil={app.key_recoverable_until} />
+            </div>
           )}
         </motion.div>
 

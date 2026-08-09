@@ -28,6 +28,10 @@ export interface AppRow {
   tables: string[];
   /** optional human note (≤ 200 chars), free-form */
   description?: string;
+  /** AES-GCM ciphertext of the raw key (viewable inside the recovery window only) */
+  keyCipher?: string;
+  /** unix seconds until which keyCipher may be decrypted */
+  keyCipherUntil?: number;
 }
 
 export interface StoredItem {

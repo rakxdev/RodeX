@@ -8,7 +8,7 @@ type SessionState = "checking" | "authed" | "anon";
  * Cached session hook: /v1/admin/me runs once per page load and the result is
  * shared by every guard. Tab switches render instantly — no re-verification.
  */
-function useSession(): SessionState {
+export function useSession(): SessionState {
   const [state, setState] = useState<SessionState>(() => {
     // A fresh explicit logout must NEVER bounce back — show /login immediately.
     if (isExplicitLogout()) return "anon";

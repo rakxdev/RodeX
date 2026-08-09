@@ -8,20 +8,40 @@ const GW = "https://rodex-gateway.rakxdev.workers.dev";
 
 /* ── small doc primitives ──────────────────────────────────────────────── */
 
-/** Code block with # comment highlighting. */
+/** Code block with # comment highlighting + a copy button. */
 function Code({ children }: { children: string }) {
+  const [copied, setCopied] = useState(false);
   const lines = children.replace(/^\n/, "").split("\n");
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
   return (
-    <pre className="code-block whitespace-pre">
-      <code>
-        {lines.map((line, i) => (
-          <span key={i} className={line.trimStart().startsWith("#") ? "cmt" : undefined}>
-            {line}
-            {i < lines.length - 1 ? "\n" : ""}
-          </span>
-        ))}
-      </code>
-    </pre>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={copy}
+        className="absolute right-2 top-2 z-10 font-mono text-[8.5px] tracking-[0.16em] px-2 py-1 rounded-md border border-line bg-panel2 text-inkdim hover:text-ink hover:border-gold/50 transition-colors"
+        aria-label="Copy code"
+      >
+        {copied ? "COPIED ✓" : "COPY"}
+      </button>
+      <pre className="code-block whitespace-pre">
+        <code>
+          {lines.map((line, i) => (
+            <span key={i} className={line.trimStart().startsWith("#") ? "cmt" : undefined}>
+              {line}
+              {i < lines.length - 1 ? "\n" : ""}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </div>
   );
 }
 

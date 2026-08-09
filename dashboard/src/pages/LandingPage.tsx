@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Shield, Coins, Repeat } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
-import { FoldLink } from "@/components/FoldButton";
-import { gatewayBase } from "@/api/client";
-const REPO = "https://github.com/rakxdev/RodeX";
+import { FoldButton, FoldLink } from "@/components/FoldButton";
+import { api, clearSessionToken, gatewayBase, markExplicitLogout } from "@/api/client";
+import { useSession } from "@/components/SessionGate";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -79,6 +79,20 @@ const budget = [
 ];
 
 export default function LandingPage() {
+  const session = useSession();
+  const authed = session === "authed";
+
+  async function exit() {
+    markExplicitLogout();
+    clearSessionToken();
+    try {
+      await api.post("/v1/admin/logout", {});
+    } catch {
+      /* best effort — the explicit-logout flag already keeps the login page up */
+    }
+    window.location.assign("/login");
+  }
+
   return (
     <motion.div {...pageTransition} className="min-h-screen flex flex-col">
       {/* header */}
@@ -96,9 +110,16 @@ export default function LandingPage() {
             <a href="#contract" className="text-inkdim hover:text-ink transition-colors">THE CONTRACT</a>
             <Link to="/docs" className="text-inkdim hover:text-gold transition-colors">DOCS</Link>
           </nav>
-          <FoldLink to="/login" variant="ghost" size="sm" className="ml-auto sm:ml-5">
-            ENTER CONSOLE
-          </FoldLink>
+          <div className="ml-auto flex items-center gap-2 sm:ml-5">
+            {authed && (
+              <FoldButton variant="ghost" size="sm" onClick={exit}>
+                EXIT
+              </FoldButton>
+            )}
+            <FoldLink to={authed ? "/apps" : "/login"} variant="ghost" size="sm">
+              {authed ? "OPEN BOARD" : "ENTER CONSOLE"}
+            </FoldLink>
+          </div>
         </div>
       </header>
 
@@ -122,14 +143,19 @@ export default function LandingPage() {
             <motion.div variants={fadeUp} transition={{ delay: 0.09 }} className="mt-6">
               <GatewayStatus />
             </motion.div>
-            <motion.div variants={fadeUp} transition={{ delay: 0.12 }} className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <FoldLink to="/login" variant="red" size="lg">
-                ENTER CONSOLE <ArrowRight className="w-4 h-4" />
+            <div className="flex flex-wrap gap-2 mt-4">
+              {authed && (
+                <FoldButton variant="ghost" size="sm" onClick={exit}>
+                  EXIT
+                </FoldButton>
+              )}
+              <FoldLink to={authed ? "/apps" : "/login"} variant="red" size="lg">
+                {authed ? "OPEN BOARD" : "ENTER CONSOLE"} <ArrowRight className="w-4 h-4" />
               </FoldLink>
               <FoldLink to="/docs" variant="ghost" size="lg">
                 VIEW DOCS <BookOpen className="w-4 h-4" />
               </FoldLink>
-            </motion.div>
+            </div>
           </motion.div>
 
           {/* product panel — the API in action */}
@@ -226,9 +252,9 @@ $ curl -X POST /v1/query
           <span>RODEX DB — GATEWAY CONSOLE · REV F</span>
           <span className="hidden md:inline">INSTRUMENT PACKET</span>
           <span className="flex items-center gap-2">
-            BUILT BY <a href={REPO} target="_blank" rel="noreferrer" className="text-gold hover:underline">RAKXDEV</a>
+            BUILT BY <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="text-gold hover:underline">RAKXDEV</a>
             <span className="text-inkdim/60">·</span>
-            <a href={REPO} target="_blank" rel="noreferrer" className="text-inkdim hover:text-gold transition-colors">GITHUB</a>
+            <a href="https://github.com/rakxdev/RodeX" target="_blank" rel="noreferrer" className="text-inkdim hover:text-gold transition-colors">SOURCE</a>
           </span>
         </div>
       </footer>

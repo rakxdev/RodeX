@@ -29,6 +29,8 @@ export const IDEMPOTENCY_TTL_SECONDS = 86_400;
 
 /** Soft-delete recovery window (minutes). */
 export const SOFT_DELETE_WINDOW_MINUTES = 5;
+/** How long a raw API key stays server-side (AES-GCM encrypted) for VIEW-KEY recovery. */
+export const KEY_RECOVERY_WINDOW_SECONDS = 48 * 60 * 60;
 
 /** Max tables purged per cron run (keeps a run inside free-plan subrequest/CPU budgets). */
 export const PURGE_MAX_TABLES_PER_RUN = 5;

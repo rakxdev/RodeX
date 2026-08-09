@@ -5,10 +5,6 @@ import { FoldLink } from "@/components/FoldButton";
 
 /** Public chrome for documentation surfaces (docs + usage) — readable without signing in. */
 export function PublicHeader({ tag }: { tag: string }) {
-  const links = [
-    { to: "/docs", label: "DOCS" },
-    { to: "/usage", label: "USAGE" },
-  ];
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
       <Link to="/" className="flex items-center gap-3">
@@ -17,38 +13,45 @@ export function PublicHeader({ tag }: { tag: string }) {
           RODEX<em className="text-gold not-italic">DB</em>
         </span>
       </Link>
-      <nav className="ml-2 hidden sm:flex items-center gap-1">
-        {links.map((l) => (
-          <Link
-            key={l.to}
-            to={l.to}
-            aria-current={tag === l.label ? "true" : undefined}
-            className={`font-mono text-[10.5px] tracking-[0.18em] px-2.5 py-1.5 rounded-md transition-colors ${
-              tag === l.label ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
-            }`}
-          >
-            {l.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="ml-auto flex items-center gap-2">
-        <Link to="/usage" className="sm:hidden font-mono text-[10px] tracking-[0.16em] text-inkdim hover:text-ink">
+      <nav className="ml-auto flex items-center gap-2">
+        <Link
+          to="/usage"
+          aria-current={tag === "USAGE" ? "true" : undefined}
+          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+            tag === "USAGE" ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
+          }`}
+        >
           USAGE
+        </Link>
+        <Link
+          to="/docs"
+          aria-current={tag === "DOCS" ? "true" : undefined}
+          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+            tag === "DOCS" ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
+          }`}
+        >
+          DOCS
         </Link>
         <FoldLink to="/login" variant="ghost" size="sm">
           ENTER CONSOLE
         </FoldLink>
-      </div>
+      </nav>
     </header>
   );
 }
 
 export function PublicFooter() {
   return (
-    <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
+    <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1.5 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
       <span>RODEX DB — GATEWAY CONSOLE</span>
       <span className="hidden md:inline">REV F · INSTRUMENT PACKET</span>
-      <span>rodexdb.pages.dev</span>
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        BUILT BY <a href="https://github.com/rakxdev" target="_blank" rel="noreferrer" className="text-gold hover:underline">RAKXDEV</a>
+        <span className="text-inkdim/60">·</span>
+        <a href="https://github.com/rakxdev/RodeX" target="_blank" rel="noreferrer" className="hover:text-gold transition-colors">SOURCE</a>
+        <span className="text-inkdim/60">·</span>
+        <span>rodexdb.pages.dev</span>
+      </span>
     </footer>
   );
 }

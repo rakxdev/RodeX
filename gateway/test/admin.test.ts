@@ -201,6 +201,36 @@ describe("admin app management", () => {
     expect(del.status).toBe(200);
     expect(((await del.json()) as any).result.status).toBe("deleting");
   });
+
+  it("view-key returns the same raw key inside the recovery window", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "viewer" }, { Cookie: adminCookie })).json() as any;
+    const { app_id, api_key } = created.result;
+    expect(created.result.key_recoverable_until).toBeGreaterThan(0);
+    const viewed = await (await call("POST", `/v1/admin/apps/${app_id}/view-key`, {}, { Cookie: adminCookie })).json() as any;
+    expect(viewed.result.api_key).toBe(api_key);
+  });
+
+  it("view-key after rotate returns the NEW key", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "viewer2" }, { Cookie: adminCookie })).json() as any;
+    const { app_id } = created.result;
+    const rotated = await (await call("POST", `/v1/admin/apps/${app_id}/rotate-key`, {}, { Cookie: adminCookie })).json() as any;
+    const viewed = await (await call("POST", `/v1/admin/apps/${app_id}/view-key`, {}, { Cookie: adminCookie })).json() as any;
+    expect(viewed.result.api_key).toBe(rotated.result.api_key);
+  });
+
+  it("view-key expired → 403 with a clear message (old keys are hash-only)", async () => {
+    vi.useFakeTimers();
+    try {
+      const created = await (await call("POST", "/v1/admin/apps", { name: "expired" }, { Cookie: adminCookie })).json() as any;
+      vi.setSystemTime(new Date(Date.now() + 49 * 3600 * 1000));
+      const fresh = await call("POST", "/v1/admin/login", { password: ADMIN_PW });
+      const r = await call("POST", `/v1/admin/apps/${created.result.app_id}/view-key`, {}, { Cookie: cookieOf(fresh) });
+      expect(r.status).toBe(403);
+      expect(((await r.json()) as any).error.message).toContain("expired");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("GitHub OAuth", () => {

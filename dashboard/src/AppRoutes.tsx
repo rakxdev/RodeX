@@ -7,7 +7,6 @@ import AppsPage from "@/pages/AppsPage";
 import AppDetailPage from "@/pages/AppDetailPage";
 import DocsPage from "@/pages/DocsPage";
 import UsagePage from "@/pages/UsagePage";
-import DesignLab from "@/pages/DesignLab";
 import { RequireAuth, PublicOnly } from "@/components/SessionGate";
 import AppShell, { Mark } from "./App";
 
@@ -42,7 +41,6 @@ export default function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/usage" element={<UsagePage />} />
-        <Route path="/design-lab" element={<DesignLab />} />
         <Route
           path="/login"
           element={
