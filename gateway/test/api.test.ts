@@ -86,12 +86,17 @@ describe("auth & isolation", () => {
   });
 
   it("security headers present on every response", async () => {
-    const res = await handler.fetch(new Request("http://localhost/v1/health"), env(), {} as ExecutionContext);
+    // https request → full header set incl. HSTS
+    const res = await handler.fetch(new Request("https://localhost/v1/health"), env(), {} as ExecutionContext);
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("x-frame-options")).toBe("DENY");
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     expect(res.headers.get("strict-transport-security")).toBe("max-age=15552000");
+    // http request → same headers except HSTS (correct behavior)
+    const httpRes = await handler.fetch(new Request("http://localhost/v1/health"), env(), {} as ExecutionContext);
+    expect(httpRes.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(httpRes.headers.get("strict-transport-security")).toBeNull();
   });
 
   it("admin routes reject foreign Origin (CSRF depth)", async () => {
