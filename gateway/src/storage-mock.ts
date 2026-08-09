@@ -6,8 +6,6 @@
 import { conflict, notFound } from "./errors";
 import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
-interface MockItem extends StoredItem {}
-
 const KEY_SEP = "\u0000";
 
 // Singleton: mock mode behaves like a long-lived dev server (state persists
@@ -26,9 +24,9 @@ export function resetMockStorage(): void {
 export class MockStorage implements Storage {
   private apps = new Map<string, AppRow>();
   private idem = new Map<string, { resp: string; exp: number }>();
-  private tables = new Map<string, Map<string, MockItem>>();
+  private tables = new Map<string, Map<string, StoredItem>>();
 
-  private table(name: string): Map<string, MockItem> {
+  private table(name: string): Map<string, StoredItem> {
     const t = this.tables.get(name);
     if (!t) throw notFound(`Table does not exist (${name})`);
     return t;
@@ -105,7 +103,7 @@ export class MockStorage implements Storage {
     const k = this.key(item.pk, item.sk);
     if (!opts.overwrite && t.has(k)) throw conflict("Item already exists — use update or overwrite:true");
     const now = Math.floor(Date.now() / 1000);
-    const stored: MockItem = { pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now };
+    const stored: StoredItem = { pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now };
     t.set(k, stored);
     return { ...stored };
   }
@@ -123,7 +121,7 @@ export class MockStorage implements Storage {
     if (expectedVersion !== undefined && cur.v !== expectedVersion) {
       throw conflict(`Version mismatch: item is at v${cur.v}, expected v${expectedVersion}`);
     }
-    const next: MockItem = { ...cur, data, v: cur.v + 1, updated: Math.floor(Date.now() / 1000) };
+    const next: StoredItem = { ...cur, data, v: cur.v + 1, updated: Math.floor(Date.now() / 1000) };
     t.set(k, next);
     return { ...next };
   }
