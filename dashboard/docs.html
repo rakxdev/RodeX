@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RodeX — API Docs</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">RodeX<span>DB</span></div>
+    <nav>
+      <a href="apps.html">Apps</a>
+      <button class="link" id="logout">Logout</button>
+    </nav>
+  </header>
+  <main style="max-width:900px">
+    <h1>API Documentation <span class="badge active">v1</span></h1>
+    <p class="muted">One API. Every app uses the same endpoints — only your credentials differ.</p>
+
+    <h2>Authentication</h2>
+    <div class="card">
+      <p>Send two headers on every request:</p>
+      <pre>X-App-Id:  app_1a2b3c4d5e6f7a8b
+X-Api-Key: &lt;your secret key&gt;</pre>
+      <p class="small muted">Keys are shown once at creation. Rotate from the dashboard if leaked. Suspended or deleting apps get <code>403</code>.</p>
+    </div>
+
+    <h2>Base URL</h2>
+    <div class="card"><code id="baseUrl">—</code></div>
+
+    <h2>Conventions</h2>
+    <div class="card">
+      <ul>
+        <li>All requests and responses are <b>JSON</b>.</li>
+        <li>Responses: <code>{ "ok": true, "result": ... }</code> or <code>{ "ok": false, "error": { "code", "message" } }</code>.</li>
+        <li>Every row needs a <code>pk</code>; <code>sk</code> is optional and defaults to <code>"~"</code>.</li>
+        <li>Rows carry a <code>version</code> — pass <code>expected_version</code> to update/delete safely (conflicts return <code>409</code>).</li>
+        <li>Add <code>"request_id"</code> to writes for <b>idempotency</b>: retries return the original result, never duplicates.</li>
+      </ul>
+    </div>
+
+    <h2>Write a row</h2>
+    <div class="card">
+      <pre>POST /v1/item/put
+{ "table": "users", "request_id": "req-123",
+  "item": { "pk": "USER#1", "sk": "PROFILE", "name": "Rakesh" } }</pre>
+      <p class="small muted">Optional <code>"overwrite": true</code> replaces an existing row (resets version). Without it, an existing row returns <code>409</code>.</p>
+    </div>
+
+    <h2>Read a row</h2>
+    <div class="card"><pre>POST /v1/item/get
+{ "table": "users", "pk": "USER#1", "sk": "PROFILE" }</pre></div>
+
+    <h2>Update a row (version-guarded)</h2>
+    <div class="card"><pre>POST /v1/item/update
+{ "table": "users", "pk": "USER#1", "sk": "PROFILE",
+  "data": { "name": "Rakesh v2" }, "expected_version": 1 }</pre></div>
+
+    <h2>Delete a row</h2>
+    <div class="card"><pre>POST /v1/item/delete
+{ "table": "users", "pk": "USER#1", "sk": "PROFILE", "expected_version": 2 }</pre></div>
+
+    <h2>Query rows</h2>
+    <div class="card">
+      <pre>POST /v1/query
+{ "table": "users", "pk": "USER#1", "sk_prefix": "MSG#", "limit": 50 }</pre>
+      <p class="small muted">Returns <code>items</code>, <code>has_more</code> and <code>next_start_key</code> (pass it back as <code>start_key</code> to page). <code>limit</code> max 100.</p>
+    </div>
+
+    <h2>Tables</h2>
+    <div class="card">
+      <pre>POST /v1/table/create   { "name": "sessions" }
+GET  /v1/tables</pre>
+      <p class="small muted">Your tables are isolated automatically: physically stored as <code>app_&lt;app_id&gt;_&lt;name&gt;</code>. No other app can touch them (<code>403</code>).</p>
+    </div>
+
+    <h2>Limits &amp; errors (must-know)</h2>
+    <div class="card">
+      <table>
+        <tr><th>Item size</th><td>Max <b>20 KB</b> per row (free-tier write budget — keeps you never-throttled).</td></tr>
+        <tr><th>Rate limits</th><td>600 req/min per app · 120 writes/min · 240 reads/min. Over → <code>429</code>.</td></tr>
+        <tr><th>Retries</th><td>On <code>429</code>/<code>502</code>/<code>503</code>, wait <code>retry_after</code> (or 1s) and retry — writes are safe thanks to <code>request_id</code>.</td></tr>
+        <tr><th>Errors</th><td><code>400</code> bad request · <code>401</code> bad key · <code>403</code> not your table / app suspended · <code>404</code> missing row · <code>409</code> version conflict or duplicate · <code>413</code> too large · <code>429</code> rate limit · <code>502/503</code> retryable</td></tr>
+      </table>
+    </div>
+
+    <h2>Quick examples</h2>
+    <div class="card">
+      <pre># create a table, then write + read (see App page for copy-paste curl)</pre>
+      <p class="small muted">Telegram bot? Rust? Python? Every language just needs HTTP — headers + JSON above is the whole contract.</p>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById("baseUrl").textContent = CONFIG.GATEWAY;
+    document.getElementById("logout").addEventListener("click", logout);
+  </script>
+</body>
+</html>

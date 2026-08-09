@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RodeX — App</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">RodeX<span>DB</span></div>
+    <nav>
+      <a href="apps.html">Apps</a>
+      <a href="docs.html">Docs</a>
+      <button class="link" id="logout">Logout</button>
+    </nav>
+  </header>
+
+  <main>
+    <p><a href="apps.html" class="muted small" style="text-decoration:none">← All apps</a></p>
+    <h1 id="title">Loading…</h1>
+    <div class="msg" id="msg" hidden></div>
+
+    <div class="card" id="keyCard" hidden>
+      <h2 style="margin-top:0">API key — copy it now, shown once</h2>
+      <div class="key-display">
+        <code id="apiKey">…</code>
+        <button id="copyKey">Copy</button>
+      </div>
+      <p class="small muted">Add to your app as: <code>X-App-Id</code> + <code>X-Api-Key</code> headers (see Docs).</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Connect app key <span class="small muted">(for table/query tools below — stored only in this browser)</span></h2>
+      <div class="row">
+        <input type="password" id="connectKeyInput" placeholder="paste API key" style="max-width:360px" />
+        <button id="connectBtn">Use this key</button>
+        <span class="small muted" id="connectedState"></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin-top:0">Details</h2>
+        <table>
+          <tr><th>App ID</th><td class="mono" id="appId"></td></tr>
+          <tr><th>Status</th><td><span class="badge" id="status"></span></td></tr>
+          <tr><th>Key prefix</th><td class="mono" id="keyPrefix"></td></tr>
+          <tr><th>Created</th><td id="created"></td></tr>
+          <tr><th>Tables</th><td id="tables"></td></tr>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <button class="ghost" id="rotateBtn">Rotate key</button>
+          <button class="ghost" id="suspendBtn">Suspend</button>
+          <button class="danger" id="deleteBtn">Delete app</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">Quick start</h2>
+        <p class="small muted" style="margin-top:-6px">One curl — writes a row, reads it back, deletes it.</p>
+        <pre id="curl"></pre>
+        <p class="small muted">Base URL: <code id="baseUrl"></code></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Tables</h2>
+      <div class="row" style="margin-bottom:10px">
+        <input type="text" id="tableName" placeholder="e.g. users" style="max-width:240px" />
+        <button id="createTable">Create table</button>
+      </div>
+      <table>
+        <thead><tr><th>Logical name</th><th>Physical (DynamoDB)</th></tr></thead>
+        <tbody id="tableRows"><tr><td colspan="2" class="muted">—</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Quick query</h2>
+      <div class="row">
+        <input type="text" id="qPk" placeholder="pk (e.g. USER#1)" style="max-width:220px" />
+        <input type="text" id="qSk" placeholder="sk (optional prefix)" style="max-width:220px" />
+        <select id="qTable" style="max-width:180px"></select>
+        <button id="runQuery">Query</button>
+      </div>
+      <pre id="queryOut" hidden></pre>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

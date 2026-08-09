@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RodeX — Apps</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">RodeX<span>DB</span></div>
+    <nav>
+      <a href="docs.html">Docs</a>
+      <button class="link" id="logout">Logout</button>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Applications</h1>
+
+    <div class="card">
+      <h2 style="margin-top:0">New application</h2>
+      <div class="row">
+        <input type="text" id="newName" placeholder="e.g. weather-bot" style="max-width:320px" />
+        <button id="createBtn">Create app</button>
+      </div>
+      <p class="small muted" style="margin-bottom:0">Each app gets its own API key and its own isolated tables (prefix <code>app_&lt;id&gt;_</code>).</p>
+      <div class="msg" id="msg" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Your apps</h2>
+      <table>
+        <thead>
+          <tr><th>Name</th><th>App ID</th><th>Status</th><th>Key</th><th>Created</th><th></th></tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog id="confirmDel">
+    <h2>Delete <span id="delName"></span>?</h2>
+    <p class="small muted" id="delInfo">The app enters a 5-minute recovery window. Tables are wiped when the window ends.</p>
+    <div class="row" style="justify-content:flex-end">
+      <button class="ghost" id="delCancel">Cancel</button>
+      <button class="danger" id="delConfirm">Delete (5 min window)</button>
+      <button class="danger" id="forceConfirm">Force delete now</button>
+    </div>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/apps.js"></script>
+</body>
+</html>
