@@ -21,8 +21,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice when auto-deploy is disabled
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
+        run: echo "::notice::CLOUDFLARE_API_TOKEN secret not set — auto-deploy disabled. Add repo secrets per docs/ci-cd.md to enable."
+
   deploy:
     runs-on: ubuntu-latest
+    needs: check-secrets
     if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
