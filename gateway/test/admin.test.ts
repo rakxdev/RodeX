@@ -184,4 +184,15 @@ describe("GitHub OAuth", () => {
     const r = await call("GET", "/v1/auth/github/callback?code=c1&state=forged");
     expect(r.status).toBe(400);
   });
+
+  it("state embedded in ANOTHER cookie's value must NOT pass (substring spoof)", async () => {
+    stubGithub("rakxdev");
+    const start = await call("GET", "/v1/auth/github/start");
+    const state = (cookieOf(start).match(/rodex_oauth_state=([^;]+)/) || [])[1];
+    // attacker-controlled cookie that merely CONTAINS the expected substring
+    const r = await call("GET", `/v1/auth/github/callback?code=c1&state=${state}`, undefined, {
+      Cookie: `other=rodex_oauth_state=${state}`,
+    });
+    expect(r.status).toBe(400);
+  });
 });

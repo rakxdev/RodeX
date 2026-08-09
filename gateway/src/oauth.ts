@@ -5,7 +5,7 @@
  * to DASHBOARD_ORIGIN.
  */
 import type { Context } from "hono";
-import { createSessionCookie } from "./auth";
+import { constantTimeEqual, createSessionCookie } from "./auth";
 import { allowedUsers, type Env } from "./env";
 import { badRequest, forbidden, serviceUnavailable } from "./errors";
 
@@ -14,6 +14,16 @@ const GH_TOKEN = "https://github.com/login/oauth/access_token";
 const GH_USER = "https://api.github.com/user";
 
 const STATE_COOKIE = "rodex_oauth_state";
+
+/** Extract the exact value of a named cookie (robust vs substring spoofing). */
+function cookieValue(cookieHeader: string, name: string): string | null {
+  for (const part of cookieHeader.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
 
 function randomState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -71,7 +81,8 @@ export async function completeGitHubOAuth(c: Context<{ Bindings: Env }>) {
     throw serviceUnavailable("GitHub login is not configured");
   }
   if (!code || !state) throw badRequest("Missing code or state");
-  if (!cookie.includes(`${STATE_COOKIE}=${state}`)) throw badRequest("Invalid OAuth state");
+  const stateCookie = cookieValue(cookie, STATE_COOKIE);
+  if (!stateCookie || !constantTimeEqual(stateCookie, state)) throw badRequest("Invalid OAuth state");
 
   // 1) exchange code for token
   const tokenRes = await fetch(GH_TOKEN, {

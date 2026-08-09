@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HttpError } from "../src/errors";
-import { MAX_ITEM_BYTES } from "../src/limits";
-import { MockStorage, assertItemSize } from "../src/storage-mock";
+import { assertItemSize, MAX_ITEM_BYTES } from "../src/limits";
+import { MockStorage } from "../src/storage-mock";
 import type { AppRow } from "../src/storage";
 
 function makeApp(over: Partial<AppRow> = {}): AppRow {

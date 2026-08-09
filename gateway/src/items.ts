@@ -5,11 +5,10 @@
 import type { Context } from "hono";
 import { badRequest, forbidden, notFound } from "./errors";
 import type { Env } from "./env";
-import { IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS } from "./limits";
+import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS } from "./limits";
 import { gateAppRequest } from "./rate";
 import { physicalName } from "./registry";
 import type { Storage, StoredItem } from "./storage";
-import { assertItemSize } from "./storage-mock";
 
 export interface AppContext {
   env: Env;

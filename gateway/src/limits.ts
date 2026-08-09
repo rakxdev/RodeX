@@ -36,9 +36,18 @@ export const PURGE_MAX_TABLES_PER_RUN = 5;
 /** Sanity guard on number of apps a free account should host. */
 export const MAX_APPS = 100;
 
+import { payloadTooLarge } from "./errors";
+
 /** Byte size of a JSON value (for size gates). */
 export function jsonBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+/** Size gate applied at the API boundary BEFORE any storage call (mock or AWS). */
+export function assertItemSize(payload: unknown): void {
+  if (jsonBytes(payload) > MAX_ITEM_BYTES) {
+    throw payloadTooLarge(`Item exceeds ${MAX_ITEM_BYTES} bytes (free-tier write budget) — see docs/rate-limits.md`);
+  }
 }
 
 /** True when the JSON-serialized item fits our write cap. */

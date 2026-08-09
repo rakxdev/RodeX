@@ -3,8 +3,7 @@
  * as the AWS adapter (409/404/413/429 behavior), so tests are meaningful.
  * Local dev: STORAGE=mock (default). Not durable — dev/tests only.
  */
-import { conflict, notFound, payloadTooLarge } from "./errors";
-import { jsonBytes, MAX_ITEM_BYTES } from "./limits";
+import { conflict, notFound } from "./errors";
 import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
 interface MockItem extends StoredItem {}
@@ -149,12 +148,5 @@ export class MockStorage implements Storage {
       items: page.map((i) => ({ ...i })),
       hasMore: rows.length > limit,
     };
-  }
-}
-
-/** Size gate used by handlers BEFORE calling storage (shared with AWS path). */
-export function assertItemSize(payload: unknown): void {
-  if (jsonBytes(payload) > MAX_ITEM_BYTES) {
-    throw payloadTooLarge(`Item exceeds ${MAX_ITEM_BYTES} bytes (free-tier write budget) — see docs/rate-limits.md`);
   }
 }
