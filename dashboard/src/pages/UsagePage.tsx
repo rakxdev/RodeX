@@ -120,6 +120,11 @@ export default function UsagePage() {
               <td>0 — plain attribute</td>
             </tr>
             <tr>
+              <td><code>Password change</code></td>
+              <td>Logged-in session + correct old password; new ≥ 12 chars, differs</td>
+              <td>0 — hash stored in platform settings (env password = factory default)</td>
+            </tr>
+            <tr>
               <td><code>Storage</code></td>
               <td><b>No per-app cap</b> — 25 GB shared across all apps (always-free tier)</td>
               <td>Free up to 25 GB total</td>

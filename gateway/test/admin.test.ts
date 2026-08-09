@@ -101,6 +101,33 @@ describe("password login", () => {
     expect(sc.toLowerCase()).toContain("max-age=0");
   });
 
+  it("change-password: wrong old → 401; too short → 400; valid → login switches to the new password", async () => {
+    const wrong = await call("POST", "/v1/admin/change-password", { old_password: "nope", new_password: "brand-new-secret-123" }, { Cookie: adminCookie });
+    expect(wrong.status).toBe(401);
+
+    const short = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "tiny" }, { Cookie: adminCookie });
+    expect(short.status).toBe(400);
+
+    const same = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: ADMIN_PW }, { Cookie: adminCookie });
+    expect(same.status).toBe(400);
+
+    const ok = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "brand-new-secret-123" }, { Cookie: adminCookie });
+    expect(ok.status).toBe(200);
+
+    // old password now fails, new one works
+    expect((await call("POST", "/v1/admin/login", { password: ADMIN_PW })).status).toBe(401);
+    expect((await call("POST", "/v1/admin/login", { password: "brand-new-secret-123" })).status).toBe(200);
+
+    // restore the original password so later tests keep logging in
+    const fresh = await call("POST", "/v1/admin/login", { password: "brand-new-secret-123" });
+    await call("POST", "/v1/admin/change-password", { old_password: "brand-new-secret-123", new_password: ADMIN_PW }, { Cookie: cookieOf(fresh) });
+  });
+
+  it("change-password requires a session (401 anonymous)", async () => {
+    const r = await call("POST", "/v1/admin/change-password", { old_password: ADMIN_PW, new_password: "brand-new-secret-123" });
+    expect(r.status).toBe(401);
+  });
+
   it("logout also accepts a JSON body (SPA sends {}) without error", async () => {
     const r = await call("POST", "/v1/admin/logout", {});
     expect(r.status).toBe(200);

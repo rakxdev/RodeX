@@ -356,6 +356,10 @@ curl -X POST $GW/v1/table/create \\
                   <td>destroy session</td>
                 </tr>
                 <tr>
+                  <td><code>POST /v1/admin/change-password</code></td>
+                  <td>rotate the console password (PROFILE — old + new)</td>
+                </tr>
+                <tr>
                   <td><code>POST /v1/admin/apps</code></td>
                   <td>create app → key shown once</td>
                 </tr>

@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import { api, clearSessionToken, markExplicitLogout } from "@/api/client";
 import { springLift } from "@/lib/motion";
 import { FoldButton } from "@/components/FoldButton";
+import ProfileModal from "@/components/ProfileModal";
 
 export function Mark({ className = "w-7 h-7" }: { className?: string }) {
   return (
@@ -27,6 +28,7 @@ const nav = [
 
 export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   async function logout() {
     markExplicitLogout();
@@ -63,7 +65,10 @@ export default function AppShell() {
                 {n.label}
               </NavLink>
             ))}
-            <FoldButton onClick={logout} variant="ghost" size="sm" className="ml-2">
+            <FoldButton variant="ghost" size="sm" className="ml-1" onClick={() => setProfileOpen(true)}>
+              PROFILE
+            </FoldButton>
+            <FoldButton onClick={logout} variant="ghost" size="sm" className="ml-1">
               EXIT
             </FoldButton>
           </nav>
@@ -94,6 +99,9 @@ export default function AppShell() {
                     {n.label}
                   </NavLink>
                 ))}
+                <FoldButton variant="ghost" size="sm" className="self-start mt-1" onClick={() => { setMenuOpen(false); setProfileOpen(true); }}>
+                  PROFILE
+                </FoldButton>
                 <FoldButton onClick={logout} variant="ghost" size="sm" className="self-start mt-1">
                   EXIT
                 </FoldButton>
@@ -105,6 +113,8 @@ export default function AppShell() {
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
           <Outlet />
         </main>
+
+        <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
         <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
           <span>RODEX DB — GATEWAY CONSOLE</span>

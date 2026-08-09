@@ -15,6 +15,7 @@ const API = "DynamoDB_20120810";
 
 const APPS_TABLE = "rodex_apps";
 const IDEM_TABLE = "rodex_idem";
+const META_TABLE = "rodex_meta";
 
 interface AwsCreds {
   AWS_ACCESS_KEY_ID: string;
@@ -173,6 +174,44 @@ export class AwsStorage implements Storage {
       UpdateExpression: "DELETE tables :t",
       ExpressionAttributeValues: marshal({ ":t": [logical] }),
     });
+  }
+
+  // ── settings (rodex_meta) ───────────────────────────────────────────────────
+  private metaTableReady: Promise<void> | null = null;
+
+  private ensureMetaTable(): Promise<void> {
+    if (!this.metaTableReady) {
+      this.metaTableReady = this.ensureMetaTableInner().catch((e) => {
+        this.metaTableReady = null;
+        throw e;
+      });
+    }
+    return this.metaTableReady;
+  }
+
+  private async ensureMetaTableInner(): Promise<void> {
+    try {
+      await this.call("DescribeTable", { TableName: META_TABLE });
+    } catch {
+      await this.call("CreateTable", {
+        TableName: META_TABLE,
+        KeySchema: [{ AttributeName: "k", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "k", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      });
+    }
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    await this.ensureMetaTable();
+    const out = await this.call<{ Item?: DdbItem }>("GetItem", { TableName: META_TABLE, Key: marshal({ k: key }) });
+    if (!out.Item) return null;
+    return (unmarshal(out.Item).v as string) ?? null;
+  }
+
+  async putSetting(key: string, value: string): Promise<void> {
+    await this.ensureMetaTable();
+    await this.call("PutItem", { TableName: META_TABLE, Item: marshal({ k: key, v: value }) });
   }
 
   // ── idempotency ─────────────────────────────────────────────────────────────

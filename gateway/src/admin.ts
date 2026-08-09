@@ -8,13 +8,15 @@
  *     `Authorization: Bearer <token>` (browsers that block third-party cookies)
  */
 import type { Hono } from "hono";
-import { constantTimeEqual, createSessionCookie, decryptKey, requireSession } from "./auth";
+import { constantTimeEqual, createSessionCookie, decryptKey, hashKey, requireSession } from "./auth";
 import { allowedUsers, sessionSecret, type Env } from "./env";
 import { badRequest, forbidden, serviceUnavailable, unauthorized } from "./errors";
 import { APP_NAME_PATTERN, MAX_APPS } from "./limits";
 import { gateAdminRequest } from "./rate";
 import { createApp, forceDelete, getApp, purgeDue, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { createStorage } from "./storage";
+
+const SETTING_ADMIN_HASH = "admin_password_hash";
 
 export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── auth ────────────────────────────────────────────────────────────────────
@@ -25,11 +27,36 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     if (!secret || secret.length < 12) throw serviceUnavailable("ADMIN_PASSWORD not set (min 12 chars)");
     const body = (await c.req.json().catch(() => null)) as { password?: string } | null;
     if (!body?.password) throw badRequest("password is required");
-    if (!constantTimeEqual(body.password, secret)) throw unauthorized("Wrong password");
+    const storage = createStorage(c.env);
+    const storedHash = await storage.getSetting(SETTING_ADMIN_HASH).catch(() => null);
+    const passwordOk = storedHash
+      ? constantTimeEqual(await hashKey(sessionSecret(c.env), body.password), storedHash)
+      : constantTimeEqual(body.password, secret);
+    if (!passwordOk) throw unauthorized("Wrong password");
     const secure = new URL(c.req.url).protocol === "https:";
     const session = await createSessionCookie(sessionSecret(c.env));
     c.header("Set-Cookie", `rodex_session=${session}; Path=/; HttpOnly; Max-Age=43200; SameSite=${secure ? "None" : "Lax"}${secure ? "; Secure" : ""}`);
     return c.json({ ok: true, result: { user: "admin", login_method: "password", session } });
+  });
+
+  app.post("/v1/admin/change-password", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const body = (await c.req.json().catch(() => null)) as { old_password?: string; new_password?: string } | null;
+    const oldPassword = body?.old_password ?? "";
+    const newPassword = body?.new_password ?? "";
+    if (newPassword.length < 12) throw badRequest("New password must be at least 12 characters");
+    if (newPassword.length > 200) throw badRequest("New password too long");
+    const storage = createStorage(c.env);
+    const storedHash = await storage.getSetting(SETTING_ADMIN_HASH).catch(() => null);
+    const current = c.env.ADMIN_PASSWORD;
+    const oldOk = storedHash
+      ? constantTimeEqual(await hashKey(sessionSecret(c.env), oldPassword), storedHash)
+      : !!current && constantTimeEqual(oldPassword, current);
+    if (!oldOk) throw unauthorized("Old password is wrong");
+    if (oldPassword === newPassword) throw badRequest("New password must differ from the old one");
+    await storage.putSetting(SETTING_ADMIN_HASH, await hashKey(sessionSecret(c.env), newPassword));
+    return c.json({ ok: true, result: { changed: true } });
   });
 
   app.post("/v1/admin/logout", async (c) => {

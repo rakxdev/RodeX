@@ -76,6 +76,10 @@ export interface Storage {
   /** true if stored; false if requestId already exists (caller must idemGet) */
   idemPut(requestId: string, responseJson: string, ttlSeconds: number): Promise<boolean>;
 
+  // platform settings (admin password hash lives here; env ADMIN_PASSWORD is fallback)
+  getSetting(key: string): Promise<string | null>;
+  putSetting(key: string, value: string): Promise<void>;
+
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
   ensureTable(physical: string): Promise<void>; // create if missing; 409→ok
   dropTable(physical: string): Promise<void>; // empty (paginated) then delete
