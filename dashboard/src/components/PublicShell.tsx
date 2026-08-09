@@ -70,7 +70,7 @@ export default function PublicShell({ tag, children }: { tag: string; children: 
   return (
     <div className="min-h-screen flex flex-col">
       <PublicHeader tag={tag} />
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-5 py-8 flex-1">{children}</main>
+      <main className="w-full max-w-7xl mx-auto px-4 sm:px-5 py-8 flex-1">{children}</main>
       <PublicFooter />
     </div>
   );

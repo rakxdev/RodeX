@@ -471,10 +471,25 @@ body {
 
 /* split-flap board (Aceternity TextFlippingBoard mechanics, Instrument-Packet look) */
 .fb-board {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   gap: 3px;
   vertical-align: middle;
+}
+/* gentle gold sheen sweeping the board while it rests — never looks stuck */
+@keyframes fbshimmer {
+  0% { background-position: 130% 0; }
+  100% { background-position: -130% 0; }
+}
+.fb-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(105deg, transparent 32%, rgba(217, 182, 74, 0.12) 50%, transparent 68%);
+  background-size: 260% 100%;
+  animation: fbshimmer 3.6s linear infinite;
 }
 .fb-row {
   display: flex;

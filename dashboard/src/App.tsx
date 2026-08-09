@@ -123,7 +123,7 @@ export default function AppShell() {
           )}
         </AnimatePresence>
 
-        <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
           <Outlet />
         </main>
 
