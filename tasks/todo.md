@@ -4,11 +4,11 @@ Status: READY-FOR-APPROVAL · Each task ≤ ~5 files · Ordered by dependency.
 
 ## Phase 0: Ship the reviewed build (all code already tested & committed)
 
-- [ ] T0 Release branch → PR (quality green) → merge → deploy gateway, then Pages
+^- [x] T0 Release branch → PR (quality green) → merge → deploy gateway, then Pages
       - Acceptance: PR merged; both deployments complete; prod smoke passes
       - Verify: `curl /v1/health`; login→fabricate→rok_ key→view-key→rotate→delete→recover→purge
       - Files: none (git/deploy only)
-- [ ] T1 Live contract check: view-key returns raw key ≤48 h; `rodex_idem` TTL ENABLED;
+^- [x] T1 Live contract check (incl. appFromItem read-path hotfix): view-key returns raw key ≤48 h; `rodex_idem` TTL ENABLED;
       `rok_` regex on new keys
       - Verify: curl against prod; no code
       - Depends: T0
