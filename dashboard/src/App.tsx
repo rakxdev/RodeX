@@ -6,6 +6,7 @@ import { api, clearSessionToken, markExplicitLogout } from "@/api/client";
 import { springLift } from "@/lib/motion";
 import { FoldButton } from "@/components/FoldButton";
 import ProfileModal from "@/components/ProfileModal";
+import CreditModal from "@/components/CreditModal";
 
 export function Mark({ className = "w-7 h-7" }: { className?: string }) {
   return (
@@ -29,6 +30,7 @@ const nav = [
 export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [creditsOpen, setCreditsOpen] = useState(false);
 
   async function logout() {
     markExplicitLogout();
@@ -68,7 +70,10 @@ export default function AppShell() {
             <FoldButton variant="ghost" size="sm" className="ml-1" onClick={() => setProfileOpen(true)}>
               PROFILE
             </FoldButton>
-            <FoldButton onClick={logout} variant="ghost" size="sm" className="ml-1">
+            <FoldButton variant="ghost" size="sm" className="ml-1" onClick={() => setCreditsOpen(true)}>
+              CREDITS
+            </FoldButton>
+            <FoldButton variant="danger" size="sm" className="ml-1" onClick={logout}>
               EXIT
             </FoldButton>
           </nav>
@@ -99,10 +104,13 @@ export default function AppShell() {
                     {n.label}
                   </NavLink>
                 ))}
+                <FoldButton variant="ghost" size="sm" className="self-start mt-1" onClick={() => { setMenuOpen(false); setCreditsOpen(true); }}>
+                  CREDITS
+                </FoldButton>
                 <FoldButton variant="ghost" size="sm" className="self-start mt-1" onClick={() => { setMenuOpen(false); setProfileOpen(true); }}>
                   PROFILE
                 </FoldButton>
-                <FoldButton onClick={logout} variant="ghost" size="sm" className="self-start mt-1">
+                <FoldButton onClick={logout} variant="danger" size="sm" className="self-start mt-1">
                   EXIT
                 </FoldButton>
               </div>
@@ -115,6 +123,7 @@ export default function AppShell() {
         </main>
 
         <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+        <CreditModal open={creditsOpen} onClose={() => setCreditsOpen(false)} />
 
         <footer className="px-4 sm:px-5 py-4 border-t border-line flex flex-wrap gap-x-6 gap-y-1 justify-between font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
           <span>RODEX DB — GATEWAY CONSOLE</span>

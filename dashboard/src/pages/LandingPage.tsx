@@ -9,6 +9,8 @@ import { useSession } from "@/components/SessionGate";
 import TypeTerminal from "@/components/TypeTerminal";
 import TiltCard from "@/components/TiltCard";
 import Magnetic from "@/components/Magnetic";
+import SplitFlap from "@/components/SplitFlap";
+import { CreditContent } from "@/components/CreditModal";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -111,17 +113,14 @@ export default function LandingPage() {
             <a href="#features" className="text-inkdim hover:text-ink transition-colors">FEATURES</a>
             <a href="#how" className="text-inkdim hover:text-ink transition-colors">HOW IT WORKS</a>
             <a href="#contract" className="text-inkdim hover:text-ink transition-colors">THE CONTRACT</a>
-            <Link to="/docs" className="text-inkdim hover:text-gold transition-colors">DOCS</Link>
+            <a href="#credits" className="text-inkdim hover:text-gold transition-colors">RAKXDEV</a>
           </nav>
           <div className="ml-auto flex items-center gap-2 sm:ml-5">
             {authed && (
-              <FoldButton variant="ghost" size="sm" onClick={exit}>
+              <FoldButton variant="danger" size="sm" onClick={exit}>
                 EXIT
               </FoldButton>
             )}
-            <FoldLink to={authed ? "/apps" : "/login"} variant="ghost" size="sm">
-              {authed ? "OPEN BOARD" : "ENTER CONSOLE"}
-            </FoldLink>
           </div>
         </div>
       </header>
@@ -136,7 +135,7 @@ export default function LandingPage() {
               variants={fadeUp}
               className="font-mono text-2xl sm:text-[34px] font-bold tracking-[0.05em] leading-snug"
             >
-              THE DATABASE GATEWAY
+              THE DATABASE <SplitFlap text="GATEWAY" />
               <br />
               <span className="text-inkdim font-semibold">FOR INDEPENDENT APPS</span>
             </motion.h1>
@@ -149,7 +148,7 @@ export default function LandingPage() {
             </motion.div>
             <div className="flex flex-wrap gap-3 mt-4">
               {authed && (
-                <FoldButton variant="ghost" size="sm" onClick={exit}>
+                <FoldButton variant="danger" size="sm" onClick={exit}>
                   EXIT
                 </FoldButton>
               )}
@@ -239,11 +238,19 @@ export default function LandingPage() {
             </motion.div>
           ))}
         </motion.div>
-        <div className="mt-6 text-center">
-          <FoldLink to="/docs" variant="ghost" size="md">
-            VIEW DOCS <BookOpen className="w-4 h-4" />
-          </FoldLink>
-        </div>
+      </section>
+
+      {/* credits — the maker's section */}
+      <section id="credits" className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-16 scroll-mt-20">
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-60px" }}
+          className="nameplate p-8 sm:p-12"
+        >
+          <CreditContent />
+        </motion.div>
       </section>
 
       {/* footer */}

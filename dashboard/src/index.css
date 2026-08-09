@@ -412,6 +412,35 @@ body {
   animation: cursorblink 1s steps(1) infinite;
 }
 
+/* split-flap cells (Vestaboard-style) */
+.flap-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05em;
+  height: 1.3em;
+  background: linear-gradient(180deg, #14171c, #101318);
+  border: 1px solid var(--line);
+  border-top: 2px solid #343a44;
+  border-radius: 3px;
+  overflow: hidden;
+  perspective: 240px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.flap-char {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  transform-style: preserve-3d;
+  color: var(--gold);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.flap-char-landed {
+  color: var(--ink);
+}
+
 .no-scrollbar {
   scrollbar-width: none; /* firefox */
   -ms-overflow-style: none;
