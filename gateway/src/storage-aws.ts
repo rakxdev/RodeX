@@ -125,6 +125,10 @@ export class AwsStorage implements Storage {
       createdAt: u.createdAt as number,
       rotatedAt: u.rotatedAt as number | undefined,
       tables: (u.tables as string[]) || [],
+      // newer fields — dropping these silently broke view-key + descriptions on read
+      description: u.description as string | undefined,
+      keyCipher: u.keyCipher as string | undefined,
+      keyCipherUntil: u.keyCipherUntil as number | undefined,
     };
   }
 
