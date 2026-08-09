@@ -3,7 +3,7 @@
  * (no network). Guards the empty-string-set rule and value round-trips.
  */
 import { describe, expect, it } from "vitest";
-import { badRequest } from "../src/errors";
+import { badRequest, HttpError } from "../src/errors";
 import { AwsStorage } from "../src/storage-aws";
 
 // marshal/unmarshal are module-private; exercise them through public ops that
@@ -50,9 +50,7 @@ describe("AwsStorage marshaling rules", () => {
     (s as any).call = async (op: string) => {
       if (op.includes("DescribeTable")) {
         if (mode === "create") {
-          const e = new Error("nope") as any;
-          e.status = 404;
-          throw Object.assign(e, { status: 404, name: "HttpError" });
+          throw new HttpError(404, "not found yet");
         }
         return { Table: { TableStatus: mode === "creating" ? "CREATING" : "ACTIVE" } };
       }
