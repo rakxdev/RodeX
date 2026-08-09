@@ -31,4 +31,5 @@ class_name = "RateLimiterDO"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RateLimiterDO"]
+# free plan: new DO classes must be SQLite-backed
+new_sqlite_classes = ["RateLimiterDO"]
