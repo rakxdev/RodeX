@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy:dashboard": "npm run build && wrangler pages deploy dist --project-name rodexdb --branch main"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
