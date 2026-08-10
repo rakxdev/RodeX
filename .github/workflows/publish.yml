@@ -33,8 +33,6 @@ jobs:
           npm test
           npm run build
           npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # fallback; trusted publishing used when OIDC is detected
 
       - name: Test + publish rodex-mcp
         run: |
@@ -43,5 +41,3 @@ jobs:
           npm test
           npm run build
           npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

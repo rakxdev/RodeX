@@ -1,8 +1,16 @@
 {
   "name": "rodexdb",
-  "version": "0.1.0",
-  "description": "Official TypeScript client for RodexDB — per-app keys & tables on DynamoDB, one clean API. Point it at any RodexDB gateway (your own deploy or the live instance).",
-  "keywords": ["rodexdb", "database", "dynamodb", "cloudflare", "serverless", "mcp", "rest"],
+  "version": "0.1.1",
+  "description": "Official TypeScript client for RodexDB \u2014 per-app keys & tables on DynamoDB, one clean API. Point it at any RodexDB gateway (your own deploy or the live instance).",
+  "keywords": [
+    "rodexdb",
+    "database",
+    "dynamodb",
+    "cloudflare",
+    "serverless",
+    "mcp",
+    "rest"
+  ],
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,8 +21,12 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
-  "engines": { "node": ">=18" },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
