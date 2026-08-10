@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24" # MUST be >= 22.14 with npm >= 11.5.1 for OIDC trusted publishing (npm v10 handshake fails -> E404)
           registry-url: "https://registry.npmjs.org"
 
       - name: Test + publish rodexdb
