@@ -84,6 +84,7 @@ const toc = [
   { a: "limits", label: "LIMITS" },
   { a: "playbook", label: "RATE-LIMIT PLAYBOOK" },
   { a: "mcp", label: "MCP — AGENTS" },
+  { a: "clients", label: "CLIENTS & SDK" },
   { a: "errors", label: "ERRORS" },
 ];
 
@@ -659,7 +660,44 @@ claude mcp add --transport http rodex ${GW}/mcp \\
             </P>
           </Section>
 
-          <Section cell="12" title="ERRORS" anchor="errors">
+          <Section cell="12" title="CLIENTS & SDK" anchor="clients">
+            <P>
+              The same platform from <span className="text-ink">your own code</span> — with{" "}
+              <span className="text-ink">your own deployment</span> or the live instance. The rule:
+              the gateway URL is always yours, never baked into a package.
+            </P>
+            <H>TYPEscript / NODE BOTS — THE SDK</H>
+            <Code>{`npm install rodexdb
+
+import { RodexDB } from "rodexdb";   // ESM — CJS require() also works
+
+const db = new RodexDB({
+  url: "https://your-name.workers.dev", // your gateway
+  appId: "app_xxxx",                    // your app
+  apiKey: "rok_...",                    // your key
+});
+
+await db.put("users", { pk: "u1", name: "Ada" });
+const user = await db.get("users", "u1");`}</Code>
+            <P>
+              Full API in the SDK: tables (create/list/delete), items
+              (put/get/update/delete), query with pagination; every failure is a{" "}
+              <code className="text-ink">RodexError</code> with status + code. Runnable example:{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/examples/sdk-bot.mjs" target="_blank" rel="noreferrer">sdk-bot.mjs</a>.
+            </P>
+            <H>LOCAL AGENTS — THE MCP BRIDGE</H>
+            <Code>{`npx -y rodex-mcp --url https://your-name.workers.dev/mcp --key $RODEX_MCP_KEY
+
+// or the live instance (key from the console MCP page):
+npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
+            <P>
+              Same 21 tools, same confirmation gate — any local MCP client
+              (Claude Desktop, VS Code) can now drive your data. Full guide:{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/developers.md" target="_blank" rel="noreferrer">docs/developers.md</a>.
+            </P>
+          </Section>
+
+          <Section cell="13" title="ERRORS" anchor="errors">
             <P>
               Every error is JSON: <code className="text-ink">{"{ \"ok\": false, \"error\": { \"code\": 409, \"message\": \"…\" } }"}</code>
             </P>

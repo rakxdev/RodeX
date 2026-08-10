@@ -129,3 +129,22 @@ describe("config validation", () => {
     expect(() => new RodexDB({ url: base, appId: "", apiKey: "k" })).toThrow(RodexError);
   });
 });
+
+describe("dual builds", () => {
+  it("CJS bundle works via require (createRequire)", async () => {
+    const { createRequire } = await import("node:module");
+    const req = createRequire(import.meta.url);
+    const cjs = req("../dist/cjs/index.cjs") as { RodexDB: new (c: { url: string; appId: string; apiKey: string }) => { listTables: () => Promise<unknown> }; RodexError: unknown };
+    const db = new cjs.RodexDB({ url: base, appId: "a", apiKey: "k" });
+    seen.length = 0;
+    await db.listTables();
+    expect(seen[0].path).toBe("/v1/tables");
+    expect(cjs.RodexError).toBeTypeOf("function");
+  });
+
+  it("ESM build works via import", async () => {
+    const esm = await import("../dist/esm/index.js");
+    expect(typeof esm.RodexDB).toBe("function");
+    expect(typeof esm.RodexError).toBe("function");
+  });
+});
