@@ -1,0 +1,21 @@
+{
+  "name": "rodex-mcp",
+  "version": "0.1.0",
+  "description": "RodexDB as a stdio MCP server — connect ANY MCP client (Claude Desktop, VS Code, local agents) to a RodexDB gateway. Point it at your own deploy or the live instance.",
+  "keywords": ["rodexdb", "mcp", "model-context-protocol", "database", "cloudflare", "serverless"],
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "type": "module",
+  "bin": { "rodex-mcp": "./dist/cli.js" },
+  "main": "./dist/cli.js",
+  "files": ["dist"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

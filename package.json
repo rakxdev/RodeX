@@ -2,7 +2,7 @@
   "name": "rodex",
   "private": true,
   "version": "0.1.0",
-  "description": "RodeX v1 — personal database gateway platform (DynamoDB + Cloudflare)",
+  "description": "RodeX v1 \u2014 personal database gateway platform (DynamoDB + Cloudflare)",
   "workspaces": [
     "gateway",
     "dashboard"
@@ -16,7 +16,9 @@
     "deploy:dashboard": "npm run build -w dashboard && wrangler pages deploy dashboard/dist --project-name rodexdb",
     "lint": "eslint gateway/src gateway/test",
     "dev:dashboard": "npm run dev -w dashboard",
-    "build:dashboard": "npm run build -w dashboard"
+    "build:dashboard": "npm run build -w dashboard",
+    "test:packages": "npm test --prefix packages/rodexdb && npm test --prefix packages/rodex-mcp",
+    "build:packages": "npm run build --prefix packages/rodexdb && npm run build --prefix packages/rodex-mcp"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260809.1",

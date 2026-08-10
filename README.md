@@ -122,6 +122,20 @@ cd dashboard && npm run dev                       # the console locally
 
 ---
 
+## Use it — 3 ways
+
+| Way | For | How |
+|---|---|---|
+| **REST** | any language, curl, your own code | `<gateway>/v1/*` with `X-App-Id` + `X-Api-Key` — [full reference](https://rodexdb.pages.dev/docs) |
+| **MCP** | coding agents | `<gateway>/mcp` with a master key — [docs/mcp.md](docs/mcp.md) |
+| **SDK** | TypeScript bots | `npm install rodexdb` — [packages/rodexdb](packages/rodexdb) · wrapper for local agents: `npx -y rodex-mcp` — [packages/rodex-mcp](packages/rodex-mcp) |
+
+Both packages are **URL-agnostic**: point them at your own deployment
+(`--url` / `url:`), or at the live instance for a quick start. Personal &
+educational use — see [LICENSE](LICENSE).
+
+---
+
 ## Deploy to Cloudflare
 
 Two parts, deployed separately — **backend** (the gateway Worker: API + MCP)
