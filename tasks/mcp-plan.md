@@ -1,6 +1,6 @@
 # Implementation Plan: MCP Server for RodeX (the Universal Gateway Interface)
 
-Status: **READY-FOR-REVIEW** · Source of truth: SPEC.md, PRODUCT.md, docs/decisions/ADR-001..005 · Research: official Cloudflare + MCP spec docs (2026-07)
+Status: **IMPLEMENTED — local branch feat/mcp, all phases A–E code+docs done, 137/137 tests, NOT pushed/deployed (per founder instruction)** · Source of truth: SPEC.md, PRODUCT.md, docs/decisions/ADR-001..005 · Research: official Cloudflare + MCP spec docs (2026-07)
 
 ## Review answers (locked with the founder, 2026-08)
 

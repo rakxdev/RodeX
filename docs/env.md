@@ -16,11 +16,14 @@ dev values go in `gateway/.dev.vars` (see `.dev.vars.example`).
 | Secret | Min | Used by | Purpose |
 |---|---|---|---|
 | `ADMIN_PASSWORD` | 12 chars | `admin.ts` login | factory password; once changed via `POST /v1/admin/change-password`, the stored hash (DynamoDB settings row) takes over and the env value is only a fallback |
-| `SESSION_SECRET` | 24 chars | session signing, key hashing, AES-GCM key derivation | HMAC for session tokens + `rok_` key hashes + the 48 h key cipher. Rotating it invalidates all sessions and key recovery — do NOT rotate casually |
+| `SESSION_SECRET` | 24 chars | session signing, key hashing, AES-GCM key derivation | HMAC for session tokens + `rok_` app-key hashes + the 48 h app-key cipher + **MCP master-key hashes and their anytime cipher** (ADR-006). Rotating it invalidates all sessions AND makes existing MCP keys un-viewable (delete + recreate) — do NOT rotate casually |
 | `GITHUB_CLIENT_ID` | — | OAuth | GitHub OAuth app id |
 | `GITHUB_CLIENT_SECRET` | — | OAuth | GitHub OAuth app secret |
 | `AWS_ACCESS_KEY_ID` | — | DynamoDB (SigV4) | IAM user `rodex-gateway` (least-privilege, docs/aws-setup.md) |
 | `AWS_SECRET_ACCESS_KEY` | — | DynamoDB (SigV4) | same |
+
+> The MCP SDK (`agents`) needs the `nodejs_compat` compatibility flag
+> (`compatibility_flags` in `wrangler.toml`) — it uses `node:async_hooks`.
 
 ## Bindings (`wrangler.toml`)
 
@@ -36,6 +39,7 @@ dev values go in `gateway/.dev.vars` (see `.dev.vars.example`).
 | `rodex_apps` | `appId` | one row per app | registry |
 | `rodex_idem` | `requestId` | idempotency records, TTL on `exp` (auto-enabled) | idempotency layer |
 | `rodex_meta` | `k` | `admin_password_hash` (after first password change) | change-password |
+| `rodex_mcp_keys` | `keyId` | one row per MCP master key (hash + anytime cipher) | console / /mcp auth |
 
 ## Dev only (`.dev.vars`)
 

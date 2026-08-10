@@ -22,6 +22,13 @@ Tables provision **5 WCU + 5 RCU** (free pool 25+25 → up to 5 tables stay free
 ### `GET /v1/tables`
 Lists the app's tables.
 
+### `POST /v1/table/delete`
+```json
+{ "name": "users", "request_id": "optional" }
+```
+Drops the physical table and deregisters it — **all data is gone**. 403 if the
+app does not own the table (no existence leak), 400 bad name, 404 unknown app.
+
 ### `POST /v1/item/put`
 ```json
 { "table": "users", "item": { "pk": "USER#1", "sk": "PROFILE", "name": "R" },
@@ -78,6 +85,10 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 | `POST /v1/admin/apps/:id/recover` | cancel soft delete |
 | `POST /v1/admin/apps/:id/force-delete` | purge all tables + registry now |
 | `GET /v1/admin/purge/run` | trigger purge manually (cron also runs it) |
+| `POST /v1/admin/mcp/keys` `{name, description?}` | mint a master key → `rok_mcp_…` returned (re-viewable anytime) |
+| `GET /v1/admin/mcp/keys` | list master keys (metadata only — never hashes/raw) |
+| `POST /v1/admin/mcp/keys/:id/view` | re-view the raw master key — **anytime**, no window |
+| `DELETE /v1/admin/mcp/keys/:id` | destroy a master key (instant revocation; no rotation exists) |
 
 ## Keys
 
@@ -87,6 +98,16 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
   short-lived AES-GCM copy keeps them recoverable for **48 hours** after
   creation/rotation (`key_recoverable_until` on the app; `POST .../view-key`).
   After the window, rotation is the only path to a fresh key.
+
+## MCP (`/mcp`)
+
+The gateway serves the Model Context Protocol at `/mcp` (Streamable HTTP,
+JSON-RPC) — see [docs/mcp.md](mcp.md). Master keys (`rok_mcp_…`, managed via
+the console MCP page and the admin endpoints above) unlock **full platform
+access**: 14 tools over every app/table/item. Every mutation requires
+`confirmed: true` (the confirmation gate); without it the server refuses with
+`confirmation_required`. MCP budgets: 600 total / 120 writes / 240 reads per
+minute, counted by the same single-point limiter.
 
 ## Error codes
 
