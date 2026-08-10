@@ -30,14 +30,14 @@ jobs:
         run: |
           cd packages/rodexdb
           npm install
-          npm test
           npm run build
+          npm test
           npm publish --access public
 
       - name: Test + publish rodex-mcp
         run: |
           cd packages/rodex-mcp
           npm install
-          npm test
           npm run build
+          npm test
           npm publish --access public
