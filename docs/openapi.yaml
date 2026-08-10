@@ -379,7 +379,7 @@ paths:
   /v1/admin/apps/{id}/rotate-key:
     post:
       tags: [Admin API]
-      summary: New api_key (old invalid instantly; shown once)
+      summary: New api_key (old invalid instantly; shown once; recoverable 48h)
       security: [{ sessionCookie: [] }]
       parameters:
         - name: id
@@ -388,7 +388,53 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: New key
+          description: New key + full app (incl. key_recoverable_until)
+
+  /v1/admin/apps/{id}/view-key:
+    post:
+      tags: [Admin API]
+      summary: Decrypt and return the current raw key inside its 48h recovery window
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: "{ api_key, recoverable_until }" }
+        "403": { description: "window expired — rotate for a fresh key" }
+
+  /v1/admin/apps/{id}/delete:
+    post:
+      tags: [Admin API]
+      summary: Soft delete alias (same contract as HTTP DELETE on the app resource)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: app with status=deleting + purge_at }
+
+  /v1/admin/change-password:
+    post:
+      tags: [Admin API]
+      summary: Rotate the console password (hash stored in platform settings)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password: { type: string }
+                new_password: { type: string, minLength: 12 }
+      responses:
+        "200": { description: "{ changed: true }" }
+        "401": { description: wrong old password or no session }
 
   /v1/admin/apps/{id}/suspend:
     post:
