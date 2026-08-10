@@ -1,0 +1,39 @@
+name: ✨ Feature request
+description: An idea for a new capability or improvement
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What do you want to do that the platform can't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: Describe the feature in plain words — how should it behave?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      options:
+        - REST API (gateway /v1/*)
+        - MCP (/mcp tools)
+        - Console (dashboard)
+        - Admin API (/v1/admin/*)
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I understand the project is free for personal/educational use only (see LICENSE)
+          required: true
