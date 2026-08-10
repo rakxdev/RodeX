@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/tests-143%20passing-6a7c5c?style=flat-square&logo=vitest" alt="tests" />
   <img src="https://img.shields.io/badge/cost-%240%20forever-d9b64a?style=flat-square" alt="cost" />
   <img src="https://img.shields.io/badge/stack-DynamoDB%20·%20Workers%20·%20Pages-2a2c28?style=flat-square" alt="stack" />
-  <img src="https://img.shields.io/badge/license-private-blue?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/license-personal%20use-6a7c5c?style=flat-square" alt="license" />
 </p>
 
 <p align="center">
@@ -124,42 +124,75 @@ cd dashboard && npm run dev                       # the console locally
 
 ## Deploy to Cloudflare
 
-### ⚡ Click-to-deploy (gateway)
+Two parts, deployed separately — **backend** (the gateway Worker: API + MCP)
+and **frontend** (the console on Pages). This section walks both, including
+which credentials go where and how the two connect.
+
+### 1 · BACKEND — the gateway Worker
+
+#### ⚡ Click-to-deploy (fastest)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rakxdev/RodeX)
 
-The button clones this repo into **your** Cloudflare account and walks you through
-every secret as a form — each with a description of exactly what to paste
-(defined in `gateway/package.json` → `cloudflare.bindings`).
+The button clones this repo into **your** Cloudflare account and walks you
+through every credential as a form, each with a description of exactly what
+to paste (defined in `gateway/package.json` → `cloudflare.bindings`).
 
-**Prerequisites (5 minutes, one time):**
+**Credentials it will ask for — get them ready first:**
 
-1. **AWS — IAM user** (~4 min): create `rodex-gateway` with the least-privilege
-   inline policy from [docs/aws-setup.md](docs/aws-setup.md). Tables are
-   **auto-provisioned** by the gateway on first use — nothing to create manually.
-2. **GitHub OAuth app** (optional, for console login): callback URL
-   `<your-worker>.workers.dev/v1/auth/github/callback`.
-3. Run the button, paste the values it asks for, deploy.
-4. **Console (Pages)** — 2 clicks: in Cloudflare dashboard → Pages → **Create project**
-   → connect this GitHub repo → build preset **Vite**, output `dashboard/dist`,
-   env `VITE_GATEWAY_URL` = your worker URL. (Your own Pages project name = your URL.)
+| Credential | Where to get it |
+|---|---|
+| `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` | **Required.** Create the IAM user `rodex-gateway` with the least-privilege policy in [docs/aws-setup.md](docs/aws-setup.md) (~4 min). Tables auto-provision on first use — nothing else to create. |
+| `ADMIN_PASSWORD` | Your console password (≥ 12 chars). Changeable later in-app. |
+| `SESSION_SECRET` | Random ≥ 24 chars: `openssl rand -hex 32`. |
+| `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | **Optional** — console GitHub login. Create an OAuth app at github.com/settings/developers; callback = `<your-backend-url>/v1/auth/github/callback`. Leave empty for password-only login. |
 
-**Then verify:** [docs/testing.md §Live](docs/testing.md) has the exact smoke script —
-health → login → fabricate → key shown once → table → CRUD → 403 cross-app → 429.
+When the deploy finishes you get **your backend URL**: `https://<name>.workers.dev`.
 
-### Manual deploy (the same thing, via CLI)
+#### Manual (same thing, via CLI)
 
 ```bash
 cd gateway
-npx wrangler secret put ADMIN_PASSWORD        # and the other secrets — see docs/env.md
-npx wrangler deploy                           # 🚀
-# dashboard:
-npm run deploy:dashboard                      # builds + publishes to Pages
+npx wrangler secret put ADMIN_PASSWORD      # your console password (min 12 chars)
+npx wrangler secret put SESSION_SECRET      # openssl rand -hex 32
+npx wrangler secret put AWS_ACCESS_KEY_ID   # from the IAM user (docs/aws-setup.md)
+npx wrangler secret put AWS_SECRET_ACCESS_KEY
+npx wrangler secret put GITHUB_CLIENT_ID    # optional — see table above
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler deploy
 ```
 
-CI note: pushing to `main` auto-deploys the gateway via
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml); `main` is protected —
-PRs only, required `quality` check.
+Note: pushing to `main` also auto-deploys via
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (PRs only —
+`main` is protected by the `quality` gate).
+
+### 2 · FRONTEND — the console on Cloudflare Pages
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**.
+2. Pick this repo → build preset **Vite** → build command `npm run build`,
+   output directory `dashboard/dist`.
+3. Set the **one connection variable**: `VITE_GATEWAY_URL = <your backend URL>`.
+4. Deploy → **your console URL**: `https://<project>.pages.dev`.
+
+### 3 · Connecting frontend to backend (the contract)
+
+Three values must agree — set them exactly like this:
+
+| Who | Variable | Set to |
+|---|---|---|
+| Backend (`wrangler.toml [vars]`) | `DASHBOARD_ORIGIN` | your **Pages** URL (console) |
+| Frontend build (Pages env) | `VITE_GATEWAY_URL` | your **backend** workers.dev URL |
+| GitHub OAuth app (if used) | callback URL | `<backend>/v1/auth/github/callback` |
+
+Then redeploy the backend once (`npx wrangler deploy`) so CORS knows the
+console origin.
+
+### 4 · Verify
+
+Follow the live smoke script in [docs/testing.md §Live](docs/testing.md):
+health → login → fabricate an app → key shown once → table → CRUD →
+403 cross-app → 429. The public docs are always live at
+rodexdb.pages.dev/docs and rodexdb.pages.dev/usage.
 
 ---
 
@@ -254,7 +287,14 @@ Live: **console** rodexdb.pages.dev · **docs** rodexdb.pages.dev/docs ·
 
 ## Credits
 
-Built and operated by **rakxdev** — a one-person instrument-packet project.
+<p align="center">
+  <a href="https://github.com/rakxdev">
+    <img src="brand/founder-card.svg" alt="Rakesh — founder & operator" width="540" />
+  </a>
+</p>
+
+**RodexDB is built and operated by [Rakesh (rakxdev)](https://github.com/rakxdev)**
+— a one-person instrument-packet project, free for personal & educational use.
 
 - **Brand & design**: the PACKET-RETICLE-KEY mark (locked R3-14) — gold = seals/reveals,
   red = action/core, amber = state, ink = structure. All marks in [`brand/`](brand/).
@@ -264,5 +304,9 @@ Built and operated by **rakxdev** — a one-person instrument-packet project.
 - **Fuel**: the AWS always-free tier and the Cloudflare free plan — the product exists
   *because* $0 is an architectural constraint, not a budget line.
 
+## License
+
+[RODEXDB PERSONAL-USE LICENSE](LICENSE) — free for **personal and educational use**:
+read it, learn from it, run it, modify it. **Commercial use is strictly forbidden.**
 <sub>RodexDB — all rights reserved. Not open source: the repo is private infrastructure
 for its operator. If you found it, you're probably the operator. 😄</sub>
