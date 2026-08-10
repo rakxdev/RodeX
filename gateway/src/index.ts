@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { registerAdminRoutes } from "./admin";
+import { registerMcpKeyRoutes } from "./mcpkeys";
 import { HttpError, gatewayError } from "./errors";
 import type { Env } from "./env";
 import { dashboardOrigin, sessionSecret } from "./env";
@@ -21,7 +22,7 @@ import {
   parseBody,
   type AppContext,
 } from "./items";
-import { handleCreateTable, handleListTables } from "./tables";
+import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -98,6 +99,7 @@ app.get("/v1/health", (c) => c.json({ ok: true, service: "rodex-gateway", versio
 app.get("/v1/auth/github/start", (c) => startGitHubOAuth(c));
 app.get("/v1/auth/github/callback", async (c) => completeGitHubOAuth(c));
 registerAdminRoutes(app);
+registerMcpKeyRoutes(app);
 
 // ── app API ──────────────────────────────────────────────────────────────────
 async function appCtx(c: Context<{ Bindings: Env }>): Promise<AppContext> {
@@ -138,6 +140,12 @@ app.post("/v1/query", async (c) => {
 app.post("/v1/table/create", async (c) => {
   const ctx = await appCtx(c);
   const { body, replay } = await handleCreateTable(ctx, await parseBody(c));
+  return c.newResponse(body, 200, { "Content-Type": "application/json", ...(replay ? { "X-Idempotent-Replay": "true" } : {}) });
+});
+
+app.post("/v1/table/delete", async (c) => {
+  const ctx = await appCtx(c);
+  const { body, replay } = await handleDeleteTable(ctx, await parseBody(c));
   return c.newResponse(body, 200, { "Content-Type": "application/json", ...(replay ? { "X-Idempotent-Replay": "true" } : {}) });
 });
 

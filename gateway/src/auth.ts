@@ -11,9 +11,10 @@ const enc = new TextEncoder();
 /** Branded API key: `rok_` + 43 base64url chars.
  *  The prefix is the RodeX fingerprint — like sk- (OpenAI), pk_ (Stripe),
  *  cf_ (Cloudflare) — so any project using RodeX is instantly recognizable. */
-export function generateApiKey(): string {
+/** Generate a crypto-random API key. Default prefix keeps legacy `rok_` format. */
+export function generateApiKey(prefix = "rok_"): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `rok_${base64Url(bytes)}`;
+  return `${prefix}${base64Url(bytes)}`;
 }
 
 function base64Url(bytes: Uint8Array): string {

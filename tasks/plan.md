@@ -128,3 +128,12 @@ Phase 3 = MCP server on Workers (decision-gated proposal).
 2. Add `https://rodex-preview.pages.dev` to the gateway origin allowlist (multi-origin support) so that URL can be used for previews after ship?
 3. T4: public aggregate meters on the usage page — yes/no?
 4. Phase 3 MCP scope: which tools? Admin-only, per-app-key, or both?
+## Phase 4: MCP server (master-key universal interface)
+
+**Full plan: [tasks/mcp-plan.md](mcp-plan.md)** · Status: READY-FOR-REVIEW
+
+Decisions locked with the founder: master-key-only auth (no GitHub OAuth for MCP),
+`rok_mcp_`-prefixed keys, console-managed (name + description, view-again 48 h,
+delete, NO rotation), full platform access, hard confirmation gate on all mutations,
+separate `rodex-mcp` worker reusing the gateway core, one small gateway addition
+(`POST /v1/table/delete`).
