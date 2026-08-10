@@ -55,6 +55,15 @@ export default function CreditsPage() {
               RodeX DB — a personal gateway platform built to full production grade,
               so it can serve as a reusable base for whatever comes next.
             </motion.p>
+            <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.24 }} className="mt-8 flex justify-center">
+              <a href={PROFILE} target="_blank" rel="noreferrer" className="block w-full max-w-md hover:opacity-90 transition-opacity">
+                <img src="/founder-card.svg" alt="Rakesh — founder and operator" className="w-full rounded-xl border border-line" />
+              </a>
+            </motion.div>
+            <motion.p variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.26 }} className="mx-auto mt-4 max-w-xl font-mono text-[10.5px] tracking-[0.12em] text-inkdim leading-relaxed">
+              FREE FOR PERSONAL &amp; EDUCATIONAL USE — COMMERCIAL USE STRICTLY FORBIDDEN ·{" "}
+              <a href={REPO} target="_blank" rel="noreferrer" className="text-gold hover:underline">LICENSE</a>
+            </motion.p>
             <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.28 }} className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Magnetic>
                 <FoldButton size="lg" onClick={() => window.open(PROFILE, "_blank")}>
