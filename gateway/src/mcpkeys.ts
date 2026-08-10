@@ -17,12 +17,16 @@ import { createStorage } from "./storage";
 import type { McpKeyRow } from "./storage";
 
 /** 1–40 printable chars, no control characters. */
+function hasControl(s: string): boolean {
+  return [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
+}
+
 function validName(name: unknown): name is string {
-  return typeof name === "string" && name.trim().length >= 1 && name.trim().length <= MCP_KEY_NAME_MAX && !/[\u0000-\u001f\u007f]/.test(name);
+  return typeof name === "string" && name.trim().length >= 1 && name.trim().length <= MCP_KEY_NAME_MAX && !hasControl(name);
 }
 
 function validDescription(desc: unknown): desc is string {
-  return typeof desc === "string" && desc.trim().length <= MCP_KEY_DESC_MAX && !/[\u0000-\u001f\u007f]/.test(desc);
+  return typeof desc === "string" && desc.trim().length <= MCP_KEY_DESC_MAX && !hasControl(desc);
 }
 
 function toPublic(row: McpKeyRow) {
