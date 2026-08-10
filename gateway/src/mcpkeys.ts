@@ -8,7 +8,7 @@
  *   - delete anytime; NO rotation endpoint (delete + create is the flow)
  */
 import type { Hono } from "hono";
-import { decryptKey, encryptKey, generateApiKey, hashKey, requireSession } from "./auth";
+import { decryptKey, encryptKey, generateApiKey, hashKey, requireSession, sessionTokenOf } from "./auth";
 import { sessionSecret, type Env } from "./env";
 import { badRequest, notFound, serviceUnavailable } from "./errors";
 import { MCP_KEY_DESC_MAX, MCP_KEY_ID_PREFIX, MCP_KEY_NAME_MAX, MCP_KEY_PREFIX } from "./limits";
@@ -99,13 +99,4 @@ function randomHex(bytes: number): string {
   return [...out].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function sessionTokenOf(c: { req: { header(name: string): string | undefined } }): string | undefined {
-  const auth = c.req.header("authorization") || "";
-  const bearer = /^Bearer\s+(.+)$/i.exec(auth);
-  if (bearer) return bearer[1].trim();
-  const x = c.req.header("x-rodex-session");
-  if (x) return x.trim();
-  const raw = c.req.header("cookie") || "";
-  const m = /rodex_session=([^;]+)/.exec(raw);
-  return m ? m[1] : undefined;
-}
+

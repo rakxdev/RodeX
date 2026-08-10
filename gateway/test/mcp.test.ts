@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
 import { resetMockStorage } from "../src/storage-mock";
-import { resetRateCounters, gateMCPRequest } from "../src/rate";
+import { resetRateCounters, gateMCPRequest, gateMCPTotal } from "../src/rate";
 import handler from "../src/index";
 import { MCP_RATE_READS, MCP_RATE_WRITES } from "../src/limits";
 
@@ -414,6 +414,21 @@ describe("MCP confirmation gate (mutations)", () => {
 
     const noTable = await toolCall("put_item", { app_id: createdApp!.app_id, table: "ghost", pk: "x", data: {}, confirmed: true });
     expect(noTable.parsed.code).toBe(403); // unowned table
+  });
+});
+
+// ── the /mcp door speaks JSON-RPC when the platform budget is exhausted ────
+
+describe("MCP door rate-limit format", () => {
+  it("HTTP 429 with Retry-After and a JSON-RPC error body (not the REST shape)", async () => {
+    // exhaust ONLY the platform-wide MCP total budget (600)
+    for (let i = 0; i < 600; i++) {
+      await gateMCPTotal(env());
+    }
+    const out = await rpc("initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "t", version: "1" } }, 1, { Authorization: `Bearer ${mcpKey}` });
+    expect(out.status).toBe(429);
+    expect(out.raw.headers.get("retry-after")).toBeTruthy();
+    expect(out.body).toMatchObject({ jsonrpc: "2.0", error: { code: -32000 } });
   });
 });
 

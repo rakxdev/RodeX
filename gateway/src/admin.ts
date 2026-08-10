@@ -8,27 +8,17 @@
  *     `Authorization: Bearer <token>` (browsers that block third-party cookies)
  */
 import type { Hono } from "hono";
-import { constantTimeEqual, createSessionCookie, decryptKey, hashKey, requireSession } from "./auth";
+import { constantTimeEqual, createSessionCookie, decryptKey, hashKey, requireSession, sessionTokenOf } from "./auth";
 import { allowedUsers, sessionSecret, type Env } from "./env";
 import { badRequest, forbidden, serviceUnavailable, unauthorized } from "./errors";
 import { APP_NAME_PATTERN, MAX_APPS } from "./limits";
 import { gateAdminRequest } from "./rate";
 import { createApp, forceDelete, getApp, purgeDue, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { createStorage } from "./storage";
-import { peekUsage } from "./rate";
-import { RATE_PLATFORM, RATE_READS_PER_APP, RATE_TOTAL_PER_APP, RATE_WRITES_PER_APP } from "./limits";
-import { physicalName } from "./registry";
+import { usageSnapshot } from "./usage";
+export { resetStorageCache } from "./usage"; // shared cache, same source as the MCP usage tool
 
 const SETTING_ADMIN_HASH = "admin_password_hash";
-
-// storage size snapshot cache (60 s — DescribeTable is control-plane, but no
-// need to hammer it; ItemCount itself lags ~6 h on DynamoDB's side)
-const storageCache = new Map<string, { at: number; data: { bytes: number; items: number } }>();
-const STORAGE_CACHE_TTL_MS = 60_000;
-
-export function resetStorageCache(): void {
-  storageCache.clear();
-}
 
 export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── auth ────────────────────────────────────────────────────────────────────
@@ -157,47 +147,8 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   app.get("/v1/admin/apps/:id/usage", async (c) => {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));
-    const storage = createStorage(c.env);
-    const row = await getApp(storage, c.req.param("id"));
-    const counts = await peekUsage(c.env, row.appId);
-    const find = (key: string) => counts.find((x) => x.key === key)?.count ?? 0;
-    const limits: Array<{ name: string; used: number; limit: number }> = [
-      { name: "total", used: find(row.appId), limit: RATE_TOTAL_PER_APP },
-      { name: "writes", used: find(`${row.appId}:write`), limit: RATE_WRITES_PER_APP },
-      { name: "reads", used: find(`${row.appId}:read`), limit: RATE_READS_PER_APP },
-      { name: "platform", used: find("platform:all"), limit: RATE_PLATFORM },
-    ];
-    const now = Date.now();
-    const sizes: Array<{ bytes: number; items: number }> = [];
-    for (const t of row.tables) {
-      const physical = physicalName(row.appId, t);
-      const cached = storageCache.get(physical);
-      let size = cached && now - cached.at < STORAGE_CACHE_TTL_MS ? cached.data : null;
-      if (!size) {
-        size = await storage.storageSize(physical).catch(() => null);
-        if (size) storageCache.set(physical, { at: now, data: size });
-      }
-      if (size) sizes.push(size);
-    }
-    return c.json({
-      ok: true,
-      result: {
-        app_id: row.appId,
-        window_seconds: 60,
-        requests: {
-          total: { used: limits[0].used, limit: limits[0].limit, remaining: Math.max(0, limits[0].limit - limits[0].used) },
-          writes: { used: limits[1].used, limit: limits[1].limit, remaining: Math.max(0, limits[1].limit - limits[1].used) },
-          reads: { used: limits[2].used, limit: limits[2].limit, remaining: Math.max(0, limits[2].limit - limits[2].used) },
-          platform: { used: limits[3].used, limit: limits[3].limit, remaining: Math.max(0, limits[3].limit - limits[3].used) },
-        },
-        storage: {
-          bytes: sizes.reduce((a, s) => a + s.bytes, 0),
-          items: sizes.reduce((a, s) => a + s.items, 0),
-          tables: row.tables.length,
-          sampled_at: Math.floor(now / 1000),
-        },
-      },
-    });
+    return c.json({ ok: true, result: await usageSnapshot(c.env, c.req.param("id")) });
+;
   });
 
   // view the RAW key inside the recovery window (encrypted at rest, hash otherwise)
@@ -238,19 +189,7 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   });
 }
 
-function sessionTokenOf(c: { req: { header(name: string): string | undefined } }): string | undefined {
-  // 1) Authorization: Bearer <token> (SPA token channel — works when third-party cookies are blocked)
-  const auth = c.req.header("authorization") || "";
-  const bearer = /^Bearer\s+(.+)$/i.exec(auth);
-  if (bearer) return bearer[1].trim();
-  // 2) X-Rodex-Session header (fallback token channel)
-  const x = c.req.header("x-rodex-session");
-  if (x) return x.trim();
-  // 3) rodex_session cookie
-  const raw = c.req.header("cookie") || "";
-  const m = /rodex_session=([^;]+)/.exec(raw);
-  return m ? m[1] : undefined;
-}
+
 
 async function verifySessionLoose(c: { env: Env; req: { header(name: string): string | undefined } }) {
   const token = sessionTokenOf(c);

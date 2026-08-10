@@ -109,6 +109,22 @@ export async function requireSession(secret: string, cookie: string | undefined 
   return session;
 }
 
+/**
+ * Extract the session token from a request, in channel order:
+ * Authorization: Bearer → X-Rodex-Session → rodex_session cookie.
+ * THE ONE implementation — admin routes and MCP key routes both use it.
+ */
+export function sessionTokenOf(c: { req: { header(name: string): string | undefined } }): string | undefined {
+  const auth = c.req.header("authorization") || "";
+  const bearer = /^Bearer\s+(.+)$/i.exec(auth);
+  if (bearer) return bearer[1].trim();
+  const x = c.req.header("x-rodex-session");
+  if (x) return x.trim();
+  const raw = c.req.header("cookie") || "";
+  const m = /rodex_session=([^;]+)/.exec(raw);
+  return m ? m[1] : undefined;
+}
+
 /** Domain helper: cookie must be SameSite=None; Secure for cross-site use. */
 export function sessionCookieHeader(value: string, secure: boolean, domain?: string): string {
   const parts = [`rodex_session=${value}`, "Path=/", "HttpOnly", "Max-Age=43200"];
