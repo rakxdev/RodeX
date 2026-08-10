@@ -59,7 +59,7 @@ async function toolCall(name: string, args: Record<string, unknown>, id = 1) {
   const out = await rpc("tools/call", { name, arguments: args }, id, { Authorization: `Bearer ${mcpKey}` });
   const result = (out.body as { result?: { content?: Array<{ type: string; text?: string }> } }).result;
   const text = result?.content?.find((c) => c.type === "text")?.text ?? "null";
-  return { status: out.status, parsed: JSON.parse(text) as { ok: boolean; code?: string; message?: string; [k: string]: unknown } };
+  return { status: out.status, parsed: JSON.parse(text) as { ok: boolean; code?: string | number; message?: string; [k: string]: unknown } };
 }
 
 let adminCookie = "";
@@ -291,4 +291,37 @@ describe("MCP budgets (same single-point counters)", () => {
     for (let i = 0; i < MCP_RATE_WRITES; i++) await gateMCPRequest(env(), "write");
     await expect(gateMCPRequest(env(), "write")).rejects.toMatchObject({ status: 429 });
   });
+});
+
+// ── stress: a real 121-write burst through the full HTTP surface ────────────
+
+describe("MCP write-burst stress (end-to-end)", () => {
+  it("write burst: every budget bites at exactly its number, naming itself", async () => {
+    // The REST table/create in setup consumed 1 app-write unit, so the APP
+    // write budget (120) exhausts at call 119 while the MCP budget (120)
+    // exhausts at call 120 — both ceilings are exact and self-naming.
+    const appId = createdApp!.app_id;
+    let ok = 0;
+    let refused = 0;
+    let appBudget = 0;
+    let mcpBudget = 0;
+    let other = 0;
+    for (let i = 0; i < 125; i++) {
+      const out = await toolCall("put_item", { app_id: appId, table: "users", pk: `burst-${i}`, data: { i }, confirmed: true }, i + 1);
+      if (out.parsed.ok === true) ok++;
+      else if (out.parsed.code === "confirmation_required") refused++;
+      else if (out.parsed.code === 429 && String(out.parsed.message).includes("mcp-writes")) mcpBudget++;
+      else if (out.parsed.code === 429 && String(out.parsed.message).includes("writes budget")) appBudget++;
+      else other++;
+    }
+    expect(ok).toBe(119); // app write budget started 1 unit consumed (setup table/create)
+    expect(refused).toBe(0); // confirmed: true was always sent
+    expect(mcpBudget).toBe(5); // calls 121-125: mcp-writes budget
+    expect(appBudget).toBe(1); // call 120: app writes budget
+    expect(other).toBe(0);
+    // nothing was silently dropped: 119 writes landed
+    const q = await toolCall("query", { app_id: appId, table: "users", pk: "burst-0" }, 999);
+    expect(q.parsed.ok).toBe(true);
+    expect((q.parsed.result as { items: unknown[] }).items.length).toBe(1);
+  }, 90_000);
 });

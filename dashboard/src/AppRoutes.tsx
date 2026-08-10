@@ -8,6 +8,7 @@ import AppDetailPage from "@/pages/AppDetailPage";
 import DocsPage from "@/pages/DocsPage";
 import UsagePage from "@/pages/UsagePage";
 import CreditsPage from "@/pages/CreditsPage";
+import McpPage from "@/pages/McpPage";
 import { RequireAuth, PublicOnly } from "@/components/SessionGate";
 import AppShell, { Mark } from "./App";
 
@@ -60,6 +61,7 @@ export default function AppRoutes() {
         >
           <Route path="/apps" element={<AppsPage />} />
           <Route path="/apps/:id" element={<AppDetailPage />} />
+          <Route path="/mcp" element={<McpPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

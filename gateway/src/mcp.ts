@@ -269,8 +269,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ name, description, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "create_app", name, description });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const { app, api_key } = await createApp(createStorage(env), sessionSecret(env), name, description);
         return { ok: true, app: { ...app, api_key } };
       });
@@ -286,8 +286,10 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "delete_app", app_id });
-      await gateMCPRequest(env, "write");
-      return safe(async () => ({ ok: true, app: await softDelete(createStorage(env), app_id) }));
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        return { ok: true, app: await softDelete(createStorage(env), app_id) };
+      });
     },
   );
 
@@ -300,8 +302,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, name, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "create_table", app_id, table: name });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const ctx = await ctxFor(env, app_id);
         return unwrap(await handleCreateTable(ctx, { name }));
       });
@@ -317,8 +319,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, name, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "delete_table", app_id, table: name, note: "ALL data in this table is destroyed" });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const ctx = await ctxFor(env, app_id);
         return unwrap(await handleDeleteTable(ctx, { name }));
       });
@@ -343,8 +345,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, table, pk, sk, data, request_id, overwrite, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "put_item", app_id, table, pk, sk, data });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const ctx = await ctxFor(env, app_id);
         const body: Record<string, unknown> = { table, item: { pk, data } };
         if (sk !== undefined) (body.item as Record<string, unknown>).sk = sk;
@@ -373,8 +375,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, table, pk, sk, data, expected_version, request_id, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "update_item", app_id, table, pk, sk, data });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const ctx = await ctxFor(env, app_id);
         const body: Record<string, unknown> = { table, pk, sk, data };
         if (expected_version !== undefined) body["expected_version"] = expected_version;
@@ -393,8 +395,8 @@ function buildMcpServer(env: Env): McpServer {
     },
     async ({ app_id, table, pk, sk, confirmed }) => {
       if (!confirmed) return needConfirmation({ action: "delete_item", app_id, table, pk, sk });
-      await gateMCPRequest(env, "write");
       return safe(async () => {
+        await gateMCPRequest(env, "write");
         const ctx = await ctxFor(env, app_id);
         return unwrap(await handleDelete(ctx, { table, pk, sk }));
       });
