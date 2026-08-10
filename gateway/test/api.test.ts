@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
 import { createApp } from "../src/registry";
 import { getMockSingleton, resetMockStorage } from "../src/storage-mock";
+import { resetRateCounters } from "../src/rate";
 import handler from "../src/index";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -62,6 +63,7 @@ let B: Creds;
 
 beforeEach(async () => {
   resetMockStorage();
+  resetRateCounters();
   A = await seedApp("botA", ["users"]);
   B = await seedApp("botB", ["orders"]);
 });

@@ -32,6 +32,24 @@ export const SOFT_DELETE_WINDOW_MINUTES = 5;
 /** How long a raw API key stays server-side (AES-GCM encrypted) for VIEW-KEY recovery. */
 export const KEY_RECOVERY_WINDOW_SECONDS = 48 * 60 * 60;
 
+// ── strict rate budgets (per 60 s window) ───────────────────────────────────
+// Enforced by single-point Durable Object counters — the same numbers the
+// docs promise: no burst tolerance, no edge lag. See docs/rate-limits.md.
+export const RATE_TOTAL_PER_APP = 600; // all requests, per app
+export const RATE_WRITES_PER_APP = 120; // put/update/delete
+export const RATE_READS_PER_APP = 240; // get/query
+export const RATE_PLATFORM = 1000; // shared across ALL apps
+export const RATE_ADMIN = 60; // console surface
+export const RATE_WINDOW_SECONDS = 60;
+
+// ── per-table provisioned capacity ──────────────────────────────────────────
+// 5 WCU / 5 RCU per data table: sustained 5 writes/s + 5 reads/s per table,
+// well above the per-app budgets (120 writes/min ≈ 2/s). The always-free pool
+// is 25+25 account-wide → up to 5 tables at 5/5 stay free. Existing tables
+// are auto-upgraded from the legacy 1/1 on their next touch.
+export const TABLE_WCU = 5;
+export const TABLE_RCU = 5;
+
 /** Max tables purged per cron run (keeps a run inside free-plan subrequest/CPU budgets). */
 export const PURGE_MAX_TABLES_PER_RUN = 5;
 

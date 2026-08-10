@@ -17,15 +17,11 @@ export interface Env {
   GITHUB_CLIENT_SECRET?: string;
   AWS_ACCESS_KEY_ID?: string;
   AWS_SECRET_ACCESS_KEY?: string;
-  // rate limiting bindings (wrangler.toml [[ratelimits]])
-  RL_APP_TOTAL?: RateLimitBinding;
-  RL_APP_WRITES?: RateLimitBinding;
-  RL_APP_READS?: RateLimitBinding;
-  RL_PLATFORM?: RateLimitBinding;
-  RL_ADMIN?: RateLimitBinding;
+  // strict rate limiting (single-point Durable Object counters)
+  RL_DO?: DurableObjectNamespace;
 }
 
-/** Minimal type of the Workers Rate Limiting binding (docs: runtime-apis/bindings/rate-limit). */
+/** Minimal type of the Workers Rate Limiting binding (legacy edge binding). */
 export interface RateLimitBinding {
   limit(opts: { key: string }): Promise<{ success: boolean }>;
 }

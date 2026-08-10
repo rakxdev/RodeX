@@ -1,66 +1,133 @@
-import { describe, expect, it } from "vitest";
-import { checkRate, gateAdminRequest, gateAppRequest } from "../src/rate";
+/**
+ * rate.test.ts — STRICT rate limiting semantics (the numbers the docs promise):
+ *   per-app total 600, writes 120, reads 240, platform 1000, admin 60,
+ *   fixed 60 s windows, retry_after = seconds remaining in the window.
+ * Uses the local fallback counter (identical semantics to the DO).
+ */
+import { beforeEach, describe, expect, it } from "vitest";
+import { gateAdminRequest, gateAppRequest, resetRateCounters } from "../src/rate";
+import { RateLimiterDO } from "../src/rate-do";
 import { HttpError } from "../src/errors";
-import type { Env, RateLimitBinding } from "../src/env";
+import type { Env } from "../src/env";
 
-function makeLimit(hits: { n: number }) {
-  return {
-    limit: async ({ key }: { key: string }) => {
-      hits.n++;
-      return { success: key !== "blocked" };
-    },
-  } as unknown as RateLimitBinding;
+function env(): Env {
+  return { STORAGE: "mock", DASHBOARD_ORIGIN: "http://x", GITHUB_ALLOWED_USERS: "" } as Env;
 }
 
-function envWith(hits: { n: number }): Env {
-  return {
-    STORAGE: "mock",
-    DASHBOARD_ORIGIN: "http://x",
-    GITHUB_ALLOWED_USERS: "",
-    RL_APP_TOTAL: makeLimit(hits),
-    RL_APP_WRITES: makeLimit(hits),
-    RL_APP_READS: makeLimit(hits),
-    RL_PLATFORM: makeLimit(hits),
-    RL_ADMIN: makeLimit(hits),
-  } as Env;
+beforeEach(() => {
+  resetRateCounters();
+});
+
+async function expect429(p: Promise<void>): Promise<number> {
+  try {
+    await p;
+  } catch (e) {
+    expect(e).toBeInstanceOf(HttpError);
+    const he = e as HttpError & { status: number; message: string };
+    expect(he.status).toBe(429);
+    return he.message === "Rate limit exceeded" ? 1 : Number(he.message.match(/\d+/)?.[0] ?? 1);
+  }
+  throw new Error("expected 429 but the call passed");
 }
 
-describe("rate envelope", () => {
-  it("passes when all bindings allow", async () => {
-    const hits = { n: 0 };
-    await gateAppRequest(envWith(hits), "app1", "write");
-    expect(hits.n).toBe(3); // total + write + platform
+describe("strict rate limiting (local counter = DO semantics)", () => {
+  it("write budget: exactly 120 writes pass per window, then 429", async () => {
+    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    await expect429(gateAppRequest(env(), "app1", "write")); // 121st write → 429
   });
 
-  it("write gate uses write budget; read gate uses read budget", async () => {
-    const hits = { n: 0 };
-    await gateAppRequest(envWith(hits), "app1", "read");
-    expect(hits.n).toBe(3); // total + read + platform
+  it("read budget: 240 reads pass, then 429", async () => {
+    for (let i = 0; i < 240; i++) await gateAppRequest(env(), "app1", "read");
+    await expect429(gateAppRequest(env(), "app1", "read"));
   });
 
-  it("throws 429 when a binding blocks", async () => {
-    const env = envWith({ n: 0 });
-    // make the platform binding block
-    (env.RL_PLATFORM as unknown as { limit: (o: { key: string }) => Promise<{ success: boolean }> }).limit = async () => ({ success: false });
-    try {
-      await gateAppRequest(env, "app1", "write");
-      expect.unreachable();
-    } catch (e) {
-      expect(e).toBeInstanceOf(HttpError);
-      expect((e as HttpError).status).toBe(429);
-      expect((e as HttpError).retryAfter).toBe(1);
+  it("mixed traffic: kind budgets trip independently (120 writes + 240 reads, then both 429)", async () => {
+    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    for (let i = 0; i < 240; i++) await gateAppRequest(env(), "app1", "read");
+    await expect429(gateAppRequest(env(), "app1", "write")); // write budget exhausted
+    await expect429(gateAppRequest(env(), "app1", "read")); // read budget exhausted
+  });
+
+  it("apps are isolated: app1 at its write cap does not touch app2", async () => {
+    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    await gateAppRequest(env(), "app2", "write"); // still allowed
+  });
+
+  it("platform pool binds across THREE apps (kind budgets alone max at 720)", async () => {
+    const e = env();
+    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appA", "write");
+    for (let i = 0; i < 240; i++) await gateAppRequest(e, "appA", "read");
+    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appB", "write");
+    for (let i = 0; i < 240; i++) await gateAppRequest(e, "appB", "read");
+    // appC: 120 writes (cum 840) + reads — platform trips once the shared pool crosses 1000
+    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appC", "write");
+    let allowed = 0;
+    for (let i = 0; i < 300; i++) {
+      try {
+        await gateAppRequest(e, "appC", "read");
+        allowed++;
+      } catch {
+        break;
+      }
     }
+    expect(allowed).toBeGreaterThanOrEqual(155); // cum 1000 needs ~160 reads
+    expect(allowed).toBeLessThanOrEqual(170); // and trips well before appC's read cap (240)
   });
 
-  it("admin gate hits admin binding", async () => {
-    const hits = { n: 0 };
-    await gateAdminRequest(envWith(hits));
-    expect(hits.n).toBe(1);
+  it("admin budget: 60, then 429", async () => {
+    for (let i = 0; i < 60; i++) await gateAdminRequest(env());
+    await expect429(gateAdminRequest(env()));
   });
 
-  it("missing bindings (dev/tests) are skipped", async () => {
-    const env = { STORAGE: "mock", DASHBOARD_ORIGIN: "x", GITHUB_ALLOWED_USERS: "" } as Env;
-    await expect(gateAppRequest(env, "a", "write")).resolves.toBeUndefined();
-    await expect(checkRate(undefined, "k")).resolves.toBeUndefined();
+  it("retry_after reflects the remaining window", async () => {
+    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    const retry = await expect429(gateAppRequest(env(), "app1", "write"));
+    expect(retry).toBeGreaterThanOrEqual(1);
+    expect(retry).toBeLessThanOrEqual(60);
+  });
+
+  it("a fresh window resets every counter", async () => {
+    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    await expect429(gateAppRequest(env(), "app1", "write"));
+    resetRateCounters(); // simulates the window boundary / DO restart
+    await gateAppRequest(env(), "app1", "write"); // allowed again
+  });
+});
+
+describe("RateLimiterDO (single-point counters)", () => {
+  it("enforces the budget atomically: 121st sequential call is denied with HTTP 429", async () => {
+    const do_ = new RateLimiterDO();
+    let ok = 0;
+    let denied = 0;
+    for (let i = 0; i < 121; i++) {
+      const res = await do_.fetch(new Request("https://rl/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checks: [{ key: "app9:write", limit: 120 }] }),
+      }));
+      if (res.status === 200) ok++;
+      else denied++;
+    }
+    expect(ok).toBe(120); // exactly the budget
+    expect(denied).toBe(1); // the 121st, HTTP 429
+  });
+
+  it("returns retry_after on the rejecting response", async () => {
+    const do_ = new RateLimiterDO();
+    for (let i = 0; i < 120; i++) {
+      await do_.fetch(new Request("https://rl/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checks: [{ key: "k", limit: 120 }] }),
+      }));
+    }
+    const res = await do_.fetch(new Request("https://rl/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checks: [{ key: "k", limit: 120 }] }),
+    }));
+    const body = (await res.json()) as { allowed: boolean; retry_after: number };
+    expect(body.allowed).toBe(false);
+    expect(body.retry_after).toBeGreaterThanOrEqual(1);
   });
 });

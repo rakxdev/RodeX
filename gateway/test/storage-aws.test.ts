@@ -82,6 +82,28 @@ describe("AwsStorage marshaling rules", () => {
     await expect((s as any).createApp({ tables: [] })).rejects.toMatchObject({ status: 400 });
   });
 
+  it("auto-upgrades legacy 1/1 tables to 5/5 (free-tier optimal)", async () => {
+    let updated = false;
+    (s as any).call = async (op: string) => {
+      if (op === "DescribeTable") return { Table: { TableStatus: "ACTIVE", ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 } } };
+      if (op === "UpdateTable") { updated = true; return {}; }
+      return {};
+    };
+    await (s as any).ensureTable("app_x_t");
+    expect(updated).toBe(true);
+  });
+
+  it("leaves already-5/5 tables untouched", async () => {
+    let updated = false;
+    (s as any).call = async (op: string) => {
+      if (op === "DescribeTable") return { Table: { TableStatus: "ACTIVE", ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 } } };
+      if (op === "UpdateTable") { updated = true; return {}; }
+      return {};
+    };
+    await (s as any).ensureTable("app_x_t");
+    expect(updated).toBe(false);
+  });
+
   it("round-trips newer AppRow fields (description/keyCipher/keyCipherUntil) — regression: view-key 'expired' on read", async () => {
     (s as any).call = async (op: string) => {
       if (op === "GetItem") {

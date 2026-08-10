@@ -101,7 +101,7 @@ export default function LandingPage() {
     <motion.div {...pageTransition} className="min-h-screen flex flex-col">
       {/* header */}
       <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur">
-        <div className="max-w-6xl mx-auto w-full flex items-center gap-3 px-4 sm:px-6 py-3.5">
+        <div className="w-full flex items-center gap-3 px-4 sm:px-6 py-3.5">
           <Link to="/" className="flex items-center gap-2.5">
             <MarkSvg />
             <span className="font-mono font-bold tracking-[0.22em] text-sm">
@@ -127,7 +127,7 @@ export default function LandingPage() {
       </header>
 
       {/* hero — SaaS layout: pitch left, product panel right */}
-      <section className="relative max-w-6xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-14 sm:pb-20">
+      <section className="relative max-w-7xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-20 pb-14 sm:pb-20">
         <div className="ambient" aria-hidden="true" />
         <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
           <motion.div variants={stagger(0.06)} initial="hidden" animate="show">
@@ -136,7 +136,7 @@ export default function LandingPage() {
               variants={fadeUp}
               className="font-mono text-2xl sm:text-[34px] font-bold tracking-[0.05em] leading-snug"
             >
-              THE DATABASE <SplitFlap text="GATEWAY" />
+              THE DATABASE <SplitFlap messages={["GATEWAY", "CONSOLE", "PLATFORM", "API"]} delay={900} />
               <br />
               <span className="text-inkdim font-semibold">FOR INDEPENDENT APPS</span>
             </motion.h1>
@@ -184,7 +184,7 @@ export default function LandingPage() {
       </section>
 
       {/* features */}
-      <section id="features" className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
+      <section id="features" className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
         <div className="flex items-baseline gap-3 mb-5">
           <h2 className="font-mono text-sm sm:text-base tracking-[0.14em]">
             WHY <span className="text-gold">RODEXDB</span>
@@ -206,7 +206,7 @@ export default function LandingPage() {
       </section>
 
       {/* how it works */}
-      <section id="how" className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
+      <section id="how" className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
         <div className="flex items-baseline gap-3 mb-5">
           <h2 className="font-mono text-sm sm:text-base tracking-[0.14em]">
             HOW IT <span className="text-gold">WORKS</span>
@@ -224,7 +224,7 @@ export default function LandingPage() {
       </section>
 
       {/* contract */}
-      <section id="contract" className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
+      <section id="contract" className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-14 scroll-mt-20">
         <div className="flex items-baseline gap-3 mb-5">
           <h2 className="font-mono text-sm sm:text-base tracking-[0.14em]">
             THE <span className="text-gold">CONTRACT</span>
@@ -243,7 +243,7 @@ export default function LandingPage() {
 
       {/* footer */}
       <footer className="border-t border-line">
-        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-5 flex flex-wrap gap-x-6 gap-y-2 justify-between items-center font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-5 flex flex-wrap gap-x-6 gap-y-2 justify-between items-center font-mono text-[9.5px] sm:text-[10px] tracking-[0.16em] text-inkdim">
           <span>RODEX DB — GATEWAY CONSOLE · REV F</span>
           <span className="hidden md:inline">INSTRUMENT PACKET</span>
           <span className="flex items-center gap-2">
