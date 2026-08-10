@@ -1,6 +1,8 @@
 name = "rodex-gateway"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
+# MCP SDK (agents) uses node:async_hooks internally — supported via nodejs_compat (free plan OK).
+compatibility_flags = ["nodejs_compat"]
 
 # ── Triggers ──────────────────────────────────────────────────────────────
 # Purge worker: finalizes scheduled (soft) deletions every minute.

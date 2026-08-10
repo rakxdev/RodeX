@@ -77,6 +77,26 @@ paths:
         "415": { $ref: "#/components/responses/UnsupportedMedia" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/table/delete:
+    post:
+      summary: Delete an owned table (all data gone)
+      security:
+        - AppKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: logical table name }
+                request_id: { type: string, description: idempotency key (24 h) }
+      responses:
+        "200":
+          description: Table deleted
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /v1/tables:
     get:
       tags: [App API]
@@ -514,6 +534,55 @@ paths:
           description: Number finalized
 
   # ── Auth ───────────────────────────────────────────────────────────────────
+  /v1/admin/mcp/keys:
+    post:
+      summary: Mint a master key (rok_mcp_; re-viewable anytime; no rotation)
+      security:
+        - SessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 40 }
+                description: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: Key minted (raw key returned; viewable anytime after)
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    get:
+      summary: List master keys (metadata only)
+      security:
+        - SessionAuth: []
+      responses:
+        "200":
+          description: Key metadata list
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/admin/mcp/keys/{id}:
+    delete:
+      summary: Destroy a master key (instant revocation; no rotation by design)
+      security:
+        - SessionAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/admin/mcp/keys/{id}/view:
+    post:
+      summary: Re-view the raw master key — anytime (no recovery window)
+      security:
+        - SessionAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Raw key }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /v1/auth/github/start:
     get:
       tags: [Auth]

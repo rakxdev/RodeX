@@ -83,6 +83,7 @@ const toc = [
   { a: "admin", label: "ADMIN API" },
   { a: "limits", label: "LIMITS" },
   { a: "playbook", label: "RATE-LIMIT PLAYBOOK" },
+  { a: "mcp", label: "MCP — AGENTS" },
   { a: "errors", label: "ERRORS" },
 ];
 
@@ -442,6 +443,22 @@ curl -X POST $GW/v1/table/create \\
                   <td>live meters — request budgets + storage</td>
                 </tr>
                 <tr>
+                  <td><code>POST /v1/admin/mcp/keys</code></td>
+                  <td>mint a master key → <code>rok_mcp_…</code> (re-viewable anytime)</td>
+                </tr>
+                <tr>
+                  <td><code>GET /v1/admin/mcp/keys</code></td>
+                  <td>list master keys (metadata only)</td>
+                </tr>
+                <tr>
+                  <td><code>POST /v1/admin/mcp/keys/:id/view</code></td>
+                  <td>re-view a master key — anytime, no window</td>
+                </tr>
+                <tr>
+                  <td><code>DELETE /v1/admin/mcp/keys/:id</code></td>
+                  <td>destroy a master key (no rotation — delete + recreate)</td>
+                </tr>
+                <tr>
                   <td><code>POST /v1/admin/apps/:id/suspend · resume</code></td>
                   <td>block / unblock traffic</td>
                 </tr>
@@ -557,7 +574,90 @@ curl -X POST $GW/v1/table/create \\
             </P>
           </Section>
 
-          <Section cell="11" title="ERRORS" anchor="errors">
+          <Section cell="11" title="MCP — AGENTS" anchor="mcp">
+            <P>
+              The gateway speaks the <span className="text-ink">Model Context Protocol</span> at{" "}
+              <code className="text-ink">{`${GW}/mcp`}</code> — one endpoint that every MCP-capable coding
+              agent (Cursor, Claude Code, VS Code/Copilot, Windsurf, Zed, Gemini CLI, Codex, …) can connect
+              to. With one <span className="text-ink">master key</span> an agent can operate the entire
+              platform: every app, every table, every item. Full reference:{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/mcp.md" target="_blank" rel="noreferrer">docs/mcp.md</a>.
+            </P>
+
+            <H>MASTER KEYS</H>
+            <P>
+              Keys are <code className="text-ink">rok_mcp_</code> + 43 base64url chars (256-bit), minted{" "}
+              <span className="text-ink">only in the console</span> (MCP page — name + description). Stored
+              hash-only; re-viewable <span className="text-ink">anytime</span>; delete = instant revocation.
+              <span className="text-ink"> No rotation</span> — delete and recreate. Send it on every request:
+            </P>
+            <Code>{`Authorization: Bearer rok_mcp_…`}</Code>
+
+            <H>CONNECTING AGENTS</H>
+            <P><span className="text-ink">Cursor</span> — <code className="text-ink">.cursor/mcp.json</code>:</P>
+            <Code>{`{ "mcpServers": {
+  "rodex": {
+    "url": "${GW}/mcp",
+    "headers": { "Authorization": "Bearer ${'${env:RODEX_MCP_KEY}'}" }
+  }
+} }`}</Code>
+            <P><span className="text-ink">Claude Code / CLI agents</span>:</P>
+            <Code>{`export RODEX_MCP_KEY=rok_mcp_…
+claude mcp add --transport http rodex ${GW}/mcp \\
+  --header "Authorization: Bearer $RODEX_MCP_KEY"`}</Code>
+            <P><span className="text-ink">stdio-only clients</span> (Claude Desktop, anything that only runs
+            local servers) — the official bridge:</P>
+            <Code>{`npx mcp-remote ${GW}/mcp \\
+  --header "Authorization: Bearer $RODEX_MCP_KEY"`}</Code>
+            <P>Never paste a key into a chat — reference <code className="text-ink">{"${env:RODEX_MCP_KEY}"}</code> instead.</P>
+
+            <H>TOOLS — 18</H>
+            <table className="doc-table mb-4">
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Kind</th>
+                  <th>What it does</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><code>health</code> · <code>get_instructions</code></td><td>read</td><td>status + the operating manual</td></tr>
+                <tr><td><code>list_apps</code> · <code>get_app</code></td><td>read</td><td>app inventory + details</td></tr>
+                <tr><td><code>list_tables</code></td><td>read</td><td>tables of an app</td></tr>
+                <tr><td><code>get_item</code> · <code>query</code></td><td>read</td><td>read data (sk defaults to <code>~</code>; paginate with <code>next_start_key</code>)</td></tr>
+                <tr><td><code>create_app</code> · <code>delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>app lifecycle</td></tr>
+                <tr><td><code>suspend_app</code> · <code>resume_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>emergency stop / restart</td></tr>
+                <tr><td><code>recover_app</code> · <code>force_delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>undo soft delete · immediate purge (no window)</td></tr>
+                <tr><td><code>create_table</code> · <code>delete_table</code></td><td><span className="text-amber">mutate — confirm</span></td><td>table lifecycle (delete is irreversible)</td></tr>
+                <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 20 KB cap)</td></tr>
+              </tbody>
+            </table>
+
+            <H>THE CONFIRMATION GATE</H>
+            <P>
+              Every mutation requires <code className="text-ink">confirmed: true</code> in its arguments.{" "}
+              <span className="text-ink">Without it, nothing executes</span> — the server refuses with a
+              structured <code className="text-ink">confirmation_required</code> response that names exactly
+              what would happen, and the agent must relay it to you and obtain your explicit approval before
+              retrying. This is enforced server-side, not by prompt. The same protocol is baked into{" "}
+              <code className="text-ink">get_instructions</code> and the console manual.
+            </P>
+
+            <H>BUDGETS</H>
+            <P>
+              MCP traffic: <span className="text-ink">600 total / 120 writes / 240 reads per minute</span>{" "}
+              (platform-wide), counted by the same single-point limiter as app traffic. App budgets also apply
+              — an agent's writes show up in the app's LIVE METERS. 429s name the budget and carry retry seconds.
+            </P>
+            <P className="mb-0">
+              Errors: <code className="text-ink">401</code> bad key · <code className="text-ink">400</code> invalid
+              arguments · <code className="text-ink">403/404</code> unknown app/table ·{" "}
+              <code className="text-ink">409</code> version conflict · <code className="text-ink">429</code> budget.
+              All tool results are structured JSON — never raw crashes.
+            </P>
+          </Section>
+
+          <Section cell="12" title="ERRORS" anchor="errors">
             <P>
               Every error is JSON: <code className="text-ink">{"{ \"ok\": false, \"error\": { \"code\": 409, \"message\": \"…\" } }"}</code>
             </P>

@@ -4,6 +4,33 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [MCP] — 2026-08-09 · The universal master-key interface (on feat/mcp, unpushed)
+
+### Added
+- **MCP server at `/mcp`** on the gateway worker (Streamable HTTP, stateless,
+  JSON mode + SSE legacy lane): 14 tools over the full platform (apps, tables,
+  items, queries) — any MCP-capable agent connects with one master key.
+- **Master keys**: `rok_mcp_` + 43 base64url; console-managed (name +
+  description), hash-only at rest, re-viewable **anytime** (no window), delete
+  = instant revocation, **no rotation** (founder decisions). New admin
+  endpoints + `rodex_mcp_keys` table (auto-provisioned).
+- **Confirmation gate**: every mutation requires `confirmed: true`; refused
+  otherwise with a structured `confirmation_required` response the agent must
+  relay to the user. Server-enforced.
+- **`POST /v1/table/delete`** — the one missing REST surface for full access
+  (owned-only, 403 unowned — no existence leak).
+- **MCP budgets** in the same single-point RateLimiterDO: 600 total / 120
+  writes / 240 reads per minute; 429s name the budget.
+- **Console MCP page** (`/mcp`): key management (mint/reveal/list/view/
+  delete) + the operating manual (connect recipes for Cursor/Claude
+  Code/mcp-remote, the confirmation protocol as a copy-paste prompt, tool
+  reference, budgets, FAQ).
+- Docs: docs/mcp.md, ADR-006, api.md + openapi.yaml sync, CHANGELOG.
+
+### Fixed
+- N/A (new surface; existing contracts untouched — old keys, apps, and
+  endpoints all work as before).
+
 ## [REV H] — 2026-08-09 · Strict limits + observability + docs
 
 ### Added

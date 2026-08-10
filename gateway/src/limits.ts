@@ -40,7 +40,24 @@ export const RATE_WRITES_PER_APP = 120; // put/update/delete
 export const RATE_READS_PER_APP = 240; // get/query
 export const RATE_PLATFORM = 1000; // shared across ALL apps
 export const RATE_ADMIN = 60; // console surface
+
 export const RATE_WINDOW_SECONDS = 60;
+
+// ── MCP (universal master-key interface) budgets ─────────────────────────────
+// Platform-wide budgets for the /mcp surface, counted by the SAME single-point
+// RateLimiterDO (keys mcp:total / mcp:write / mcp:read). Separate from the
+// per-app pools so agents can never starve an app's budget (or vice versa).
+export const MCP_RATE_TOTAL = 600;
+export const MCP_RATE_WRITES = 120;
+export const MCP_RATE_READS = 240;
+
+// ── MCP master keys ──────────────────────────────────────────────────────────
+// Console-managed, hash-only at rest + AES-GCM cipher (viewable ANYTIME — no
+// window, founder decision). No rotation endpoint by design (delete + create).
+export const MCP_KEY_PREFIX = "rok_mcp_";
+export const MCP_KEY_ID_PREFIX = "mcpk_";
+export const MCP_KEY_NAME_MAX = 40;
+export const MCP_KEY_DESC_MAX = 200;
 
 // ── per-table provisioned capacity ──────────────────────────────────────────
 // 5 WCU / 5 RCU per data table: sustained 5 writes/s + 5 reads/s per table,

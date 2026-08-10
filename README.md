@@ -88,7 +88,8 @@ npm run dev:dashboard                             # dashboard (Vite dev)
 - [docs/testing.md](docs/testing.md) — tests + live verification runbook
 - [docs/ci-cd.md](docs/ci-cd.md) — CI gates, deploy, rollback
 - [docs/research-validation.md](docs/research-validation.md) — verified sources
-- [docs/decisions/](docs/decisions/) — architecture decision records
+- [docs/mcp.md](docs/mcp.md) — the universal master-key MCP interface
+- [docs/decisions/](docs/decisions/) — architecture decision records (001–006)
 - [CHANGELOG.md](CHANGELOG.md) — shipped history
 - [tasks/](tasks/) — plan + task list
 

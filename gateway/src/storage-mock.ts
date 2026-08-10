@@ -4,7 +4,7 @@
  * Local dev: STORAGE=mock (default). Not durable — dev/tests only.
  */
 import { conflict, notFound } from "./errors";
-import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
+import type { AppRow, McpKeyRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
 const KEY_SEP = "\u0000";
 
@@ -25,6 +25,7 @@ export class MockStorage implements Storage {
   private apps = new Map<string, AppRow>();
   private idem = new Map<string, { resp: string; exp: number }>();
   private settings = new Map<string, string>();
+  private mcpKeys = new Map<string, McpKeyRow>();
   private tables = new Map<string, Map<string, StoredItem>>();
 
   private table(name: string): Map<string, StoredItem> {
@@ -76,6 +77,33 @@ export class MockStorage implements Storage {
 
   async putSetting(key: string, value: string): Promise<void> {
     this.settings.set(key, value);
+  }
+
+  // ── MCP master keys ─────────────────────────────────────────────────────────
+  async mcpKeyCreate(row: McpKeyRow): Promise<void> {
+    if (this.mcpKeys.has(row.keyId)) throw conflict("MCP key already exists");
+    this.mcpKeys.set(row.keyId, { ...row });
+  }
+
+  async mcpKeyGet(keyId: string): Promise<McpKeyRow | null> {
+    const k = this.mcpKeys.get(keyId);
+    return k ? { ...k } : null;
+  }
+
+  async mcpKeyFindByHash(keyHash: string): Promise<McpKeyRow | null> {
+    for (const k of this.mcpKeys.values()) {
+      if (k.keyHash === keyHash) return { ...k };
+    }
+    return null;
+  }
+
+  async mcpKeyList(): Promise<McpKeyRow[]> {
+    return [...this.mcpKeys.values()].map((k) => ({ ...k }));
+  }
+
+  async mcpKeyDelete(keyId: string): Promise<void> {
+    if (!this.mcpKeys.has(keyId)) throw notFound("MCP key not found");
+    this.mcpKeys.delete(keyId);
   }
 
   // ── idempotency ─────────────────────────────────────────────────────────────

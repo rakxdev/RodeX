@@ -7,7 +7,7 @@
 import { AwsClient } from "aws4fetch";
 import { badRequest, conflict, forbidden, gatewayError, HttpError, notFound, serviceUnavailable, tooManyRequests } from "./errors";
 import { IDEMPOTENCY_TTL_SECONDS, TABLE_RCU, TABLE_WCU } from "./limits";
-import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
+import type { AppRow, McpKeyRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
 const REGION = "ap-southeast-1";
 const ENDPOINT = `https://dynamodb.${REGION}.amazonaws.com/`;
@@ -16,6 +16,7 @@ const API = "DynamoDB_20120810";
 const APPS_TABLE = "rodex_apps";
 const IDEM_TABLE = "rodex_idem";
 const META_TABLE = "rodex_meta";
+const MCP_KEYS_TABLE = "rodex_mcp_keys";
 
 interface AwsCreds {
   AWS_ACCESS_KEY_ID: string;
@@ -216,6 +217,99 @@ export class AwsStorage implements Storage {
   async putSetting(key: string, value: string): Promise<void> {
     await this.ensureMetaTable();
     await this.call("PutItem", { TableName: META_TABLE, Item: marshal({ k: key, v: value }) });
+  }
+
+  // ── MCP master keys (rodex_mcp_keys) ────────────────────────────────────────
+  // Console-managed keys for the /mcp surface. Hash-only at rest plus an
+  // AES-GCM cipher for anytime re-view (NO expiry window — founder decision).
+  // Control-plane table: PAY_PER_REQUEST, lazily created like rodex_meta.
+  private mcpKeysReady: Promise<void> | null = null;
+
+  private ensureMcpKeysTable(): Promise<void> {
+    if (!this.mcpKeysReady) {
+      this.mcpKeysReady = this.ensureMcpKeysTableInner().catch((e) => {
+        this.mcpKeysReady = null; // allow retry on next call
+        throw e;
+      });
+    }
+    return this.mcpKeysReady;
+  }
+
+  private async ensureMcpKeysTableInner(): Promise<void> {
+    try {
+      await this.call("DescribeTable", { TableName: MCP_KEYS_TABLE });
+    } catch (e) {
+      const err = e as { status?: number };
+      if (err.status !== 404) throw e;
+      await this.call("CreateTable", {
+        TableName: MCP_KEYS_TABLE,
+        KeySchema: [{ AttributeName: "keyId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "keyId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      });
+    }
+  }
+
+  private mcpKeyFromItem(item: DdbItem): McpKeyRow {
+    const u = unmarshal(item);
+    return {
+      keyId: u.keyId as string,
+      name: u.name as string,
+      description: u.description as string | undefined,
+      keyHash: u.keyHash as string,
+      keyCipher: u.keyCipher as string | undefined,
+      createdAt: (u.createdAt as number) ?? 0,
+    };
+  }
+
+  async mcpKeyCreate(row: McpKeyRow): Promise<void> {
+    await this.ensureMcpKeysTable();
+    await this.call("PutItem", {
+      TableName: MCP_KEYS_TABLE,
+      Item: marshal({
+        keyId: row.keyId,
+        name: row.name,
+        description: row.description,
+        keyHash: row.keyHash,
+        keyCipher: row.keyCipher,
+        createdAt: row.createdAt,
+      }),
+      ConditionExpression: "attribute_not_exists(keyId)",
+    });
+  }
+
+  async mcpKeyGet(keyId: string): Promise<McpKeyRow | null> {
+    await this.ensureMcpKeysTable();
+    const out = await this.call<{ Item?: DdbItem }>("GetItem", {
+      TableName: MCP_KEYS_TABLE,
+      Key: marshal({ keyId }),
+    });
+    return out.Item ? this.mcpKeyFromItem(out.Item) : null;
+  }
+
+  async mcpKeyFindByHash(keyHash: string): Promise<McpKeyRow | null> {
+    await this.ensureMcpKeysTable();
+    // few keys (personal platform): scan is cheap and avoids a GSI
+    const out = await this.call<{ Items?: DdbItem[] }>("Scan", { TableName: MCP_KEYS_TABLE });
+    for (const item of out.Items || []) {
+      if (unmarshal(item).keyHash === keyHash) return this.mcpKeyFromItem(item);
+    }
+    return null;
+  }
+
+  async mcpKeyList(): Promise<McpKeyRow[]> {
+    await this.ensureMcpKeysTable();
+    const out = await this.call<{ Items?: DdbItem[] }>("Scan", { TableName: MCP_KEYS_TABLE });
+    return (out.Items || []).map((i) => this.mcpKeyFromItem(i));
+  }
+
+  async mcpKeyDelete(keyId: string): Promise<void> {
+    await this.ensureMcpKeysTable();
+    await this.call("DeleteItem", {
+      TableName: MCP_KEYS_TABLE,
+      Key: marshal({ keyId }),
+      ConditionExpression: "attribute_exists(keyId)",
+    });
   }
 
   // ── idempotency ─────────────────────────────────────────────────────────────

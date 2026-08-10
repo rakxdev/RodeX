@@ -22,6 +22,7 @@ export function Mark({ className = "w-7 h-7" }: { className?: string }) {
 
 const nav = [
   { to: "/apps", label: "APPS" },
+  { to: "/mcp", label: "MCP" },
   { to: "/docs", label: "DOCS" },
   { to: "/usage", label: "USAGE" },
 ];

@@ -60,3 +60,25 @@ Status: READY-FOR-APPROVAL · Each task ≤ ~5 files · Ordered by dependency.
 2. Allow `rodex-preview.pages.dev` as a gateway origin (multi-origin allowlist)?
 3. T4 public aggregate meters — yes/no?
 4. MCP scope: admin-only, per-app-key, or both?
+## Phase 4: MCP server (master-key universal interface) — full plan in tasks/mcp-plan.md
+
+### Phase A: Gateway foundation (key CRUD + table delete) — DONE
+- [x] A1 rodex_mcp_keys table + storage helpers (hash-only + anytime cipher, create/list/view/delete)
+- [x] A2 Admin endpoints: POST/GET /v1/admin/mcp/keys · POST :id/view (anytime) · DELETE :id (no rotation)
+- [x] A3 POST /v1/table/delete (app auth, owned-only, 403 cross-app, withIdem)
+### Checkpoint: gateway green — 122/122 tests at Phase A
+### Phase B: MCP surface + read-only tools — DONE (on the gateway worker at /mcp)
+- [x] B1 /mcp route: Streamable HTTP, Bearer auth vs key table, handler Origin/Host validation, MCP budgets in the SAME RateLimiterDO
+- [x] B2 read-only tools: health, get_instructions, list_apps, get_app, list_tables, get_item, query
+### Checkpoint: real JSON-RPC integration tests green
+### Phase C: Mutations + confirmation gate — DONE
+- [x] C1 gate: mutating tools refuse without confirmed:true (structured refusal)
+- [x] C2 mutation tools: put/update/delete_item, create/delete_table, create/delete_app (+ burst stress)
+### Checkpoint: 15/15 MCP tests incl. 125-call write burst
+### Phase D: Dashboard MCP page — DONE
+- [x] D1 /mcp route + header button + key management (mint/reveal/list/view anytime/delete)
+- [x] D2 operating manual panel (connect recipes, tool table, confirmation protocol, budgets, FAQ)
+### Checkpoint: tsc + build green
+### Phase E: Docs — DONE (E1); E2 (push/PR/deploy) BLOCKED pending founder review
+- [x] E1 docs: api.md + openapi.yaml sync, docs/mcp.md, ADR-006, CHANGELOG, env.md note
+- [ ] E2 review → push → PR → quality → merge → auto-deploy; live MCP Inspector demo with user

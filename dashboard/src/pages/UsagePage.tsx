@@ -129,6 +129,11 @@ export default function UsagePage() {
               <td><b>No per-app cap</b> — 25 GB shared across all apps (always-free tier)</td>
               <td>Free up to 25 GB total</td>
             </tr>
+            <tr>
+              <td><code>MCP — agents</code></td>
+              <td>One master key (<code>rok_mcp_</code>) per agent; endpoint <code>…/mcp</code>; console-minted, viewable anytime, no rotation</td>
+              <td>0 — MCP budgets ride the same free limiter (600/120/240 per min); a few hash reads per request</td>
+            </tr>
           </tbody>
         </table>
       </motion.div>

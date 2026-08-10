@@ -11,6 +11,9 @@
  */
 import { tooManyRequests } from "./errors";
 import {
+  MCP_RATE_READS,
+  MCP_RATE_TOTAL,
+  MCP_RATE_WRITES,
   RATE_ADMIN,
   RATE_PLATFORM,
   RATE_READS_PER_APP,
@@ -93,6 +96,21 @@ export async function gateAppRequest(env: Env, appId: string, kind: "write" | "r
 /** Admin surface gate. */
 export async function gateAdminRequest(env: Env): Promise<void> {
   const result = await doCheck(env, [{ key: "admin", limit: RATE_ADMIN, budget: "admin" }]);
+  if (result) fail(result);
+}
+
+/** MCP entry gate: platform-wide total only (initialize/list are reads). */
+export async function gateMCPTotal(env: Env): Promise<void> {
+  const result = await doCheck(env, [{ key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total" }]);
+  if (result) fail(result);
+}
+
+/** MCP tool gate: total + kind budget (writes/reads). */
+export async function gateMCPRequest(env: Env, kind: "write" | "read"): Promise<void> {
+  const result = await doCheck(env, [
+    { key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total" },
+    { key: `mcp:${kind}`, limit: kind === "write" ? MCP_RATE_WRITES : MCP_RATE_READS, budget: kind === "write" ? "mcp-writes" : "mcp-reads" },
+  ]);
   if (result) fail(result);
 }
 

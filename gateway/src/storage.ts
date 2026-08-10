@@ -12,6 +12,21 @@ import { getMockSingleton } from "./storage-mock";
 
 export type AppStatus = "active" | "suspended" | "deleting";
 
+/** Console-managed MCP master key (full platform access). Hash-only at rest +
+ *  AES-GCM cipher for anytime view (no expiry — founder decision). */
+export interface McpKeyRow {
+  keyId: string;
+  /** human name, 1–40 chars */
+  name: string;
+  /** optional note, ≤ 200 chars */
+  description?: string;
+  /** HMAC-SHA256(SESSION_SECRET, key) — never the raw key */
+  keyHash: string;
+  /** AES-GCM ciphertext of the raw key — decryptable ANYTIME */
+  keyCipher?: string;
+  createdAt: number;
+}
+
 export interface AppRow {
   appId: string;
   name: string;
@@ -79,6 +94,14 @@ export interface Storage {
   // platform settings (admin password hash lives here; env ADMIN_PASSWORD is fallback)
   getSetting(key: string): Promise<string | null>;
   putSetting(key: string, value: string): Promise<void>;
+
+  // MCP master keys (console-managed, full platform access)
+  mcpKeyCreate(row: McpKeyRow): Promise<void>; // 409 if keyId exists
+  mcpKeyGet(keyId: string): Promise<McpKeyRow | null>;
+  /** find a key by its hash (MCP Bearer auth — never scans raw keys) */
+  mcpKeyFindByHash(keyHash: string): Promise<McpKeyRow | null>;
+  mcpKeyList(): Promise<McpKeyRow[]>;
+  mcpKeyDelete(keyId: string): Promise<void>;
 
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
   ensureTable(physical: string): Promise<void>; // create if missing; 409→ok
