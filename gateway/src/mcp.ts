@@ -24,7 +24,7 @@ import { createStorage } from "./storage";
 import type { AppContext } from "./items";
 import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
-import { createApp, getApp, softDelete, toPublic } from "./registry";
+import { createApp, forceDelete, getApp, recover, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
 import { APP_NAME_PATTERN, TABLE_NAME_PATTERN } from "./limits";
 
@@ -114,8 +114,11 @@ EVERY app, table, and item on the platform.
 - list_apps / get_app — app inventory + details (read)
 - list_tables — tables of an app, with key schema (read)
 - get_item — one item (pk required; sk defaults to "~") (read)
-- query — pk + optional sk_begins_with, limit <= 100, pagination (read)
+- query — pk + optional sk_prefix, limit <= 100, pagination (read)
 - create_app / delete_app — app lifecycle (MUTATION — confirm)
+- suspend_app / resume_app — emergency stop / restart (MUTATION — confirm)
+- recover_app — undo a soft delete inside its window (MUTATION — confirm)
+- force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
 - create_table / delete_table — table lifecycle (MUTATION — confirm)
 - put_item / update_item / delete_item — item lifecycle (MUTATION — confirm)
 
@@ -289,6 +292,71 @@ function buildMcpServer(env: Env): McpServer {
       return safe(async () => {
         await gateMCPRequest(env, "write");
         return { ok: true, app: await softDelete(createStorage(env), app_id) };
+      });
+    },
+  );
+
+  server.registerTool(
+    "suspend_app",
+    {
+      description:
+        "Suspend an app: all REST traffic to it is blocked with 403 until resumed. MUTATION: tell the user which app and why, get explicit approval, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "suspend_app", app_id });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        return { ok: true, app: await setStatus(createStorage(env), app_id, "suspended") };
+      });
+    },
+  );
+
+  server.registerTool(
+    "resume_app",
+    {
+      description:
+        "Resume a suspended app: traffic flows again. MUTATION: confirm with the user first, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "resume_app", app_id });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        return { ok: true, app: await setStatus(createStorage(env), app_id, "active") };
+      });
+    },
+  );
+
+  server.registerTool(
+    "recover_app",
+    {
+      description:
+        "Undo a soft-deleted app inside its recovery window: status goes back to active and the purge is cancelled. MUTATION: confirm with the user first, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "recover_app", app_id });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        return { ok: true, app: await recover(createStorage(env), app_id) };
+      });
+    },
+  );
+
+  server.registerTool(
+    "force_delete_app",
+    {
+      description:
+        "IMMEDIATELY purge an app and ALL its tables — data is gone forever, no recovery window. This is the most destructive tool. MUTATION: state exactly which app and its data to the user, get explicit approval, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "force_delete_app", app_id, note: "ALL tables and data of this app are destroyed instantly" });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        await forceDelete(createStorage(env), app_id);
+        return { ok: true, deleted: true, app_id };
       });
     },
   );

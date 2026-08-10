@@ -59,7 +59,13 @@ async function toolCall(name: string, args: Record<string, unknown>, id = 1) {
   const out = await rpc("tools/call", { name, arguments: args }, id, { Authorization: `Bearer ${mcpKey}` });
   const result = (out.body as { result?: { content?: Array<{ type: string; text?: string }> } }).result;
   const text = result?.content?.find((c) => c.type === "text")?.text ?? "null";
-  return { status: out.status, parsed: JSON.parse(text) as { ok: boolean; code?: string | number; message?: string; [k: string]: unknown } };
+  let parsed: { ok: boolean; code?: string | number; message?: string; [k: string]: unknown };
+  try {
+    parsed = JSON.parse(text) as { ok: boolean; code?: string | number; message?: string; [k: string]: unknown };
+  } catch {
+    parsed = { ok: false, code: "unparseable", message: text.slice(0, 200) };
+  }
+  return { status: out.status, parsed };
 }
 
 let adminCookie = "";
@@ -118,19 +124,20 @@ describe("MCP auth (master key)", () => {
 // ── discovery ────────────────────────────────────────────────────────────────
 
 describe("MCP discovery", () => {
-  it("tools/list exposes exactly the 14 tools with instructions", async () => {
+  it("tools/list exposes exactly the 18 tools with instructions", async () => {
     const out = await rpc("tools/list", {}, 1, { Authorization: `Bearer ${mcpKey}` });
     expect(out.status).toBe(200);
     const tools = ((out.body as { result: { tools: Array<{ name: string; description: string }> } }).result?.tools) ?? [];
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "create_app", "create_table", "delete_app", "delete_item", "delete_table",
-      "get_app", "get_instructions", "get_item", "health", "list_apps", "list_tables",
-      "put_item", "query", "update_item",
+      "force_delete_app", "get_app", "get_instructions", "get_item", "health",
+      "list_apps", "list_tables", "put_item", "query", "recover_app", "resume_app",
+      "suspend_app", "update_item",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
-      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item"].includes(t.name)) {
+      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "suspend_app", "resume_app", "recover_app", "force_delete_app"].includes(t.name)) {
         expect(t.description.toLowerCase()).toContain("confirmed: true");
       }
     }
@@ -220,6 +227,19 @@ describe("MCP confirmation gate (mutations)", () => {
     const da = await toolCall("delete_app", { app_id: appId });
     expect(da.parsed.code).toBe("confirmation_required");
 
+    const sa = await toolCall("suspend_app", { app_id: appId });
+    expect(sa.parsed.code).toBe("confirmation_required");
+
+    const ra = await toolCall("resume_app", { app_id: appId });
+    expect(ra.parsed.code).toBe("confirmation_required");
+
+    const rc = await toolCall("recover_app", { app_id: appId });
+    expect(rc.parsed.code).toBe("confirmation_required");
+
+    const fa = await toolCall("force_delete_app", { app_id: appId });
+    expect(fa.parsed.code).toBe("confirmation_required");
+    expect((fa.parsed.what_would_happen as { note: string }).note).toContain("destroyed");
+
     // nothing changed: no table created, no item written, app still active
     const after = await call("GET", "/v1/tables", undefined, { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key });
     expect((await after.json()) as unknown).toEqual((await before.json()) as unknown);
@@ -268,6 +288,40 @@ describe("MCP confirmation gate (mutations)", () => {
     const da = await toolCall("delete_app", { app_id: newAppId, confirmed: true });
     expect(da.parsed.ok).toBe(true);
     expect((da.parsed.app as { status: string }).status).toBe("deleting");
+  });
+
+  it("suspend / resume / recover / force-delete work when confirmed", async () => {
+    const appId = createdApp!.app_id;
+    const headers = { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key };
+
+    // suspend → REST writes are blocked with 403
+    const sus = await toolCall("suspend_app", { app_id: appId, confirmed: true });
+    expect(sus.parsed.ok).toBe(true);
+    expect((sus.parsed.app as { status: string }).status).toBe("suspended");
+    const blocked = await call("POST", "/v1/item/put", { table: "users", item: { pk: "x", data: {} } }, headers);
+    expect(blocked.status).toBe(403);
+
+    // resume → traffic flows again
+    const res = await toolCall("resume_app", { app_id: appId, confirmed: true });
+    expect(res.parsed.ok).toBe(true);
+    expect((res.parsed.app as { status: string }).status).toBe("active");
+    const ok = await call("POST", "/v1/item/put", { table: "users", item: { pk: "x", data: { v: 1 } } }, headers);
+    expect(ok.status).toBe(200);
+
+    // soft delete → recover inside the window
+    await toolCall("delete_app", { app_id: appId, confirmed: true });
+    const rc = await toolCall("recover_app", { app_id: appId, confirmed: true });
+    expect(rc.parsed.ok).toBe(true);
+    expect((rc.parsed.app as { status: string }).status).toBe("active");
+
+    // force-delete a fresh app: gone from list_apps, tables purged
+    const freshRes = await call("POST", "/v1/admin/apps", { name: "fdapp" }, { Cookie: adminCookie });
+    const fresh = ((await freshRes.json()) as { result: { app_id: string; api_key: string } }).result;
+    await call("POST", "/v1/table/create", { name: "t" }, { "X-App-Id": fresh.app_id, "X-Api-Key": fresh.api_key });
+    const fd = await toolCall("force_delete_app", { app_id: fresh.app_id, confirmed: true });
+    expect(fd.parsed).toMatchObject({ ok: true, deleted: true });
+    const apps = await toolCall("list_apps", {});
+    expect((apps.parsed.apps as Array<{ app_id: string }>).map((a) => a.app_id)).not.toContain(fresh.app_id);
   });
 
   it("unknown apps / tables map to structured errors (403/404), never crashes", async () => {
