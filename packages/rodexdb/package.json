@@ -11,7 +11,7 @@
     "mcp",
     "rest"
   ],
-  "license": "SEE LICENSE IN ../../LICENSE",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,5 +35,13 @@
     "@types/node": "^26.0.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rakxdev/RodeX"
+  },
+  "homepage": "https://rodexdb.pages.dev",
+  "bugs": {
+    "url": "https://github.com/rakxdev/RodeX/issues"
   }
 }

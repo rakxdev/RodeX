@@ -1,0 +1,67 @@
+RODEXDB PERSONAL-USE LICENSE
+Copyright (c) 2026 Rakesh (rakxdev) — all rights reserved except as granted below.
+
+Version 1.0 · 2026-08-10
+
+## What this license means, in plain words
+
+RodexDB is made available **free for personal and educational use** — so that
+developers, students, and hobbyists can read it, learn from it, run it for
+their own projects, modify it, and build their own things with it.
+
+**Commercial use is strictly forbidden.** You may NOT use RodexDB — in whole
+or in part, directly or indirectly — to make money, to run a business, to
+sell, to license, to sublicense, or to provide paid services or hosted
+offerings (SaaS) to third parties.
+
+## Grant
+
+Subject to the terms below, the author grants you a non-exclusive,
+non-transferable, revocable, worldwide, royalty-free license to:
+
+1. **Use** RodexDB for personal, non-commercial, educational, or
+   research purposes.
+2. **Modify** RodexDB for your own personal, non-commercial use.
+3. **Copy and distribute** copies of RodexDB, modified or unmodified,
+   PROVIDED that every copy carries this license text unmodified and the
+   copyright notice above, and is distributed free of charge.
+
+## Restrictions (what you may NOT do)
+
+1. **No commercial use.** Any use in connection with revenue, a business,
+   employment, contracting, paid hosting, advertising, or commercial
+   software — regardless of scale — is prohibited without a separate
+   written license from the author.
+2. **No selling.** You may not sell RodexDB or any derived work, nor charge
+   for access to it, nor bundle it into a product that is sold.
+3. **No trademark use.** The RODEXDB name, the mark (PACKET-RETICLE-KEY),
+   and the brand identity may not be used to promote or brand derived works
+   except to state that they are based on RodexDB.
+4. **No misrepresentation.** You may not present modified versions as the
+   original project or as officially endorsed.
+
+## Attribution
+
+Any public distribution, publication, or acknowledgment of work based on
+RodexDB must credit the original author: "Based on RodexDB by rakxdev
+(https://github.com/rakxdev)".
+
+## Disclaimer of warranty
+
+RODEXDB IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN
+AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH RODEXDB OR ITS USE.
+
+## Termination
+
+This license terminates automatically if you breach any term. Upon
+termination you must cease all use and destroy all copies in your
+possession. The author may grant a separate commercial license on request.
+
+## Questions
+
+For commercial licensing inquiries: open an issue on the repository or
+reach the author via GitHub (https://github.com/rakxdev).
