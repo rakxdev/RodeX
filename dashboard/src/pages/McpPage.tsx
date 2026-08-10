@@ -314,12 +314,13 @@ claude mcp add --transport http rodex ${ENDPOINT} \\
 4. Reads are free: explore before proposing changes.`}</pre>
           </Section>
 
-          <Section tag="TOOL REFERENCE" title="20 tools — reads free, mutations confirmed">
+          <Section tag="TOOL REFERENCE" title="21 tools — reads free, mutations confirmed">
             <ul className="grid grid-cols-1 gap-1.5">
               {[
                 ["health · get_instructions", "read"],
                 ["list_apps · get_app · list_tables", "read"],
                 ["get_item · query", "read"],
+                ["get_app_usage — meters as data", "read"],
                 ["create_app · delete_app · suspend · resume", "confirm"],
                 ["rotate_app_key · view_app_key", "confirm"],
                 ["recover_app · force_delete_app", "confirm"],

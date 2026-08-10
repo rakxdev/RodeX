@@ -108,7 +108,7 @@ describe("MCP auth (master key)", () => {
     const out = await rpc("initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "t", version: "1" } }, 1, { Authorization: `Bearer ${mcpKey}` });
     expect(out.status).toBe(200);
     const result = out.body?.result as { protocolVersion?: string; serverInfo?: { name: string } };
-    expect(result.serverInfo?.name).toBe("rodex");
+    expect(result.serverInfo?.name).toBe("rodexdb");
     expect(result.protocolVersion).toBeTruthy();
   });
 
@@ -124,16 +124,16 @@ describe("MCP auth (master key)", () => {
 // ── discovery ────────────────────────────────────────────────────────────────
 
 describe("MCP discovery", () => {
-  it("tools/list exposes exactly the 20 tools with instructions", async () => {
+  it("tools/list exposes exactly the 21 tools with instructions", async () => {
     const out = await rpc("tools/list", {}, 1, { Authorization: `Bearer ${mcpKey}` });
     expect(out.status).toBe(200);
     const tools = ((out.body as { result: { tools: Array<{ name: string; description: string }> } }).result?.tools) ?? [];
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "create_app", "create_table", "delete_app", "delete_item", "delete_table",
-      "force_delete_app", "get_app", "get_instructions", "get_item", "health",
-      "list_apps", "list_tables", "put_item", "query", "recover_app", "resume_app",
-      "rotate_app_key", "suspend_app", "update_item", "view_app_key",
+      "force_delete_app", "get_app", "get_app_usage", "get_instructions", "get_item",
+      "health", "list_apps", "list_tables", "put_item", "query", "recover_app",
+      "resume_app", "rotate_app_key", "suspend_app", "update_item", "view_app_key",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
@@ -195,6 +195,36 @@ describe("MCP read-only tools", () => {
     const missing = await toolCall("get_item", { app_id: appId, table: "users", pk: "nope" });
     expect(missing.parsed.ok).toBe(false);
     expect(missing.parsed.code).toBe(404);
+  });
+});
+
+describe("MCP get_app_usage (meters for agents)", () => {
+  it("reports request budgets + storage for an app, without consuming anything", async () => {
+    const appId = createdApp!.app_id;
+    // fire some traffic via REST so counters move
+    for (let i = 0; i < 3; i++) {
+      await call("POST", "/v1/item/put", { table: "users", item: { pk: `u${i}`, data: {} } }, { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key });
+    }
+    const before = await toolCall("get_app_usage", { app_id: appId });
+    expect(before.parsed.ok).toBe(true);
+    // 3 puts + the setup table/create = 4 app writes consumed this minute
+    const req = (before.parsed.result as { requests: { writes: { used: number; limit: number; remaining: number } } }).requests;
+    expect(req.writes.used).toBe(4);
+    expect(req.writes.limit).toBe(120);
+    expect(req.writes.remaining).toBe(116);
+    const st = (before.parsed.result as { storage: { bytes: number; items: number; tables: number } }).storage;
+    expect(st.tables).toBe(1);
+    expect(st.items).toBe(3);
+
+    // peeking consumed nothing: a subsequent usage call sees the same numbers
+    const after = await toolCall("get_app_usage", { app_id: appId });
+    expect((after.parsed.result as { requests: { writes: { used: number } } }).requests.writes.used).toBe(4);
+  });
+
+  it("structured error for unknown apps (read-only, no confirmation needed)", async () => {
+    const out = await toolCall("get_app_usage", { app_id: "app_nope" });
+    expect(out.parsed.ok).toBe(false);
+    expect(out.parsed.code).toBe(404);
   });
 });
 
