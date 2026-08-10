@@ -130,4 +130,30 @@ describe("RateLimiterDO (single-point counters)", () => {
     expect(body.allowed).toBe(false);
     expect(body.retry_after).toBeGreaterThanOrEqual(1);
   });
+
+  it("peek reports counts WITHOUT consuming", async () => {
+    const do_ = new RateLimiterDO();
+    for (let i = 0; i < 7; i++) {
+      await do_.fetch(new Request("https://rl/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checks: [{ key: "appX:write", limit: 120 }] }),
+      }));
+    }
+    const peek = await do_.fetch(new Request("https://rl/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "peek", checks: [{ key: "appX:write" }, { key: "appX:read" }] }),
+    }));
+    const body = (await peek.json()) as { counts: Array<{ key: string; count: number }> };
+    expect(body.counts.find((x) => x.key === "appX:write")?.count).toBe(7);
+    expect(body.counts.find((x) => x.key === "appX:read")?.count).toBe(0);
+    // peek consumed nothing → the next check still passes (113 remaining)
+    const after = await do_.fetch(new Request("https://rl/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checks: [{ key: "appX:write", limit: 120 }] }),
+    }));
+    expect((await after.json()) as { allowed: boolean }).toMatchObject({ allowed: true });
+  });
 });

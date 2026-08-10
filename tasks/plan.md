@@ -44,9 +44,9 @@ Phase 3 = MCP server on Workers (decision-gated proposal).
 - [ ] Prod console fully functional, console clean (browser check)
 - [ ] User reviews prod, not just the preview
 
-### Phase 1: Observability (free meters)
+### Phase 1: Observability (free meters) — IN PROGRESS
 
-- [ ] T2: Gateway `GET /v1/admin/apps/:id/usage`
+- [x] T2: Gateway `GET /v1/admin/apps/:id/usage` — peeks single-point limiter counters (no consumption) + DescribeTable storage (60 s cache)
   - Description: read the rate-limiter counters (total/writes/reads used in current window),
     plus per-table `TableSizeBytes`/`ItemCount` via DescribeTable (bounded, lazy, cached 60 s);
     returns `{ requests: {total, writes, reads}, storage_bytes, item_count }`
@@ -54,7 +54,7 @@ Phase 3 = MCP server on Workers (decision-gated proposal).
     tests cover limiter snapshot + storage mock sizes
   - Dependencies: T0 (contract deploys first)
   - Files: gateway/src/rate.ts (snapshot fn), admin.ts, storage (sizeQuery), tests — M
-- [ ] T3: App detail usage panel
+- [x] T3: App detail LIVE METERS panel
   - Description: meters row (WRITES/READS/TOTAL with remaining budget bars) + storage
     readout (MB used / 25 GB account-wide) on AppDetailPage; auto-refresh 30 s; Loader on fetch
   - Acceptance: panel renders real numbers within 30 s of traffic; degrades to "—" on error

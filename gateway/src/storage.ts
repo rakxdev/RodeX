@@ -83,6 +83,8 @@ export interface Storage {
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
   ensureTable(physical: string): Promise<void>; // create if missing; 409→ok
   dropTable(physical: string): Promise<void>; // empty (paginated) then delete
+  /** observability: approximate size + item count (DynamoDB ItemCount lags ~6 h) */
+  storageSize(physical: string): Promise<{ bytes: number; items: number } | null>;
 
   // items
   putItem(physical: string, item: { pk: string; sk: string; data: string }, opts?: PutOptions): Promise<StoredItem>;

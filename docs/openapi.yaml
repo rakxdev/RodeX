@@ -376,6 +376,20 @@ paths:
         "200":
           description: App now deleting
 
+  /v1/admin/apps/{id}/usage:
+    get:
+      tags: [Admin API]
+      summary: Live usage — limiter counters (peek, no consumption) + storage size
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: "{ requests: { total/writes/reads/platform: {used, limit, remaining} }, storage: { bytes, items, tables, sampled_at } }"
+
   /v1/admin/apps/{id}/rotate-key:
     post:
       tags: [Admin API]

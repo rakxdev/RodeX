@@ -370,6 +370,17 @@ export class AwsStorage implements Storage {
     await this.call("DeleteTable", { TableName: physical });
   }
 
+  async storageSize(physical: string): Promise<{ bytes: number; items: number } | null> {
+    const out = await this.call<{ Table?: { TableSizeBytes?: number; ItemCount?: number } }>("DescribeTable", {
+      TableName: physical,
+    });
+    if (!out.Table) return null;
+    return {
+      bytes: out.Table.TableSizeBytes ?? 0,
+      items: out.Table.ItemCount ?? 0,
+    };
+  }
+
   // ── items ───────────────────────────────────────────────────────────────────
 
   private itemFromDdb(item: DdbItem): StoredItem {
