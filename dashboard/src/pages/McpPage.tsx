@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Eye, Trash2, X } from "lucide-react";
-import { api, ApiError } from "@/api/client";
+import { api, ApiError, gatewayBase } from "@/api/client";
 import { pageTransition, stagger } from "@/lib/motion";
 import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
@@ -23,7 +23,9 @@ interface McpKey {
   created_at: number;
 }
 
-const ENDPOINT = `${location.origin.replace(/\/$/, "")}/mcp`;
+// the MCP server lives on the GATEWAY worker — never location.origin (that
+// would point agents at the dashboard website itself)
+const ENDPOINT = `${gatewayBase}/mcp`;
 
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
