@@ -8,6 +8,10 @@ Response shape: `{ "ok": true, "result": {...} }` | `{ "ok": false, "error": { "
 
 ## App endpoints
 
+### `GET /v1/health`
+Public liveness: `{ "ok": true, "service": "rodex-gateway", "version": 1 }`.
+No auth, no rate limit.
+
 ### `POST /v1/table/create`
 ```json
 { "name": "users", "request_id": "optional" }

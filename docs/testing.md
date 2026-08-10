@@ -4,65 +4,48 @@
 
 ```bash
 npm install
-npm test          # vitest — 70+ tests, mock storage
-npm run typecheck # strict TS
+npm test          # vitest — 105 tests, mock storage
+npm run typecheck # strict TS (gateway)
+cd dashboard && npx tsc --noEmit   # dashboard typecheck
+npx eslint gateway/src gateway/test   # lint gate (CI matches)
 ```
 
-Test map:
+Run a single file: `npx vitest run gateway/test/rate.test.ts`.
+
+## Test map
 
 | File | Covers |
 |---|---|
-| `test/auth.test.ts` | key gen/hash, constant-time compare, session sign/verify/tamper |
-| `test/errors.test.ts` | error contract shape |
-| `test/limits.test.ts` | size caps, name patterns |
-| `test/storage-mock.test.ts` | storage contract: apps, idempotency TTL, items, versions, queries |
-| `test/registry.test.ts` | lifecycle: rotate, soft delete/recover, purge bounds |
-| `test/rate.test.ts` | rate envelope: 429 on block, budgets, missing-binding skip |
-| `test/api.test.ts` | full-stack via `app.fetch`: isolation 403, idempotency, 409/413/401, table create |
-| `test/admin.test.ts` | password + GitHub OAuth (mocked fetch), admin CRUD, suspend, soft delete |
+| `test/auth.test.ts` | `rok_` key gen/hash, constant-time compare, session sign/verify/tamper, AES-GCM encrypt/decrypt |
+| `test/storage-mock.test.ts` | storage contract: apps, idempotency TTL, items, versions, queries, settings rows, storageSize |
+| `test/storage-aws.test.ts` | marshaling rules (empty-string-set guard), table ACTIVE polling, 5/5 auto-upgrade, **app-row round-trip of newer fields** (view-key regression) |
+| `test/registry.test.ts` | lifecycle: rotate, soft delete/recover, purge bounds, key cipher on create/rotate |
+| `test/rate.test.ts` | **strict budgets**: writes 120, reads 240, mixed kind isolation, platform pool across 3 apps, admin 60, retry_after, window reset, DO atomicity + peek-no-consume |
+| `test/api.test.ts` | full-stack via `app.fetch`: isolation 403, idempotency, 409/413/401, table create, cross-app table checks |
+| `test/admin.test.ts` | password + GitHub OAuth (mocked fetch incl. User-Agent regression), admin CRUD, suspend, soft delete, view-key window, **change-password round-trip**, **usage endpoint (counters without consuming)**, delete alias, descriptions |
 
-## Local gateway (mock storage — zero AWS)
+## Live verification runbook (after any deploy)
 
-```bash
-npm run dev        # wrangler dev on :8787, STORAGE=mock (in-memory, resets on restart)
-```
+1. `curl https://<gateway>/v1/health` → `ok:true`
+2. Login (password) → session; `/v1/admin/me` → authenticated
+3. Fabricate an app → key is `rok_…`, shown once; `key_recoverable_until` set
+4. `POST /v1/admin/apps/:id/view-key` → returns the same raw key (inside 48 h)
+5. Create table → put/get/update/query/delete with `X-App-Id` + `X-Api-Key`
+6. Cross-app isolation: second app on first app's table → 403
+7. Rate limit: fire 121 rapid writes → exactly 120 pass, 121st is 429 naming
+   the budget with `retry_after`
+8. `GET /v1/admin/apps/:id/usage` → counters match the traffic just fired
+9. Soft delete → status `deleting` + `purge_at` → recover → active
+10. Change-password round-trip (temp → verify → restore) if touching auth
 
-Smoke test (from another terminal):
-
-```bash
-BASE=http://localhost:8787
-# 1. admin login
-curl -s -c /tmp/cj $BASE/v1/admin/login -H 'Content-Type: application/json' -d '{"password":"dev"}'
-# 2. create app (ADMIN_PASSWORD via .dev.vars)
-curl -s -b /tmp/cj $BASE/v1/admin/apps -H 'Content-Type: application/json' -d '{"name":"smoke"}'
-# → copy api_key, then:
-curl -s $BASE/v1/table/create -H 'Content-Type: application/json' \
-  -H 'X-App-Id: <id>' -H 'X-Api-Key: <key>' -d '{"name":"users"}'
-curl -s $BASE/v1/item/put -H 'Content-Type: application/json' \
-  -H 'X-App-Id: <id>' -H 'X-Api-Key: <key>' \
-  -d '{"table":"users","item":{"pk":"U#1","sk":"P","hello":"world"},"request_id":"r1"}'
-curl -s $BASE/v1/item/get -H 'Content-Type: application/json' \
-  -H 'X-App-Id: <id>' -H 'X-Api-Key: <key>' -d '{"table":"users","pk":"U#1","sk":"P"}'
-```
-
-## Local dashboard
+## Local preview with the real gateway
 
 ```bash
-cd dashboard && python3 -m http.server 8788
+cd dashboard && VITE_GATEWAY_URL="" npm run build   # same-origin /v1 (proxied)
+npx vite preview --port 4174 --host                 # preview server
+cloudflared tunnel --url http://localhost:4174      # shareable preview URL
 ```
-Open http://localhost:8788 → login with password. Put in `gateway/.dev.vars`:
-```
-ADMIN_PASSWORD=<your dev password>
-DASHBOARD_ORIGIN=http://localhost:8788
-```
-(`.dev.vars` overrides `wrangler.toml` vars during `wrangler dev`.)
 
-## Live (AWS) verification runbook
-
-After deploy (README §Deploy):
-1. `curl <gw>/v1/health` → `{"ok":true,...}`
-2. Login → create app → table → put/get/update/query/delete (same curl as above, real base URL).
-3. Cross-app check: second app touching first app's table → 403.
-4. Rate limit: hammer an app key 601 times in a minute → 429.
-5. Soft delete an app → app key → 403; recover → works; delete again → force-delete → gone.
-6. `wrangler tail` shows gateway logs; console shows purge ticks.
+The preview proxies `/v1/*` to the production gateway (Origin stripped), so
+login and the console work from the tunnel. GitHub OAuth from a tunnel lands
+on the real dashboard (callback is fixed to `DASHBOARD_ORIGIN`).

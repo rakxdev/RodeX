@@ -438,6 +438,10 @@ curl -X POST $GW/v1/table/create \\
                   <td>new key, old one dies instantly</td>
                 </tr>
                 <tr>
+                  <td><code>GET /v1/admin/apps/:id/usage</code></td>
+                  <td>live meters — request budgets + storage</td>
+                </tr>
+                <tr>
                   <td><code>POST /v1/admin/apps/:id/suspend · resume</code></td>
                   <td>block / unblock traffic</td>
                 </tr>
