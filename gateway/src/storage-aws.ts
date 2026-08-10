@@ -6,7 +6,7 @@
  */
 import { AwsClient } from "aws4fetch";
 import { badRequest, conflict, forbidden, gatewayError, HttpError, notFound, serviceUnavailable, tooManyRequests } from "./errors";
-import { IDEMPOTENCY_TTL_SECONDS } from "./limits";
+import { IDEMPOTENCY_TTL_SECONDS, TABLE_RCU, TABLE_WCU } from "./limits";
 import type { AppRow, PutOptions, QueryResult, Storage, StoredItem } from "./storage";
 
 const REGION = "ap-southeast-1";
@@ -297,7 +297,20 @@ export class AwsStorage implements Storage {
 
   async ensureTable(physical: string): Promise<void> {
     const status = await this.tableStatus(physical);
-    if (status === "ACTIVE") return;
+    if (status === "ACTIVE") {
+      // legacy tables were created at 1 WCU / 1 RCU — auto-upgrade to the
+      // free-tier-optimal 5/5 so a busy table is never the throttle point
+      const cap = await this.call<{ Table?: { ProvisionedThroughput?: { ReadCapacityUnits?: number; WriteCapacityUnits?: number } } }>("DescribeTable", { TableName: physical });
+      const rc = cap.Table?.ProvisionedThroughput?.ReadCapacityUnits ?? 0;
+      const wc = cap.Table?.ProvisionedThroughput?.WriteCapacityUnits ?? 0;
+      if (rc < TABLE_RCU || wc < TABLE_WCU) {
+        await this.call("UpdateTable", {
+          TableName: physical,
+          ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU },
+        });
+      }
+      return;
+    }
     if (status === null) {
       // create it, then poll until ACTIVE (data ops are rejected while CREATING)
       await this.call("CreateTable", {
@@ -311,7 +324,7 @@ export class AwsStorage implements Storage {
           { AttributeName: "sk", AttributeType: "S" },
         ],
         BillingMode: "PROVISIONED",
-        ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 },
+        ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU },
       });
     }
     // poll up to ~20 s (max 10 extra subrequests — free-plan budget safe)

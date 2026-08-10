@@ -15,12 +15,12 @@ export class RateLimiterDO {
 
   async fetch(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => ({}))) as {
-      checks?: Array<{ key: string; limit: number }>;
+      checks?: Array<{ key: string; limit: number; budget?: string }>;
     };
     const checks = Array.isArray(body.checks) ? body.checks : [];
     const now = Math.floor(Date.now() / 1000);
 
-    for (const { key, limit } of checks) {
+    for (const { key, limit, budget } of checks) {
       if (!key || typeof limit !== "number" || limit <= 0) continue;
       let c = this.counters.get(key);
       if (!c || c.start + 60 <= now) {
@@ -28,7 +28,10 @@ export class RateLimiterDO {
         this.counters.set(key, c);
       }
       if (c.count >= limit) {
-        return Response.json({ allowed: false, retry_after: Math.max(1, c.start + 60 - now) }, { status: 429 });
+        return Response.json(
+          { allowed: false, retry_after: Math.max(1, c.start + 60 - now), budget: budget ?? "rate" },
+          { status: 429 },
+        );
       }
       c.count += 1;
     }

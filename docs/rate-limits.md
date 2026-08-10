@@ -63,22 +63,46 @@ request budget is the real ceiling**, and it's per-day, not per-minute. Our
 actual traffic (Rakesh's bots/dev servers) is a tiny fraction; the 100k/day
 number is documented so nobody is surprised.
 
-## 4. Two known approximations (documented, not hidden)
+## 4. Enforcement model (v2 — STRICT, since Aug 2026)
 
-1. **The Workers Rate Limiting binding counts per Cloudflare location**, not
-   globally. An app hammering from many datacenters could momentarily exceed
-   its global intent. Mitigation: our caps are already conservative vs the
-   DynamoDB pool, and DynamoDB throttling is still mapped to 429 + Retry-After.
-2. **Bursts within one second** can still spike above 25 units even when
-   per-minute averages are fine (e.g., 20 writes arrive the same second).
-   Mitigation: gateway maps `ProvisionedThroughputExceeded` → `429 Retry-After: 1`;
-   our own apps use a tiny retry-with-backoff helper (docs/api.md).
+All budgets are counted by a **single-point Durable Object** (`RateLimiterDO`,
+free plan, SQLite-backed): one shared, single-threaded counter owner, so the
+numbers the docs promise are the numbers enforced — **no edge lag, no burst
+tolerance, no per-location drift**. Every request consumes ALL of its budgets
+atomically (per-app total, per-app kind, platform pool) in one DO call; the
+first exhausted budget answers with `429` naming it:
 
-## 5. What happens on every failure path
+```json
+{"ok":false,"error":{"code":429,"message":"Rate limit exceeded — writes budget, retry in 59s","retry_after":59}}
+```
+
+The 429 names its budget (total / writes / reads / platform / admin) so a
+client always knows which ceiling it hit. A rare DO restart merely starts a
+fresh window (over-allow of at most one minute, never a lock-out).
+
+## 5. Per-table provisioned capacity (the second ceiling)
+
+Every app data table provisions **5 WCU + 5 RCU** (free pool is 25+25
+account-wide → up to 5 tables at 5/5 stay free; legacy 1/1 tables are
+auto-upgraded on their next touch). Sustained throughput per table:
+
+| Load | Per table | Verdict |
+|---|---|---|
+| Writes ≤ 5/s (budget: 120/min = 2/s) | ≤ 5 WCU | ✅ never throttles |
+| Reads ≤ 10/s eventual (budget: 240/min = 4/s) | ≤ 5 RCU | ✅ never throttles |
+| Fresh-table burst | ~35 units of credit, refills at provisioned rate | ⚠️ drains in seconds |
+
+An artificial 1 000-request single-minute burst on 5 tables can brush the
+fresh-table credit and throttle at DynamoDB (mapped to 429 "DynamoDB capacity
+reached"). Real apps pacing at the documented budgets never see it.
+
+## 6. What happens on every failure path
 
 | Situation | Client sees | Internal |
 |---|---|---|
-| Over per-app limit | 429 (JSON) | rate limiter rejects before DynamoDB |
+| Over per-app limit | 429 naming the budget | single-point DO rejects before DynamoDB |
+| Over platform pool | 429 "platform budget" | same |
+| Over admin surface | 429 "admin budget" | same |
 | DynamoDB throttle | 429 + Retry-After: 1 | logged, no crash |
 | Item > 20 KB | 413 | rejected before signing |
 | Unknown key / wrong app | 401 | logged (no key material) |
@@ -90,7 +114,23 @@ number is documented so nobody is surprised.
 **Guarantee:** no path leaks a 500 with internal detail, no path writes
 unintended data, every path is idempotency-safe.
 
-## 6. Capacity planning notes (v2+)
+## 7. Stress-test evidence (2026-08-09, live production gateway)
+
+| Scenario | Sent | Allowed | Denied | Verdict |
+|---|---|---|---|---|
+| Write burst 250 × <1 s (budget 120/min) | 250 | **120** | 130 × 429 | ✅ exact |
+| Sustained reads 20/s (budget 240/min) | 300 | 240 | 60 × 429 | ✅ exact (first 429 at #241) |
+| Admin burst 70 (budget 60/min) | 70 | 59 + 1 login | 11 × 429 | ✅ exact |
+| Mixed isolation (app A saturated, app B) | 125 + 1 | 120 / 200 | — | ✅ apps fully isolated |
+| 100 rapid writes, fresh 5-WCU table | 100 | 100 | 0 | ✅ no DB throttle (was ~36 at 1 WCU) |
+| 100 reads, 2-way, long-used table | 100 | 100 | 0 | ✅ |
+| Platform pool (1000/min) | unit-tested | ~1000 | — | ✅ same DO code path as the exact per-app results |
+
+Every 429 carried `retry_after`; the 429 message names its budget ("writes
+budget, retry in 59s"). All tests ran through the gateway — Cloudflare edge +
+worker + DynamoDB — against a live app.
+
+## 8. Capacity planning notes (v2+)
 
 - Storage: 25 GB free — text data only (20 KB cap) → **millions of records**.
 - If > 25 GB ever needed: second AWS account (separate free pool) or R2 (10 GB

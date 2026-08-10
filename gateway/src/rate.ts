@@ -42,24 +42,26 @@ function checkWindow(counters: Map<string, { start: number; count: number }>, ke
   return null;
 }
 
-function localCheck(keys: Array<{ key: string; limit: number }>): number | null {
+interface RateCheck {
+  key: string;
+  limit: number;
+  budget?: string;
+}
+
+/** Local fixed-window check; returns {retry,budget} when over. */
+function localCheck(checks: Array<{ key: string; limit: number; budget?: string }>): { retry: number; budget: string } | null {
   const now = Math.floor(Date.now() / 1000);
-  for (const { key, limit } of keys) {
+  for (const { key, limit, budget } of checks) {
     const retry = checkWindow(localCounters, key, limit, now);
-    if (retry !== null) return retry;
+    if (retry !== null) return { retry, budget: budget ?? "rate" };
   }
   return null;
 }
 
 // ── Durable Object path ─────────────────────────────────────────────────────
 
-interface RateCheck {
-  key: string;
-  limit: number;
-}
-
 /** Ask the single-point DO to consume all budgets atomically (one call). */
-async function doCheck(env: Env, checks: RateCheck[]): Promise<number | null> {
+async function doCheck(env: Env, checks: RateCheck[]): Promise<{ retry: number; budget: string } | null> {
   const ns = env.RL_DO;
   if (!ns) return localCheck(checks); // dev/tests
   const id = ns.idFromName("rodex-rl");
@@ -69,23 +71,27 @@ async function doCheck(env: Env, checks: RateCheck[]): Promise<number | null> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ checks }),
   });
-  const body = (await res.json().catch(() => ({}))) as { allowed?: boolean; retry_after?: number };
-  return body.allowed ? null : (body.retry_after ?? 1);
+  const body = (await res.json().catch(() => ({}))) as { allowed?: boolean; retry_after?: number; budget?: string };
+  return body.allowed ? null : { retry: body.retry_after ?? 1, budget: body.budget ?? "rate" };
+}
+
+function fail(result: { retry: number; budget: string }): never {
+  throw tooManyRequests(result.retry, `Rate limit exceeded — ${result.budget} budget, retry in ${result.retry}s`);
 }
 
 /** Per-app gate: total + write/read budget + platform pool — all strict. */
 export async function gateAppRequest(env: Env, appId: string, kind: "write" | "read"): Promise<void> {
   const checks: RateCheck[] = [
-    { key: appId, limit: RATE_TOTAL_PER_APP },
-    { key: `${appId}:${kind}`, limit: kind === "write" ? RATE_WRITES_PER_APP : RATE_READS_PER_APP },
-    { key: "platform:all", limit: RATE_PLATFORM },
+    { key: appId, limit: RATE_TOTAL_PER_APP, budget: "total" },
+    { key: `${appId}:${kind}`, limit: kind === "write" ? RATE_WRITES_PER_APP : RATE_READS_PER_APP, budget: kind === "write" ? "writes" : "reads" },
+    { key: "platform:all", limit: RATE_PLATFORM, budget: "platform" },
   ];
-  const retry = await doCheck(env, checks);
-  if (retry !== null) throw tooManyRequests(retry);
+  const result = await doCheck(env, checks);
+  if (result) fail(result);
 }
 
 /** Admin surface gate. */
 export async function gateAdminRequest(env: Env): Promise<void> {
-  const retry = await doCheck(env, [{ key: "admin", limit: RATE_ADMIN }]);
-  if (retry !== null) throw tooManyRequests(retry);
+  const result = await doCheck(env, [{ key: "admin", limit: RATE_ADMIN, budget: "admin" }]);
+  if (result) fail(result);
 }

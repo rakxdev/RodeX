@@ -178,7 +178,10 @@ export default function UsagePage() {
           The numbers, exactly: <span className="text-ink">600 req/min total</span> ·{" "}
           <span className="text-ink">120 writes/min</span> · <span className="text-ink">240 reads/min</span> per app —{" "}
           <span className="text-ink">1 000 req/min platform pool</span> — <span className="text-ink">60 req/min admin</span>.
-          A 429 is a bucket, not a ban: it resets within the minute, and if you throttle to ~80% of the budget you{" "}
+          Every 429 names its budget ({" "}
+          <code className="text-ink">"Rate limit exceeded — writes budget, retry in 59s"</code>) and carries{" "}
+          <code className="text-ink">retry_after</code>. Counters are single-point and strict — a 429 is a bucket,
+          not a ban: it resets within the minute, and if you throttle to ~80% of the budget you{" "}
           <span className="text-ink">should never see it again</span>.
         </p>
       </motion.div>
