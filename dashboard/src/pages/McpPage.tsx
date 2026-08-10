@@ -114,7 +114,7 @@ export default function McpPage() {
       const r = await api.post<{ key: string }>(`/v1/admin/mcp/keys/${encodeURIComponent(keyId)}/view`, {});
       setRevealed((m) => ({ ...m, [keyId]: r.key }));
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Could not view key");
+      setError(err instanceof ApiError ? err.message : "Could not view key");
     }
   }
 
@@ -138,7 +138,7 @@ export default function McpPage() {
       setConfirmId(null);
       await load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Delete failed");
+      setError(err instanceof ApiError ? err.message : "Delete failed");
     } finally {
       setBusy(false);
     }

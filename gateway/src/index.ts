@@ -166,7 +166,22 @@ app.all("/mcp", async (c) => {
       401,
     );
   }
-  await gateMCPTotal(c.env);
+  try {
+    await gateMCPTotal(c.env);
+  } catch (e) {
+    // speak JSON-RPC at the MCP door (the REST error shape would confuse clients)
+    const err = e as { toJson?: () => { error?: { code: number; message: string; retry_after?: number } } };
+    const j = err.toJson?.();
+    if (j?.error?.code === 429) {
+      const retry = j.error.retry_after ?? 1;
+      return c.json(
+        { jsonrpc: "2.0", id: null, error: { code: -32000, message: j.error.message } },
+        429,
+        { "Retry-After": String(retry) },
+      );
+    }
+    throw e;
+  }
   const handler = createMcpRoute(c.env);
   return handler(c.req.raw, c.env, c.executionCtx as unknown as Parameters<typeof handler>[2]);
 });

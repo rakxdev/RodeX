@@ -21,12 +21,13 @@ import type { Env } from "./env";
 import { sessionSecret } from "./env";
 import { decryptKey, hashKey } from "./auth";
 import { createStorage } from "./storage";
+import { usageSnapshot } from "./usage";
 import type { AppContext } from "./items";
 import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
-import { createApp, forceDelete, getApp, physicalName, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
-import { gateMCPRequest, peekUsage } from "./rate";
-import { APP_NAME_PATTERN, KEY_RECOVERY_WINDOW_SECONDS, RATE_PLATFORM, RATE_READS_PER_APP, RATE_TOTAL_PER_APP, RATE_WRITES_PER_APP, TABLE_NAME_PATTERN } from "./limits";
+import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
+import { gateMCPRequest } from "./rate";
+import { APP_NAME_PATTERN, KEY_RECOVERY_WINDOW_SECONDS, TABLE_NAME_PATTERN } from "./limits";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ function buildMcpServer(env: Env): McpServer {
     async ({ app_id }) =>
       safe(async () => {
         await gateMCPRequest(env, "read");
-        return { ok: true, result: await usageFor(env, app_id) };
+        return { ok: true, result: await usageSnapshot(env, app_id) };
       }),
   );
 
@@ -537,48 +538,6 @@ function buildMcpServer(env: Env): McpServer {
   );
 
   return server;
-}
-
-// ── get_app_usage: limiter peek + storage size (60 s cache, zero cost) ──────
-const usageCache = new Map<string, { at: number; bytes: number; items: number }>();
-const USAGE_CACHE_TTL_MS = 60_000;
-
-async function usageFor(env: Env, appId: string) {
-  const storage = createStorage(env);
-  const row = await getApp(storage, appId);
-  const counts = await peekUsage(env, row.appId);
-  const find = (key: string) => counts.find((x) => x.key === key)?.count ?? 0;
-  const requests = {
-    total: { used: find(row.appId), limit: RATE_TOTAL_PER_APP, remaining: Math.max(0, RATE_TOTAL_PER_APP - find(row.appId)) },
-    writes: { used: find(`${row.appId}:write`), limit: RATE_WRITES_PER_APP, remaining: Math.max(0, RATE_WRITES_PER_APP - find(`${row.appId}:write`)) },
-    reads: { used: find(`${row.appId}:read`), limit: RATE_READS_PER_APP, remaining: Math.max(0, RATE_READS_PER_APP - find(`${row.appId}:read`)) },
-    platform: { used: find("platform:all"), limit: RATE_PLATFORM, remaining: Math.max(0, RATE_PLATFORM - find("platform:all")) },
-  };
-  const now = Date.now();
-  let bytes = 0;
-  let items = 0;
-  for (const t of row.tables) {
-    const physical = physicalName(row.appId, t);
-    const cached = usageCache.get(physical);
-    let size = cached && now - cached.at < USAGE_CACHE_TTL_MS ? cached : null;
-    if (!size) {
-      const fresh = await storage.storageSize(physical).catch(() => null);
-      if (fresh) {
-        size = { at: now, bytes: fresh.bytes, items: fresh.items };
-        usageCache.set(physical, size);
-      }
-    }
-    if (size) {
-      bytes += size.bytes;
-      items += size.items;
-    }
-  }
-  return {
-    app_id: row.appId,
-    window_seconds: 60,
-    requests,
-    storage: { bytes, items, tables: row.tables.length, sampled_at: Math.floor(now / 1000) },
-  };
 }
 
 // ── handler wiring ──────────────────────────────────────────────────────────
