@@ -1,10 +1,13 @@
 name: Publish npm packages
 
-# Publishes rodexdb + rodex-mcp on version tags (v*).
-# Uses npm TRUSTED PUBLISHING (OIDC) — no tokens stored anywhere.
-# One-time setup per package on npmjs.com: Settings → Trusted Publisher →
-# GitHub Actions → org `rakxdev`, repo `RodeX`, workflow `publish.yml`,
-# allowed action `npm publish`.
+# Publishes rodexdb + rodex-mcp on version tags (v*):
+#   1. npmjs.com  — via npm TRUSTED PUBLISHING (OIDC), no tokens stored.
+#      One-time setup per package on npmjs.com: Settings → Trusted Publisher →
+#      GitHub Actions → org `rakxdev`, repo `RodeX`, workflow `publish.yml`,
+#      allowed action `npm publish`.
+#   2. GitHub Packages (npm.pkg.github.com) — mirror as @rakxdev/<name> so the
+#      repo's Packages section shows the artifacts (GH Packages requires
+#      scoped names; npmjs keeps the unscoped, beginner-friendly names).
 
 on:
   push:
@@ -12,8 +15,9 @@ on:
       - "v*"
 
 permissions:
-  id-token: write # required for npm OIDC trusted publishing
+  id-token: write # npm OIDC trusted publishing
   contents: read
+  packages: write # GitHub Packages mirror
 
 jobs:
   publish:
@@ -23,10 +27,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24" # MUST be >= 22.14 with npm >= 11.5.1 for OIDC trusted publishing (npm v10 handshake fails -> E404)
+          node-version: "24" # npm >= 11.5.1 required for OIDC trusted publishing (npm v10 handshake fails -> E404)
           registry-url: "https://registry.npmjs.org"
 
-      - name: Test + publish rodexdb
+      # ── rodexdb ──────────────────────────────────────────────────────
+      - name: Test + publish rodexdb (npmjs)
         run: |
           cd packages/rodexdb
           npm install
@@ -34,10 +39,29 @@ jobs:
           npm test
           npm publish --access public
 
-      - name: Test + publish rodex-mcp
+      - name: Mirror rodexdb (GitHub Packages)
+        run: |
+          cd packages/rodexdb
+          npm pkg set name=@rakxdev/rodexdb
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > .npmrc
+          npm publish --registry=https://npm.pkg.github.com
+          rm -f .npmrc
+          git checkout -- package.json
+
+      # ── rodex-mcp ────────────────────────────────────────────────────
+      - name: Test + publish rodex-mcp (npmjs)
         run: |
           cd packages/rodex-mcp
           npm install
           npm run build
           npm test
           npm publish --access public
+
+      - name: Mirror rodex-mcp (GitHub Packages)
+        run: |
+          cd packages/rodex-mcp
+          npm pkg set name=@rakxdev/rodex-mcp
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > .npmrc
+          npm publish --registry=https://npm.pkg.github.com
+          rm -f .npmrc
+          git checkout -- package.json

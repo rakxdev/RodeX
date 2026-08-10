@@ -51,7 +51,7 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
 async function runCli(args: string[], input: string[], env: Record<string, string> = {}): Promise<{ stdout: string[]; stderr: string; code: number | null }> {
-  const child: ChildProcess = spawn(process.execPath, [new URL("../dist/cli.js", import.meta.url).pathname, ...args], {
+  const child: ChildProcess = spawn(process.execPath, [new URL("../dist/esm/cli.js", import.meta.url).pathname, ...args], {
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env, ...env },
   });

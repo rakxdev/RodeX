@@ -12,6 +12,8 @@
   <img src="https://img.shields.io/badge/cost-%240%20forever-d9b64a?style=flat-square" alt="cost" />
   <img src="https://img.shields.io/badge/stack-DynamoDB%20·%20Workers%20·%20Pages-2a2c28?style=flat-square" alt="stack" />
   <img src="https://img.shields.io/badge/license-personal%20use-6a7c5c?style=flat-square" alt="license" />
+  <a href="https://www.npmjs.com/package/rodexdb"><img src="https://img.shields.io/npm/v/rodexdb?style=flat-square&label=npm%20SDK" alt="rodexdb npm" /></a>
+  <a href="https://www.npmjs.com/package/rodex-mcp"><img src="https://img.shields.io/npm/v/rodex-mcp?style=flat-square&label=npm%20MCP" alt="rodex-mcp npm" /></a>
 </p>
 
 <p align="center">
@@ -131,8 +133,10 @@ cd dashboard && npm run dev                       # the console locally
 | **SDK** | TypeScript bots | `npm install rodexdb` — [packages/rodexdb](packages/rodexdb) · wrapper for local agents: `npx -y rodex-mcp` — [packages/rodex-mcp](packages/rodex-mcp) |
 
 Both packages are **URL-agnostic**: point them at your own deployment
-(`--url` / `url:`), or at the live instance for a quick start. Personal &
-educational use — see [LICENSE](LICENSE).
+(`--url` / `url:`), or at the live instance for a quick start. Full
+walkthrough (deploy your own → credentials → code): **[docs/developers.md](docs/developers.md)** ·
+runnable example: **[examples/sdk-bot.mjs](examples/sdk-bot.mjs)**.
+Personal & educational use — see [LICENSE](LICENSE).
 
 ---
 
@@ -288,6 +292,7 @@ POST /mcp                          → MCP (JSON-RPC, master-key auth)
 | [docs/env.md](docs/env.md) | every variable & secret |
 | [docs/aws-setup.md](docs/aws-setup.md) | IAM + auto-provisioning |
 | [docs/testing.md](docs/testing.md) | tests + live runbook |
+| [docs/developers.md](docs/developers.md) | SDK + MCP bridge guide for your own code |
 | [docs/ci-cd.md](docs/ci-cd.md) | gates, deploy, rollback |
 | [docs/research-validation.md](docs/research-validation.md) | verified sources |
 | [docs/decisions/](docs/decisions/) | ADR-001 … ADR-006 |
