@@ -1,0 +1,40 @@
+name: Release
+
+# Drafts a GitHub Release automatically when a version tag (v*) is pushed.
+# Notes are generated from the CHANGELOG section for the tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Draft release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "RodexDB $GITHUB_REF_NAME" \
+            --notes "$(node -e '
+              const fs = require("fs");
+              const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+              const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+              const lines = changelog.split("\n");
+              let out = [], capture = false;
+              for (const l of lines) {
+                if (/^## \[/.test(l)) {
+                  if (l.includes(`[${tag}]`) || l.includes(`[REV`) && !capture) { capture = true; continue; }
+                  if (capture) break;
+                }
+                if (capture) out.push(l);
+              }
+              console.log(out.join("\n").trim() || "See CHANGELOG.md for details.");
+            ')"
+        env:
+          GH_TOKEN: ${{ github.token }}

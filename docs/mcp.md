@@ -103,10 +103,17 @@ claude mcp add --transport http rodex https://rodex-gateway.rakxdev.workers.dev/
   --header "Authorization: Bearer $RODEX_MCP_KEY"
 ```
 
-**stdio-only clients** (Claude Desktop, anything that only runs local servers):
+**stdio-only clients** (Claude Desktop, anything that only runs local servers) — two ways:
 ```bash
 npx mcp-remote https://rodex-gateway.rakxdev.workers.dev/mcp \
   --header "Authorization: Bearer $RODEX_MCP_KEY"
+```
+
+or the branded wrapper (same bridge, zero config beyond the key):
+
+```bash
+npx -y rodex-mcp --key $RODEX_MCP_KEY                        # live instance
+npx -y rodex-mcp --url <your-worker>/mcp --key $RODEX_MCP_KEY # your own deploy
 ```
 
 Never paste the key into a chat — reference `${env:RODEX_MCP_KEY}`.

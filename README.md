@@ -122,6 +122,20 @@ cd dashboard && npm run dev                       # the console locally
 
 ---
 
+## Use it — 3 ways
+
+| Way | For | How |
+|---|---|---|
+| **REST** | any language, curl, your own code | `<gateway>/v1/*` with `X-App-Id` + `X-Api-Key` — [full reference](https://rodexdb.pages.dev/docs) |
+| **MCP** | coding agents | `<gateway>/mcp` with a master key — [docs/mcp.md](docs/mcp.md) |
+| **SDK** | TypeScript bots | `npm install rodexdb` — [packages/rodexdb](packages/rodexdb) · wrapper for local agents: `npx -y rodex-mcp` — [packages/rodex-mcp](packages/rodex-mcp) |
+
+Both packages are **URL-agnostic**: point them at your own deployment
+(`--url` / `url:`), or at the live instance for a quick start. Personal &
+educational use — see [LICENSE](LICENSE).
+
+---
+
 ## Deploy to Cloudflare
 
 Two parts, deployed separately — **backend** (the gateway Worker: API + MCP)
@@ -296,8 +310,6 @@ Live: **console** rodexdb.pages.dev · **docs** rodexdb.pages.dev/docs ·
 **RodexDB is built and operated by [Rakesh (rakxdev)](https://github.com/rakxdev)**
 — a one-person instrument-packet project, free for personal & educational use.
 
-- **Brand & design**: the PACKET-RETICLE-KEY mark (locked R3-14) — gold = seals/reveals,
-  red = action/core, amber = state, ink = structure. All marks in [`brand/`](brand/).
 - **Stack**: TypeScript · Hono · aws4fetch · Zod · React · Vite · Tailwind v4 ·
   Framer Motion · the official MCP TypeScript SDK · Cloudflare Workers/Pages/Durable
   Objects · AWS DynamoDB.
@@ -308,5 +320,3 @@ Live: **console** rodexdb.pages.dev · **docs** rodexdb.pages.dev/docs ·
 
 [RODEXDB PERSONAL-USE LICENSE](LICENSE) — free for **personal and educational use**:
 read it, learn from it, run it, modify it. **Commercial use is strictly forbidden.**
-<sub>RodexDB — all rights reserved. Not open source: the repo is private infrastructure
-for its operator. If you found it, you're probably the operator. 😄</sub>
