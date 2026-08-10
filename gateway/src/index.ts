@@ -7,6 +7,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { registerAdminRoutes } from "./admin";
 import { registerMcpKeyRoutes } from "./mcpkeys";
+import { authMcpKey, createMcpRoute } from "./mcp";
+import { gateMCPTotal } from "./rate";
 import { HttpError, gatewayError } from "./errors";
 import type { Env } from "./env";
 import { dashboardOrigin, sessionSecret } from "./env";
@@ -26,9 +28,10 @@ import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables
 
 const app = new Hono<{ Bindings: Env }>();
 
-// ── CORS (dashboard lives on another origin) ────────────────────────────────
+// ── CORS (dashboard lives on another origin; /mcp handles its own CORS) ─────
 app.use("*", async (c, next) => {
   await next();
+  if (new URL(c.req.url).pathname === "/mcp") return; // MCP handler owns CORS
   const origin = dashboardOrigin(c.env);
   c.header("Access-Control-Allow-Origin", origin);
   c.header("Access-Control-Allow-Credentials", "true");
@@ -152,6 +155,20 @@ app.post("/v1/table/delete", async (c) => {
 app.get("/v1/tables", async (c) => {
   const ctx = await appCtx(c);
   return c.json(await handleListTables(ctx));
+});
+
+// ── MCP (master-key universal interface, Streamable HTTP at /mcp) ───────────
+app.all("/mcp", async (c) => {
+  const key = await authMcpKey(c.env, c.req.raw);
+  if (!key) {
+    return c.json(
+      { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized — send Authorization: Bearer rok_mcp_<key>" } },
+      401,
+    );
+  }
+  await gateMCPTotal(c.env);
+  const handler = createMcpRoute(c.env);
+  return handler(c.req.raw, c.env, c.executionCtx as unknown as Parameters<typeof handler>[2]);
 });
 
 // ── error handling ───────────────────────────────────────────────────────────
