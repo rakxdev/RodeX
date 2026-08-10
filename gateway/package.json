@@ -20,5 +20,27 @@
     "typescript": "^5.6.0",
     "vitest": "^3.0.0",
     "wrangler": "^4.120.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_PASSWORD": {
+        "description": "Console login password (fallback, min 12 chars). You can change it later from the console itself (PROFILE)."
+      },
+      "SESSION_SECRET": {
+        "description": "Signs sessions and hashes API keys (min 24 chars). Generate: openssl rand -hex 32. Do NOT rotate casually \u2014 it invalidates all sessions and key recovery."
+      },
+      "GITHUB_CLIENT_ID": {
+        "description": "OPTIONAL \u2014 GitHub OAuth app client id for console login (create one at github.com/settings/developers, callback = your worker URL + /v1/auth/github/callback). Leave empty to use password login only."
+      },
+      "GITHUB_CLIENT_SECRET": {
+        "description": "OPTIONAL \u2014 the matching GitHub OAuth app secret. Leave empty if you did not create an OAuth app."
+      },
+      "AWS_ACCESS_KEY_ID": {
+        "description": "AWS IAM access key id for user 'rodex-gateway' (least-privilege policy in docs/aws-setup.md). REQUIRED \u2014 the whole platform runs on DynamoDB."
+      },
+      "AWS_SECRET_ACCESS_KEY": {
+        "description": "The matching AWS secret access key. Keep it safe \u2014 it can read/write all your app data."
+      }
+    }
   }
 }
