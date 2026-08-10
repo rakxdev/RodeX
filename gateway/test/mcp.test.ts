@@ -124,7 +124,7 @@ describe("MCP auth (master key)", () => {
 // ── discovery ────────────────────────────────────────────────────────────────
 
 describe("MCP discovery", () => {
-  it("tools/list exposes exactly the 18 tools with instructions", async () => {
+  it("tools/list exposes exactly the 20 tools with instructions", async () => {
     const out = await rpc("tools/list", {}, 1, { Authorization: `Bearer ${mcpKey}` });
     expect(out.status).toBe(200);
     const tools = ((out.body as { result: { tools: Array<{ name: string; description: string }> } }).result?.tools) ?? [];
@@ -133,11 +133,11 @@ describe("MCP discovery", () => {
       "create_app", "create_table", "delete_app", "delete_item", "delete_table",
       "force_delete_app", "get_app", "get_instructions", "get_item", "health",
       "list_apps", "list_tables", "put_item", "query", "recover_app", "resume_app",
-      "suspend_app", "update_item",
+      "rotate_app_key", "suspend_app", "update_item", "view_app_key",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
-      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "suspend_app", "resume_app", "recover_app", "force_delete_app"].includes(t.name)) {
+      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
         expect(t.description.toLowerCase()).toContain("confirmed: true");
       }
     }
@@ -240,6 +240,12 @@ describe("MCP confirmation gate (mutations)", () => {
     expect(fa.parsed.code).toBe("confirmation_required");
     expect((fa.parsed.what_would_happen as { note: string }).note).toContain("destroyed");
 
+    const rot = await toolCall("rotate_app_key", { app_id: appId });
+    expect(rot.parsed.code).toBe("confirmation_required");
+
+    const view = await toolCall("view_app_key", { app_id: appId });
+    expect(view.parsed.code).toBe("confirmation_required");
+
     // nothing changed: no table created, no item written, app still active
     const after = await call("GET", "/v1/tables", undefined, { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key });
     expect((await after.json()) as unknown).toEqual((await before.json()) as unknown);
@@ -322,6 +328,54 @@ describe("MCP confirmation gate (mutations)", () => {
     expect(fd.parsed).toMatchObject({ ok: true, deleted: true });
     const apps = await toolCall("list_apps", {});
     expect((apps.parsed.apps as Array<{ app_id: string }>).map((a) => a.app_id)).not.toContain(fresh.app_id);
+  });
+
+  it("rotate_app_key: new key returned once, old key dies instantly, view shows the new one", async () => {
+    const appId = createdApp!.app_id;
+    const oldKey = createdApp!.api_key;
+    const headers = { "X-App-Id": appId, "X-Api-Key": oldKey };
+    await call("POST", "/v1/item/put", { table: "users", item: { pk: "pre", data: {} } }, headers); // old key works
+
+    const rot = await toolCall("rotate_app_key", { app_id: appId, confirmed: true });
+    expect(rot.parsed.ok).toBe(true);
+    const newKey = String((rot.parsed as { api_key?: unknown }).api_key);
+    expect(newKey).toMatch(/^rok_[A-Za-z0-9_-]{43}$/);
+    expect(newKey).not.toBe(oldKey);
+
+    // old key is dead instantly (401), new key works
+    const oldAttempt = await call("POST", "/v1/item/put", { table: "users", item: { pk: "x", data: {} } }, headers);
+    expect(oldAttempt.status).toBe(401);
+    const newHeaders = { "X-App-Id": appId, "X-Api-Key": newKey };
+    const newAttempt = await call("POST", "/v1/item/put", { table: "users", item: { pk: "post", data: {} } }, newHeaders);
+    expect(newAttempt.status).toBe(200);
+
+    // view_app_key inside the fresh 48 h window returns the NEW key
+    const view = await toolCall("view_app_key", { app_id: appId, confirmed: true });
+    expect(view.parsed.ok).toBe(true);
+    expect(String((view.parsed as { key?: unknown }).key)).toBe(newKey);
+  });
+
+  it("view_app_key outside the recovery window returns a structured expired error", async () => {
+    // craft an app whose recovery window has passed (direct storage, like time travel)
+    const { createStorage } = await import("../src/storage");
+    const { encryptKey } = await import("../src/auth");
+    const storage = createStorage(env());
+    const raw = "rok_expired_key_00000000000000000000000000000000000000";
+    await storage.createApp({
+      appId: "app_expired1",
+      name: "old",
+      keyHash: await (await import("../src/auth")).hashKey(SECRET, raw),
+      keyPrefix: "rok_ex",
+      status: "active",
+      createdAt: 1,
+      tables: [],
+      keyCipher: (await encryptKey(SECRET, raw)) ?? undefined,
+      keyCipherUntil: Math.floor(Date.now() / 1000) - 1, // window already over
+    });
+    const view = await toolCall("view_app_key", { app_id: "app_expired1", confirmed: true });
+    expect(view.parsed.ok).toBe(false);
+    expect(view.parsed.code).toBe("key_recovery_expired");
+    expect(String(view.parsed.message)).toContain("Rotate the key instead");
   });
 
   it("unknown apps / tables map to structured errors (403/404), never crashes", async () => {

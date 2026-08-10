@@ -19,14 +19,14 @@ import { createMcpHandler, type StatelessMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import type { Env } from "./env";
 import { sessionSecret } from "./env";
-import { hashKey } from "./auth";
+import { decryptKey, hashKey } from "./auth";
 import { createStorage } from "./storage";
 import type { AppContext } from "./items";
 import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
-import { createApp, forceDelete, getApp, recover, setStatus, softDelete, toPublic } from "./registry";
+import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
-import { APP_NAME_PATTERN, TABLE_NAME_PATTERN } from "./limits";
+import { APP_NAME_PATTERN, KEY_RECOVERY_WINDOW_SECONDS, TABLE_NAME_PATTERN } from "./limits";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,6 +116,8 @@ EVERY app, table, and item on the platform.
 - get_item — one item (pk required; sk defaults to "~") (read)
 - query — pk + optional sk_prefix, limit <= 100, pagination (read)
 - create_app / delete_app — app lifecycle (MUTATION — confirm)
+- rotate_app_key — new app key, old one dies instantly; new key returned once (MUTATION — confirm)
+- view_app_key — re-view an app's raw key inside its 48 h recovery window (SECRET — confirm)
 - suspend_app / resume_app — emergency stop / restart (MUTATION — confirm)
 - recover_app — undo a soft delete inside its window (MUTATION — confirm)
 - force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
@@ -357,6 +359,54 @@ function buildMcpServer(env: Env): McpServer {
         await gateMCPRequest(env, "write");
         await forceDelete(createStorage(env), app_id);
         return { ok: true, deleted: true, app_id };
+      });
+    },
+  );
+
+  server.registerTool(
+    "rotate_app_key",
+    {
+      description:
+        "Rotate an app's API key: a new rok_ key is issued and returned ONCE in the result; the old key stops working instantly — any client using it breaks until it gets the new key. MUTATION: tell the user which app and that its clients will need the new key, get explicit approval, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "rotate_app_key", app_id, note: "The app's current key stops working instantly; clients need the new key" });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        const out = await rotateKey(createStorage(env), sessionSecret(env), app_id);
+        return { ok: true, app_id, api_key: out.api_key, key_prefix: out.key_prefix, note: "shown once — copy it now" };
+      });
+    },
+  );
+
+  server.registerTool(
+    "view_app_key",
+    {
+      description:
+        "Re-view an app's raw API key — only inside its 48 h recovery window after creation/rotation (same rule as the console). Outside the window this returns a structured error: rotate instead. SECRET REVEAL: confirm with the user before calling with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "view_app_key", app_id, note: "reveals the app's raw API key" });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        const storage = createStorage(env);
+        const row = await getApp(storage, app_id);
+        const now = Math.floor(Date.now() / 1000);
+        if (!row.keyCipher || !row.keyCipherUntil || row.keyCipherUntil < now) {
+          return {
+            ok: false,
+            code: "key_recovery_expired",
+            message: "Recovery window expired (48 h) — no recoverable copy exists. Rotate the key instead (rotate_app_key).",
+            window_seconds: KEY_RECOVERY_WINDOW_SECONDS,
+          };
+        }
+        const rawKey = await decryptKey(sessionSecret(env), row.keyCipher);
+        if (!rawKey) {
+          return { ok: false, code: "key_recovery_failed", message: "Could not decrypt the key — rotate it instead." };
+        }
+        return { ok: true, app_id, key: rawKey, recoverable_until: row.keyCipherUntil };
       });
     },
   );
