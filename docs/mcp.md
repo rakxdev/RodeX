@@ -57,6 +57,7 @@ what the agent "thinks" it was told.
 | `get_app` | read | — | one app's details |
 | `list_tables` | read | — | tables of an app |
 | `get_item` | read | — | pk required; sk defaults to `~`; `strong` for read-after-write |
+| `get_app_usage` | read | — | live request budgets (used/limit/remaining per minute) + storage size — the meters as data |
 | `query` | read | — | pk + optional `sk_prefix`, limit ≤ 100, `next_start_key` pagination |
 | `create_app` | **mutate** | ✅ | name pattern `^[a-z0-9][a-z0-9_-]{0,39}$` |
 | `delete_app` | **mutate** | ✅ | soft delete (recoverable window, then purge) |

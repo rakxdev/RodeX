@@ -19,14 +19,14 @@ import { createMcpHandler, type StatelessMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import type { Env } from "./env";
 import { sessionSecret } from "./env";
-import { hashKey } from "./auth";
+import { decryptKey, hashKey } from "./auth";
 import { createStorage } from "./storage";
 import type { AppContext } from "./items";
 import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
-import { createApp, forceDelete, getApp, recover, setStatus, softDelete, toPublic } from "./registry";
-import { gateMCPRequest } from "./rate";
-import { APP_NAME_PATTERN, TABLE_NAME_PATTERN } from "./limits";
+import { createApp, forceDelete, getApp, physicalName, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
+import { gateMCPRequest, peekUsage } from "./rate";
+import { APP_NAME_PATTERN, KEY_RECOVERY_WINDOW_SECONDS, RATE_PLATFORM, RATE_READS_PER_APP, RATE_TOTAL_PER_APP, RATE_WRITES_PER_APP, TABLE_NAME_PATTERN } from "./limits";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ function needConfirmation(what: Record<string, unknown>): { content: Array<{ typ
 }
 
 /** Full operating manual — served by get_instructions and shown in the console. */
-export const MCP_MANUAL = `# RodeX MCP — Operating Manual
+export const MCP_MANUAL = `# RodexDB MCP — Operating Manual
 
 You are connected to the RodeX database platform (master-key access).
 Your identity is bound to a console-created master key: you can operate
@@ -113,9 +113,12 @@ EVERY app, table, and item on the platform.
 - get_instructions — this manual (read)
 - list_apps / get_app — app inventory + details (read)
 - list_tables — tables of an app, with key schema (read)
+- get_app_usage — live request budgets (total/writes/reads used this minute) + storage size (read)
 - get_item — one item (pk required; sk defaults to "~") (read)
 - query — pk + optional sk_prefix, limit <= 100, pagination (read)
 - create_app / delete_app — app lifecycle (MUTATION — confirm)
+- rotate_app_key — new app key, old one dies instantly; new key returned once (MUTATION — confirm)
+- view_app_key — re-view an app's raw key inside its 48 h recovery window (SECRET — confirm)
 - suspend_app / resume_app — emergency stop / restart (MUTATION — confirm)
 - recover_app — undo a soft delete inside its window (MUTATION — confirm)
 - force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
@@ -145,7 +148,7 @@ const dataSchema = z.record(z.string(), z.unknown());
 const confirmedSchema = z.boolean().optional().describe("MUST be true — only after the user explicitly approved this mutation");
 
 function buildMcpServer(env: Env): McpServer {
-  const server = new McpServer({ name: "rodex", version: "1.0.0" });
+  const server = new McpServer({ name: "rodexdb", version: "1.0.0" });
 
   // ── read-only tools ────────────────────────────────────────────────────────
 
@@ -159,7 +162,7 @@ function buildMcpServer(env: Env): McpServer {
       resultText({
         ok: true,
         service: "rodex-gateway",
-        mcp: "rodex/1.0.0",
+        mcp: "rodexdb/1.0.0",
         auth: "master-key",
         identity: "master",
         instructions: "Run get_instructions for the operating manual.",
@@ -198,6 +201,20 @@ function buildMcpServer(env: Env): McpServer {
       safe(async () => {
         await gateMCPRequest(env, "read");
         return { ok: true, app: toPublic(await getApp(createStorage(env), app_id)) };
+      }),
+  );
+
+  server.registerTool(
+    "get_app_usage",
+    {
+      description:
+        "Live usage of one app: request budgets (total/writes/reads/platform used in the current minute, with remaining) + storage size (bytes/items). Read-only, zero cost — same numbers as the console's LIVE METERS. Call before proposing writes when the user asks about limits or capacity.",
+      inputSchema: { app_id: z.string().min(1) },
+    },
+    async ({ app_id }) =>
+      safe(async () => {
+        await gateMCPRequest(env, "read");
+        return { ok: true, result: await usageFor(env, app_id) };
       }),
   );
 
@@ -362,6 +379,54 @@ function buildMcpServer(env: Env): McpServer {
   );
 
   server.registerTool(
+    "rotate_app_key",
+    {
+      description:
+        "Rotate an app's API key: a new rok_ key is issued and returned ONCE in the result; the old key stops working instantly — any client using it breaks until it gets the new key. MUTATION: tell the user which app and that its clients will need the new key, get explicit approval, then call with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "rotate_app_key", app_id, note: "The app's current key stops working instantly; clients need the new key" });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        const out = await rotateKey(createStorage(env), sessionSecret(env), app_id);
+        return { ok: true, app_id, api_key: out.api_key, key_prefix: out.key_prefix, note: "shown once — copy it now" };
+      });
+    },
+  );
+
+  server.registerTool(
+    "view_app_key",
+    {
+      description:
+        "Re-view an app's raw API key — only inside its 48 h recovery window after creation/rotation (same rule as the console). Outside the window this returns a structured error: rotate instead. SECRET REVEAL: confirm with the user before calling with confirmed: true.",
+      inputSchema: { app_id: z.string().min(1), confirmed: confirmedSchema },
+    },
+    async ({ app_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "view_app_key", app_id, note: "reveals the app's raw API key" });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        const storage = createStorage(env);
+        const row = await getApp(storage, app_id);
+        const now = Math.floor(Date.now() / 1000);
+        if (!row.keyCipher || !row.keyCipherUntil || row.keyCipherUntil < now) {
+          return {
+            ok: false,
+            code: "key_recovery_expired",
+            message: "Recovery window expired (48 h) — no recoverable copy exists. Rotate the key instead (rotate_app_key).",
+            window_seconds: KEY_RECOVERY_WINDOW_SECONDS,
+          };
+        }
+        const rawKey = await decryptKey(sessionSecret(env), row.keyCipher);
+        if (!rawKey) {
+          return { ok: false, code: "key_recovery_failed", message: "Could not decrypt the key — rotate it instead." };
+        }
+        return { ok: true, app_id, key: rawKey, recoverable_until: row.keyCipherUntil };
+      });
+    },
+  );
+
+  server.registerTool(
     "create_table",
     {
       description:
@@ -472,6 +537,48 @@ function buildMcpServer(env: Env): McpServer {
   );
 
   return server;
+}
+
+// ── get_app_usage: limiter peek + storage size (60 s cache, zero cost) ──────
+const usageCache = new Map<string, { at: number; bytes: number; items: number }>();
+const USAGE_CACHE_TTL_MS = 60_000;
+
+async function usageFor(env: Env, appId: string) {
+  const storage = createStorage(env);
+  const row = await getApp(storage, appId);
+  const counts = await peekUsage(env, row.appId);
+  const find = (key: string) => counts.find((x) => x.key === key)?.count ?? 0;
+  const requests = {
+    total: { used: find(row.appId), limit: RATE_TOTAL_PER_APP, remaining: Math.max(0, RATE_TOTAL_PER_APP - find(row.appId)) },
+    writes: { used: find(`${row.appId}:write`), limit: RATE_WRITES_PER_APP, remaining: Math.max(0, RATE_WRITES_PER_APP - find(`${row.appId}:write`)) },
+    reads: { used: find(`${row.appId}:read`), limit: RATE_READS_PER_APP, remaining: Math.max(0, RATE_READS_PER_APP - find(`${row.appId}:read`)) },
+    platform: { used: find("platform:all"), limit: RATE_PLATFORM, remaining: Math.max(0, RATE_PLATFORM - find("platform:all")) },
+  };
+  const now = Date.now();
+  let bytes = 0;
+  let items = 0;
+  for (const t of row.tables) {
+    const physical = physicalName(row.appId, t);
+    const cached = usageCache.get(physical);
+    let size = cached && now - cached.at < USAGE_CACHE_TTL_MS ? cached : null;
+    if (!size) {
+      const fresh = await storage.storageSize(physical).catch(() => null);
+      if (fresh) {
+        size = { at: now, bytes: fresh.bytes, items: fresh.items };
+        usageCache.set(physical, size);
+      }
+    }
+    if (size) {
+      bytes += size.bytes;
+      items += size.items;
+    }
+  }
+  return {
+    app_id: row.appId,
+    window_seconds: 60,
+    requests,
+    storage: { bytes, items, tables: row.tables.length, sampled_at: Math.floor(now / 1000) },
+  };
 }
 
 // ── handler wiring ──────────────────────────────────────────────────────────

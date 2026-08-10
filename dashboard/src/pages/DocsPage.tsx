@@ -611,7 +611,7 @@ claude mcp add --transport http rodex ${GW}/mcp \\
   --header "Authorization: Bearer $RODEX_MCP_KEY"`}</Code>
             <P>Never paste a key into a chat — reference <code className="text-ink">{"${env:RODEX_MCP_KEY}"}</code> instead.</P>
 
-            <H>TOOLS — 18</H>
+            <H>TOOLS — 21</H>
             <table className="doc-table mb-4">
               <thead>
                 <tr>
@@ -625,8 +625,10 @@ claude mcp add --transport http rodex ${GW}/mcp \\
                 <tr><td><code>list_apps</code> · <code>get_app</code></td><td>read</td><td>app inventory + details</td></tr>
                 <tr><td><code>list_tables</code></td><td>read</td><td>tables of an app</td></tr>
                 <tr><td><code>get_item</code> · <code>query</code></td><td>read</td><td>read data (sk defaults to <code>~</code>; paginate with <code>next_start_key</code>)</td></tr>
+                <tr><td><code>get_app_usage</code></td><td>read</td><td>live request budgets + storage — the meters as data</td></tr>
                 <tr><td><code>create_app</code> · <code>delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>app lifecycle</td></tr>
                 <tr><td><code>suspend_app</code> · <code>resume_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>emergency stop / restart</td></tr>
+                <tr><td><code>rotate_app_key</code> · <code>view_app_key</code></td><td><span className="text-amber">mutate — confirm</span></td><td>new app key (old dies instantly) · re-view inside 48 h window</td></tr>
                 <tr><td><code>recover_app</code> · <code>force_delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>undo soft delete · immediate purge (no window)</td></tr>
                 <tr><td><code>create_table</code> · <code>delete_table</code></td><td><span className="text-amber">mutate — confirm</span></td><td>table lifecycle (delete is irreversible)</td></tr>
                 <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 20 KB cap)</td></tr>
