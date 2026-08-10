@@ -49,7 +49,17 @@
 3. **Create access key** (Application outside AWS) → save `AWS_ACCESS_KEY_ID` /
    `AWS_SECRET_ACCESS_KEY` → these go into `wrangler secret put` (step 3 of README).
 
-## 2. Control-plane tables (create once via console or CLI)
+## 2. Control-plane tables — AUTO-PROVISIONED (nothing to create)
+
+The gateway **creates everything on first use** (no CLI steps needed):
+- `rodex_apps` — app registry (PROVISIONED 1/1)
+- `rodex_idem` — idempotency records, **TTL on `exp` auto-enabled**
+- `rodex_meta` — platform settings (e.g. the admin password hash, PAY_PER_REQUEST)
+- data tables (`app_<appId>_<name>`) at **5 WCU / 5 RCU** (auto-upgrade from
+  legacy 1/1 on first touch)
+
+If you ever provision them manually (e.g. to pre-create before first deploy),
+use the shapes below — otherwise skip straight to §3.
 
 ```bash
 # apps registry
@@ -81,6 +91,6 @@ aws dynamodb update-time-to-live \
 
 ## 3. Capacity budget check (free tier math — docs/rate-limits.md)
 
-- Each table provisioned 1/1; every app table adds to the pool.
+- Each data table provisions **5/5**; up to 5 tables stay inside the 25+25 pool.
 - Gateway per-app limits keep aggregate writes ≤ 20 WCU/s and reads ≤ 25 RCU/s.
 - Watch CloudWatch: `ConsumedWriteCapacityUnits` / `ProvisionedThroughputExceeded`.

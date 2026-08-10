@@ -44,6 +44,11 @@ npx wrangler deploy
 
 Then run the live smoke (docs/testing.md §Live).
 
+> Gotcha: the strict rate limiter is a Durable Object. On the **free plan** its
+> migration must be `new_sqlite_classes` (plain `new_classes` is rejected with
+> code 10097). The first deploy of a new DO class creates it; later deploys
+> are migration-free.
+
 ## Rollback
 
 Cloudflare Workers keeps deploy history. To undo the latest deploy:
