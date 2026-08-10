@@ -1,0 +1,50 @@
+name: 🐛 Bug report
+description: Something is broken — a bug, crash, or wrong behavior
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe the bug in plain words. What did you expect, and what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps — including the endpoint or MCP tool, and the exact request/payload.
+      placeholder: |
+        1. Created an app with name "x"
+        2. Called POST /v1/item/put with ...
+        3. Got ...
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      options:
+        - REST API (gateway /v1/*)
+        - MCP (/mcp tools)
+        - Console (dashboard)
+        - Admin API (/v1/admin/*)
+        - Deployment / CI
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Response or logs
+      description: Paste the exact error JSON, status code, or console output.
+      render: json
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed any real API keys / secrets from this report
+          required: true
+        - label: This is not a security issue (security issues go to SECURITY.md — private reporting)
+          required: true
