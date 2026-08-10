@@ -103,6 +103,16 @@ export class MockStorage implements Storage {
     this.tables.delete(physical);
   }
 
+  async storageSize(physical: string): Promise<{ bytes: number; items: number } | null> {
+    const t = this.tables.get(physical);
+    if (!t) return null;
+    let bytes = 0;
+    for (const [, item] of t) {
+      bytes += JSON.stringify(item).length;
+    }
+    return { bytes, items: t.size };
+  }
+
   // ── items ───────────────────────────────────────────────────────────────────
   private key(pk: string, sk: string) {
     return pk + KEY_SEP + sk;

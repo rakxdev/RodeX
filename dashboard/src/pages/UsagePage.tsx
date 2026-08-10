@@ -213,7 +213,7 @@ export default function UsagePage() {
       </motion.div>
 
       <p className="font-mono text-[10px] sm:text-[10.5px] tracking-[0.1em] text-inkdim mt-5">
-        REAL-TIME PER-APP METERS SHIP WITH THE OBSERVABILITY PHASE — THE BUDGET TABLE ABOVE IS THE CONTRACT TODAY.
+        LIVE PER-APP METERS RENDER ON EACH APP DETAIL PAGE — REQUEST BUDGETS + STORAGE, REFRESHED EVERY 30 S.
       </p>
       </PublicShell>
     </motion.div>

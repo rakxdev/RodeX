@@ -95,3 +95,34 @@ export async function gateAdminRequest(env: Env): Promise<void> {
   const result = await doCheck(env, [{ key: "admin", limit: RATE_ADMIN, budget: "admin" }]);
   if (result) fail(result);
 }
+
+// ── observability: peek counters WITHOUT consuming ───────────────────────────
+
+export interface UsageSnapshot {
+  key: string;
+  count: number;
+  window_start: number;
+}
+
+/** Current per-budget usage for an app (total / writes / reads / platform). */
+export async function peekUsage(env: Env, appId: string): Promise<UsageSnapshot[]> {
+  const keys = [appId, `${appId}:write`, `${appId}:read`, "platform:all"];
+  const ns = env.RL_DO;
+  if (!ns) {
+    // dev/tests: read the local fallback counters directly
+    const now = Math.floor(Date.now() / 1000);
+    return keys.map((key) => {
+      const c = localCounters.get(key);
+      return { key, count: c && c.start + RATE_WINDOW_SECONDS > now ? c.count : 0, window_start: c && c.start + RATE_WINDOW_SECONDS > now ? c.start : now };
+    });
+  }
+  const id = ns.idFromName("rodex-rl");
+  const stub = ns.get(id);
+  const res = await stub.fetch("https://rl/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ op: "peek", checks: keys.map((key) => ({ key })) }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { counts?: UsageSnapshot[] };
+  return Array.isArray(body.counts) ? body.counts : [];
+}

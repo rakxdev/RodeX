@@ -19,11 +19,11 @@ Status: READY-FOR-APPROVAL · Each task ≤ ~5 files · Ordered by dependency.
 
 # (next build round, after motion/docs round shipped)
 # Phase 1 observation: RATE LIMITING SHIPPED (REV H) — meters next
-- [ ] T2 Gateway `GET /v1/admin/apps/:id/usage` — limiter snapshot + DescribeTable sizes,
+- [x] T2 Gateway `GET /v1/admin/apps/:id/usage` (peek counters + storage) — limiter snapshot + DescribeTable sizes,
       cached 60 s; tests for counters + mock sizes
       - Verify: `npm test`; scripted burst moves counters
       - Depends: T0
-- [ ] T3 App detail usage panel — WRITES/READS/TOTAL bars + storage readout, 30 s refresh,
+- [x] T3 App detail LIVE METERS panel — WRITES/READS/TOTAL bars + storage readout, 30 s refresh,
       graceful "—" on error
       - Verify: real traffic moves bars; `npm run typecheck` + browser
       - Depends: T2

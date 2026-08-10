@@ -261,6 +261,32 @@ describe("admin app management", () => {
       vi.useRealTimers();
     }
   });
+
+  it("usage endpoint reports live counters without consuming them", async () => {
+    const created = await (await call("POST", "/v1/admin/apps", { name: "meter" }, { Cookie: adminCookie })).json() as any;
+    const { app_id, api_key } = created.result;
+    const h = { "X-App-Id": app_id, "X-Api-Key": api_key };
+
+    // 5 table creates (writes) via the app key
+    for (let i = 0; i < 5; i++) {
+      await call("POST", "/v1/table/create", { name: `t${i}` }, h);
+    }
+    const before = await (await call("GET", `/v1/admin/apps/${app_id}/usage`, undefined, { Cookie: adminCookie })).json() as any;
+    expect(before.result.requests.writes.used).toBeGreaterThanOrEqual(5);
+    expect(before.result.requests.writes.limit).toBe(120);
+    expect(before.result.requests.reads.used).toBe(0);
+    expect(before.result.storage.tables).toBe(5);
+    expect(typeof before.result.storage.items).toBe("number");
+
+    // peek must not consume: a write right after is still allowed
+    const after = await call("POST", "/v1/table/create", { name: "t5" }, h);
+    expect(after.status).toBe(200);
+  });
+
+  it("usage endpoint requires a session", async () => {
+    const r = await call("GET", `/v1/admin/apps/app_x/usage`);
+    expect(r.status).toBe(401);
+  });
 });
 
 describe("GitHub OAuth", () => {

@@ -8,6 +8,7 @@ import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
 import ViewKey from "@/components/ViewKey";
 import Loader from "@/components/Loader";
+import UsageMeters from "@/components/UsageMeters";
 import { FoldButton } from "@/components/FoldButton";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
@@ -254,6 +255,13 @@ curl -X POST /v1/item/put \\
   -H "X-Api-Key: YOUR_KEY" \\
   -d '{"table":"users","item":{"pk":"U#1"}}'`}
           </pre>
+        </motion.div>
+
+        <motion.div variants={foldIn} className="sheet-panel p-5">
+          <h4 className="mb-4">
+            <b>CELL 05</b> · LIVE METERS
+          </h4>
+          <UsageMeters appId={app.app_id} />
         </motion.div>
       </motion.div>
     </motion.div>

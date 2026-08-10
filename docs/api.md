@@ -66,6 +66,7 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 | `POST /v1/admin/apps` `{name, description?}` | optional app note (≤200 chars) |
 | `GET /v1/admin/apps` | list apps |
 | `GET /v1/admin/apps/:id` | app detail |
+| `GET /v1/admin/apps/:id/usage` | live meters — limiter counters (peek, no consumption) + storage size (60 s cache) |
 | `POST /v1/admin/apps/:id/rotate-key` | new key (old invalid instantly) |
 | `POST /v1/admin/apps/:id/view-key` | decrypt + show the raw key inside its 48 h recovery window |
 | `POST /v1/admin/apps/:id/suspend` / `resume` | block/unblock traffic |

@@ -15,10 +15,20 @@ export class RateLimiterDO {
 
   async fetch(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => ({}))) as {
+      op?: "check" | "peek";
       checks?: Array<{ key: string; limit: number; budget?: string }>;
     };
     const checks = Array.isArray(body.checks) ? body.checks : [];
     const now = Math.floor(Date.now() / 1000);
+
+    if (body.op === "peek") {
+      // observability: return current counts WITHOUT consuming (no side effects)
+      const counts = checks.map(({ key }) => {
+        const c = this.counters.get(key);
+        return { key, count: c && c.start + 60 > now ? c.count : 0, window_start: c && c.start + 60 > now ? c.start : now };
+      });
+      return Response.json({ allowed: true, op: "peek", counts });
+    }
 
     for (const { key, limit, budget } of checks) {
       if (!key || typeof limit !== "number" || limit <= 0) continue;
