@@ -3,7 +3,7 @@
  * All writes are idempotency-safe when `request_id` is supplied.
  */
 import type { Context } from "hono";
-import { badRequest, forbidden, notFound } from "./errors";
+import { badRequest, forbidden, notFound, HttpError } from "./errors";
 import type { Env } from "./env";
 import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS } from "./limits";
 import { gateAppRequest } from "./rate";
@@ -67,7 +67,21 @@ export interface ParsedItem {
   data: string;
 }
 
-/** Split app payload into {pk, sk, data}. sk defaults to the "~" sentinel. */
+/** Strict request-body validation: unknown top-level keys are rejected (never silently ignored). */
+export function rejectUnknown(body: Record<string, unknown>, allowed: string[]): void {
+  const unknown = Object.keys(body).filter((k) => !allowed.includes(k));
+  if (unknown.length > 0) {
+    throw badRequest(`Unknown field(s): ${unknown.join(", ")} — allowed: ${allowed.join(", ")}`);
+  }
+}
+
+/** Split app payload into {pk, sk, data}.
+ *
+ * Two accepted item shapes (both store the payload FLAT):
+ *   A) flat      — item: { pk, sk, ...fields }      (classic, unchanged)
+ *   B) envelope  — item: { pk, sk, data: {...} }    (canonical; matches what reads return)
+ * A `data` key inside `item` selects the envelope; mixing it with flat fields
+ * is rejected. sk defaults to the "~" sentinel in both forms. */
 export function parseItem(item: unknown): ParsedItem {
   if (typeof item !== "object" || item === null || Array.isArray(item)) {
     throw badRequest("Field 'item' must be an object with at least a 'pk'");
@@ -80,6 +94,18 @@ export function parseItem(item: unknown): ParsedItem {
   const sk = skRaw === undefined ? "~" : skRaw;
   if (typeof sk !== "string" || sk.length === 0) throw badRequest("item.sk must be a non-empty string");
   if (sk.length > SK_MAX_CHARS) throw badRequest(`item.sk too long (max ${SK_MAX_CHARS} chars)`);
+  if ("data" in it) {
+    // envelope form — the payload is item.data, stored flat
+    const extra = Object.keys(it).filter((k) => k !== "pk" && k !== "sk" && k !== "data");
+    if (extra.length > 0) {
+      throw badRequest(
+        `item.data envelope cannot be mixed with flat fields (${extra.join(", ")}) — use either item:{pk,sk,data} or item:{pk,sk,...fields}, not both`,
+      );
+    }
+    const data = it["data"];
+    if (typeof data !== "object" || data === null || Array.isArray(data)) throw badRequest("item.data must be an object");
+    return { pk, sk, data: JSON.stringify(data) };
+  }
   const { pk: _p, sk: _s, ...rest } = it;
   const data = JSON.stringify(rest);
   return { pk, sk, data };
@@ -114,6 +140,7 @@ export async function withIdem<T extends { ok: true; result: unknown }>(
 // ── route handlers ───────────────────────────────────────────────────────────
 
 export async function handlePut(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "item", "request_id", "overwrite"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "write");
@@ -130,6 +157,7 @@ export async function handlePut(ctx: AppContext, body: Record<string, unknown>) 
 }
 
 export async function handleGet(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "pk", "sk", "strong"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "read");
@@ -144,6 +172,7 @@ export async function handleGet(ctx: AppContext, body: Record<string, unknown>) 
 }
 
 export async function handleUpdate(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "pk", "sk", "data", "expected_version", "request_id"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "write");
@@ -162,6 +191,7 @@ export async function handleUpdate(ctx: AppContext, body: Record<string, unknown
 }
 
 export async function handleDelete(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "pk", "sk", "expected_version", "request_id"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "write");
@@ -177,7 +207,62 @@ export async function handleDelete(ctx: AppContext, body: Record<string, unknown
   });
 }
 
+export const BATCH_MAX_ITEMS = 50;
+
+export async function handleBatchPut(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "items", "overwrite", "request_id"]);
+  const table = reqString(body, "table");
+  assertOwned(ctx, table);
+  const itemsRaw = body["items"];
+  if (!Array.isArray(itemsRaw) || itemsRaw.length === 0) {
+    throw badRequest(`Field 'items' must be a non-empty array of items (max ${BATCH_MAX_ITEMS})`);
+  }
+  if (itemsRaw.length > BATCH_MAX_ITEMS) {
+    throw badRequest(`Batch too large: ${itemsRaw.length} items (max ${BATCH_MAX_ITEMS}) — split into multiple calls`);
+  }
+  // Validate ALL items before ANY write: a single bad item rejects the whole batch (nothing written).
+  const parsed: ParsedItem[] = itemsRaw.map((it, i) => {
+    try {
+      const p = parseItem(it);
+      assertItemSize(JSON.parse(p.data));
+      return p;
+    } catch (err) {
+      if (err instanceof HttpError) {
+        throw new HttpError(err.status, `items[${i}]: ${err.message}`, err.retryAfter);
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      throw badRequest(`items[${i}]: ${msg}`);
+    }
+  });
+  const requestId = body["request_id"] as string | undefined;
+  const overwrite = body["overwrite"] === true;
+  // Reserve the full write budget upfront (a batch of N consumes N writes).
+  await gateAppRequest(ctx.env, ctx.appId, "write", parsed.length);
+  const physical = physicalName(ctx.appId, table);
+  return withIdem(ctx.storage, requestId, async () => {
+    await ctx.storage.ensureTable(physical);
+    const items: Array<Record<string, unknown>> = [];
+    let written = 0;
+    for (const item of parsed) {
+      try {
+        const stored = await ctx.storage.putItem(physical, item, { overwrite });
+        written += 1;
+        items.push({ pk: item.pk, sk: item.sk, ok: true, item: { ...itemToJson(stored), table } });
+      } catch (err) {
+        items.push({
+          pk: item.pk,
+          sk: item.sk,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return { ok: true as const, result: { table, requested: parsed.length, written, items } };
+  });
+}
+
 export async function handleQuery(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "pk", "sk_prefix", "limit", "start_key"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
   await gateAppRequest(ctx.env, ctx.appId, "read");
