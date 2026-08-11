@@ -297,6 +297,7 @@ POST /mcp                          → MCP (JSON-RPC, master-key auth)
 | [docs/developers.md](docs/developers.md) | SDK + MCP bridge guide for your own code |
 | [docs/ci-cd.md](docs/ci-cd.md) | gates, deploy, rollback |
 | [docs/research-validation.md](docs/research-validation.md) | verified sources |
+| [docs/faq.md](docs/faq.md) | plain-language FAQ (meters, budgets, TTL, license) |
 | [docs/decisions/](docs/decisions/) | ADR-001 … ADR-006 |
 | [CHANGELOG.md](CHANGELOG.md) | shipped history |
 | [tasks/](tasks/) | plans & task lists |

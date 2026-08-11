@@ -481,7 +481,7 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
                 <tr>
                   <td><code>GET /v1/admin/apps/:id/usage</code></td>
-                  <td>live meters — request budgets + storage</td>
+                  <td>live meters — request budgets + storage (request counters live · storage AWS-sampled ~6 h)</td>
                 </tr>
                 <tr>
                   <td><code>POST /v1/admin/mcp/keys</code></td>
@@ -775,7 +775,7 @@ npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
           <div className="flex flex-col gap-1 px-1 pb-2">
             <div className="foldline" />
             <div className="font-mono text-[10px] tracking-[0.16em] text-inkdim pt-2">
-              FULL CONTRACT — <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/openapi.yaml" target="_blank" rel="noreferrer">OPENAPI.YAML</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/api.md" target="_blank" rel="noreferrer">API.MD</a>
+              FULL CONTRACT — <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/openapi.yaml" target="_blank" rel="noreferrer">OPENAPI.YAML</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/api.md" target="_blank" rel="noreferrer">API.MD</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/faq.md" target="_blank" rel="noreferrer">FAQ</a>
             </div>
           </div>
         </motion.div>
