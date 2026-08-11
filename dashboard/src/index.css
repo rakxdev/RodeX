@@ -59,14 +59,16 @@ body {
   background: rgba(217, 182, 74, 0.35);
 }
 
-/* OS-level reduced motion fallback (belt to MotionConfig's suspenders) */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+/* NOTE: no OS-level reduced-motion kill-all here — the 0.01ms override made
+   infinite animations (marquee) flicker at turbo speed on desktops with the
+   OS setting on. All animations run at their designed speeds everywhere. */
+
+/* All-screen guard: clip any horizontal bleed (e.g. the decorative
+   .ambient glow) without creating a scroll container — position:sticky
+   keeps working (overflow-x:hidden would break it). */
+html,
+body {
+  overflow-x: clip;
 }
 
 /* safe areas for notched phones */
@@ -582,7 +584,12 @@ body {
 
 /* doc tables */
 .doc-table {
+  /* All-screen-safe: on wide screens the table fills 100%; on narrow
+     screens it scrolls INSIDE itself instead of widening the page. */
+  display: block;
   width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 11.5px;

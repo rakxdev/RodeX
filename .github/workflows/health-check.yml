@@ -1,0 +1,39 @@
+name: Health check
+
+# Daily smoke test of the live platform. On failure an issue is opened
+# automatically — silent downtime should never go unnoticed.
+
+on:
+  schedule:
+    - cron: "17 5 * * *" # 05:17 UTC daily
+  workflow_dispatch: # manual run button too
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe endpoints
+        id: probe
+        run: |
+          GW=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://rodex-gateway.rakxdev.workers.dev/v1/health)
+          DB=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://rodexdb.pages.dev/)
+          echo "gateway=$GW" >> "$GITHUB_OUTPUT"
+          echo "dashboard=$DB" >> "$GITHUB_OUTPUT"
+          echo "gateway=$GW dashboard=$DB"
+
+      - name: Open issue when something is down
+        if: steps.probe.outputs.gateway != '200' || steps.probe.outputs.dashboard != '200'
+        run: |
+          gh issue create \
+            --title "⚠️ Health check failed — $(date -u +%F %H:%M)" \
+            --body "One or more endpoints returned a non-200:
+            - Gateway (/v1/health): ${{ steps.probe.outputs.gateway }}
+            - Dashboard: ${{ steps.probe.outputs.dashboard }}
+
+            See this run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

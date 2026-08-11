@@ -69,7 +69,7 @@ npx -y rodex-mcp --url https://your-name.workers.dev/mcp --key $RODEX_MCP_KEY
 
 ```json
 { "mcpServers": {
-  "rodex": { "command": "npx", "args": ["-y", "rodex-mcp", "--key", "rok_mcp_..."] }
+  "rodexdb": { "command": "npx", "args": ["-y", "rodex-mcp", "--key", "rok_mcp_..."] }
 } }
 ```
 

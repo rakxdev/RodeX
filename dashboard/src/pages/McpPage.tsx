@@ -286,14 +286,14 @@ export default function McpPage() {
             <div className="font-mono text-[9px] tracking-[0.16em] text-gold mt-1">CURSOR</div>
             <pre className="font-mono text-[10px] leading-relaxed text-ink bg-panel2 border border-line rounded-lg p-3 overflow-x-auto">{`// .cursor/mcp.json
 { "mcpServers": {
-  "rodex": {
+  "rodexdb": {
     "url": "${ENDPOINT}",
     "headers": { "Authorization": "Bearer \${env:RODEX_MCP_KEY}" }
   }
 } }`}</pre>
             <div className="font-mono text-[9px] tracking-[0.16em] text-gold mt-2">CLAUDE CODE / CLI AGENTS</div>
             <pre className="font-mono text-[10px] leading-relaxed text-ink bg-panel2 border border-line rounded-lg p-3 overflow-x-auto">{`export RODEX_MCP_KEY=rok_mcp_…
-claude mcp add --transport http rodex ${ENDPOINT} \\
+claude mcp add --transport http rodexdb ${ENDPOINT} \\
   --header "Authorization: Bearer $RODEX_MCP_KEY"`}</pre>
             <div className="font-mono text-[9px] tracking-[0.16em] text-gold mt-2">STDIO-ONLY CLIENTS (CLAUDE DESKTOP, …)</div>
             <pre className="font-mono text-[10px] leading-relaxed text-ink bg-panel2 border border-line rounded-lg p-3 overflow-x-auto">{`npx mcp-remote ${ENDPOINT} \\

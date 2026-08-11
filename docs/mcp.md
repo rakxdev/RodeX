@@ -89,7 +89,7 @@ name the budget and carry `retry_after`.
 **Cursor** (`.cursor/mcp.json`):
 ```json
 { "mcpServers": {
-  "rodex": {
+  "rodexdb": {
     "url": "https://rodex-gateway.rakxdev.workers.dev/mcp",
     "headers": { "Authorization": "Bearer ${env:RODEX_MCP_KEY}" }
   }
@@ -99,7 +99,7 @@ name the budget and carry `retry_after`.
 **Claude Code / CLI agents**:
 ```bash
 export RODEX_MCP_KEY=rok_mcp_…
-claude mcp add --transport http rodex https://rodex-gateway.rakxdev.workers.dev/mcp \
+claude mcp add --transport http rodexdb https://rodex-gateway.rakxdev.workers.dev/mcp \
   --header "Authorization: Bearer $RODEX_MCP_KEY"
 ```
 

@@ -13,7 +13,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
+    // TS 7 removed baseUrl; paths now resolve relative to this file
     "paths": { "@/*": ["./src/*"] },
     "types": ["vite/client"]
   },
