@@ -1,84 +1,13 @@
-# RodeX — Task List (REV G)
+# Todo — Real-user review fixes  (ALL DONE — committed locally, deployed live, NOT pushed)
 
-Status: READY-FOR-APPROVAL · Each task ≤ ~5 files · Ordered by dependency.
+- [x] T1: rate weight support (rate.ts, rate-do.ts, localCheck) + tests
+- [x] T2: strict body validation + envelope unwrap in items.ts + tests
+- [x] T3: `/v1/batch/put` endpoint + tests
+- [x] T4: MCP `batch_put_item` + contract test + tests
+- [x] T5: docs (api, mcp, rate-limits, python.md, testing, CHANGELOG, README, review status)
+- [x] T6: dashboard (DocsPage, UsageMeters copy)
+- [x] T7: full verification (vitest 170, tsc, eslint, bundle, dashboard build)
+- [x] T8: deploy + live-verify + local commits (NO PUSH)
 
-## Phase 0: Ship the reviewed build (all code already tested & committed)
-
-^- [x] T0 Release branch → PR (quality green) → merge → deploy gateway, then Pages
-      - Acceptance: PR merged; both deployments complete; prod smoke passes
-      - Verify: `curl /v1/health`; login→fabricate→rok_ key→view-key→rotate→delete→recover→purge
-      - Files: none (git/deploy only)
-^- [x] T1 Live contract check (incl. appFromItem read-path hotfix): view-key returns raw key ≤48 h; `rodex_idem` TTL ENABLED;
-      `rok_` regex on new keys
-      - Verify: curl against prod; no code
-      - Depends: T0
-
-### Checkpoint Phase 0 — prod fully functional; user reviews prod
-
-## Phase 1: Observability (free meters)
-
-# (next build round, after motion/docs round shipped)
-# Phase 1 observation: RATE LIMITING SHIPPED (REV H) — meters next
-- [x] T2 Gateway `GET /v1/admin/apps/:id/usage` (peek counters + storage) — limiter snapshot + DescribeTable sizes,
-      cached 60 s; tests for counters + mock sizes
-      - Verify: `npm test`; scripted burst moves counters
-      - Depends: T0
-- [x] T3 App detail LIVE METERS panel — WRITES/READS/TOTAL bars + storage readout, 30 s refresh,
-      graceful "—" on error
-      - Verify: real traffic moves bars; `npm run typecheck` + browser
-      - Depends: T2
-- [ ] T4 (decision-gated) Public aggregate meters on usage page
-      - Depends: T2/T3
-
-### Checkpoint Phase 1 — meters honest vs real traffic; storage matches AWS console
-
-## Phase 2: Hardening & documentation
-
-- [ ] T5 Rotate live credentials (admin password, GitHub secret, AWS keys, CF token —
-      some steps are user-executed; instructions in report)
-      - Verify: old password fails, new works
-- [ ] T6 Sync docs/api.md + docs/openapi.yaml (view-key, description, delete alias, rok_,
-      key_recoverable_until, storage note)
-      - Verify: consistency grep docs↔openapi
-- [ ] T7 CSP tighten: drop 'unsafe-inline' from script-src/style-src; console clean
-      - Verify: prod loads with violations=0
-- [ ] T8 DESIGN.md via impeccable document; detector clean
-
-### Checkpoint Phase 2 — headers tightened, docs consistent, DESIGN.md committed
-
-## Phase 3: MCP server (decision-gated)
-
-- [ ] T9a MCP scaffold + auth on the gateway worker (streamable HTTP)
-- [ ] T9b Tool surface: table list, query, put/update/delete, usage (admin) — same isolation
-      - Verify: MCP client connects; isolation tests pass
-      - Depends: T9a
-
-### Checkpoint Phase 3 — MCP tools pass the REST isolation suite
-
-## Open questions for human approval
-1. Ship Phase 0 now?
-2. Allow `rodex-preview.pages.dev` as a gateway origin (multi-origin allowlist)?
-3. T4 public aggregate meters — yes/no?
-4. MCP scope: admin-only, per-app-key, or both?
-## Phase 4: MCP server (master-key universal interface) — full plan in tasks/mcp-plan.md
-
-### Phase A: Gateway foundation (key CRUD + table delete) — DONE
-- [x] A1 rodex_mcp_keys table + storage helpers (hash-only + anytime cipher, create/list/view/delete)
-- [x] A2 Admin endpoints: POST/GET /v1/admin/mcp/keys · POST :id/view (anytime) · DELETE :id (no rotation)
-- [x] A3 POST /v1/table/delete (app auth, owned-only, 403 cross-app, withIdem)
-### Checkpoint: gateway green — 122/122 tests at Phase A
-### Phase B: MCP surface + read-only tools — DONE (on the gateway worker at /mcp)
-- [x] B1 /mcp route: Streamable HTTP, Bearer auth vs key table, handler Origin/Host validation, MCP budgets in the SAME RateLimiterDO
-- [x] B2 read-only tools: health, get_instructions, list_apps, get_app, list_tables, get_item, query
-### Checkpoint: real JSON-RPC integration tests green
-### Phase C: Mutations + confirmation gate — DONE
-- [x] C1 gate: mutating tools refuse without confirmed:true (structured refusal)
-- [x] C2 mutation tools: put/update/delete_item, create/delete_table, create/delete_app (+ burst stress)
-### Checkpoint: 15/15 MCP tests incl. 125-call write burst
-### Phase D: Dashboard MCP page — DONE
-- [x] D1 /mcp route + header button + key management (mint/reveal/list/view anytime/delete)
-- [x] D2 operating manual panel (connect recipes, tool table, confirmation protocol, budgets, FAQ)
-### Checkpoint: tsc + build green
-### Phase E: Docs — DONE (E1); E2 (push/PR/deploy) BLOCKED pending founder review
-- [x] E1 docs: api.md + openapi.yaml sync, docs/mcp.md, ADR-006, CHANGELOG, env.md note
-- [ ] E2 review → push → PR → quality → merge → auto-deploy; live MCP Inspector demo with user
+Live-verified 2026-08-12 against production: trap → 400 · envelope stored flat ·
+MCP≡REST flat · batch 3/51/invalid · MCP gate · 22 tools · cleanup done · prod healthy.
