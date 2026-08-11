@@ -23,7 +23,7 @@ import { decryptKey, hashKey } from "./auth";
 import { createStorage } from "./storage";
 import { usageSnapshot } from "./usage";
 import type { AppContext } from "./items";
-import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate, handleBatchPut, BATCH_MAX_ITEMS } from "./items";
+import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate, handleBatchPut, handleBatchGet, handleIncrement, BATCH_MAX_ITEMS } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
 import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
@@ -116,6 +116,7 @@ EVERY app, table, and item on the platform.
 - list_tables — tables of an app, with key schema (read)
 - get_app_usage — live request budgets (total/writes/reads used this minute) + storage size (read)
 - get_item — one item (pk required; sk defaults to "~") (read)
+- batch_get_item — up to 50 keys in ONE call; missing keys reported, not errors (read)
 - query — pk + optional sk_prefix, limit <= 100, pagination (read)
 - create_app / delete_app — app lifecycle (MUTATION — confirm)
 - rotate_app_key — new app key, old one dies instantly; new key returned once (MUTATION — confirm)
@@ -125,6 +126,7 @@ EVERY app, table, and item on the platform.
 - force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
 - create_table / delete_table — table lifecycle (MUTATION — confirm)
 - put_item / update_item / delete_item — item lifecycle (MUTATION — confirm)
+- increment_item — atomic counter (MUTATION — confirm; 1 write, race-free)
 - batch_put_item — up to 50 items in ONE call (MUTATION — confirm; consumes N writes)
 
 ## Budgets
@@ -140,7 +142,8 @@ apply too (per-app 600 total / 120 writes / 240 reads per minute).
   version-guarded (expected_version → 409 on conflict).
 - batch_put_item writes items with the SAME wire shape as put_item — REST
   and MCP rows are physically identical (flat data).
-- Items cap at 20 KB; query limit max 100; batch max 50 items.
+- batch_get_item / increment_item match their REST twins exactly.
+- Items cap at 20 KB; query limit max 100; batch max 50 items/keys.
 - Returned results are JSON text blocks — read them carefully before
   proposing the next step.`;
 
@@ -250,6 +253,28 @@ function buildMcpServer(env: Env): McpServer {
         if (sk !== undefined) body["sk"] = sk;
         if (strong) body["strong"] = true;
         return handleGet(ctx, body);
+      }),
+  );
+
+  server.registerTool(
+    "batch_get_item",
+    {
+      description:
+        `Fetch up to ${BATCH_MAX_ITEMS} items in ONE call — keys: [{pk, sk?}], sk defaults to '~'. Missing keys are reported in "missing", NOT errors. strong: true for read-after-write. Consumes N reads. READ — no confirmation needed.`,
+      inputSchema: {
+        app_id: z.string().min(1),
+        table: z.string().min(1).max(42),
+        keys: z.array(z.object({ pk: pkSchema, sk: skSchema.optional() })).min(1).max(BATCH_MAX_ITEMS),
+        strong: z.boolean().optional(),
+      },
+    },
+    async ({ app_id, table, keys, strong }) =>
+      safe(async () => {
+        await gateMCPRequest(env, "read", keys.length);
+        const ctx = await ctxFor(env, app_id);
+        const body: Record<string, unknown> = { table, keys };
+        if (strong) body["strong"] = true;
+        return handleBatchGet(ctx, body);
       }),
   );
 
@@ -520,6 +545,33 @@ function buildMcpServer(env: Env): McpServer {
         if (overwrite) body["overwrite"] = true;
         if (request_id !== undefined) body["request_id"] = request_id;
         return unwrap(await handleBatchPut(ctx, body));
+      });
+    },
+  );
+
+  server.registerTool(
+    "increment_item",
+    {
+      description:
+        "Atomic counter: add `by` (integer, default 1, negative decrements) to the row's counter — one write, zero reads, race-free. Creates the row if missing. Returns the NEW counter value. MUTATION: show the user which row and by how much, get approval, then confirmed: true.",
+      inputSchema: {
+        app_id: z.string().min(1),
+        table: z.string().min(1).max(42),
+        pk: pkSchema,
+        sk: skSchema,
+        by: z.number().int().optional(),
+        confirmed: confirmedSchema,
+      },
+    },
+    async ({ app_id, table, pk, sk, by, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "increment_item", app_id, table, pk, sk, by: by ?? 1 });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        const ctx = await ctxFor(env, app_id);
+        const body: Record<string, unknown> = { table, pk };
+        if (sk !== undefined) body["sk"] = sk;
+        if (by !== undefined) body["by"] = by;
+        return handleIncrement(ctx, body);
       });
     },
   );
