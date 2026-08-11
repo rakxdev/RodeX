@@ -130,14 +130,14 @@ describe("MCP discovery", () => {
     const tools = ((out.body as { result: { tools: Array<{ name: string; description: string }> } }).result?.tools) ?? [];
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      "batch_put_item", "create_app", "create_table", "delete_app", "delete_item", "delete_table",
+      "batch_get_item", "batch_put_item", "create_app", "create_table", "delete_app", "delete_item", "delete_table",
       "force_delete_app", "get_app", "get_app_usage", "get_instructions", "get_item",
-      "health", "list_apps", "list_tables", "put_item", "query", "recover_app",
+      "health", "increment_item", "list_apps", "list_tables", "put_item", "query", "recover_app",
       "resume_app", "rotate_app_key", "suspend_app", "update_item", "view_app_key",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
-      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "batch_put_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
+      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "batch_put_item", "increment_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
         expect(t.description.toLowerCase()).toContain("confirmed: true");
       }
     }
@@ -160,6 +160,35 @@ describe("MCP discovery", () => {
 });
 
 // ── read-only tools ──────────────────────────────────────────────────────────
+
+describe("MCP trio tools (batch get / increment)", () => {
+  it("batch_get_item is a READ (no confirmation) and matches REST shape", async () => {
+    const appId = createdApp!.app_id;
+    const apiKey = createdApp!.api_key;
+    await call("POST", "/v1/batch/put", { table: "users", items: [
+      { pk: "BG#1", sk: "s", data: { n: 1 } },
+      { pk: "BG#2", sk: "s", data: { n: 2 } },
+    ] }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+
+    // NO confirmed flag needed — reads are free
+    const out = await toolCall("batch_get_item", { app_id: appId, table: "users", keys: [{ pk: "BG#1", sk: "s" }, { pk: "BG#9", sk: "s" }] });
+    expect(out.parsed.ok).toBe(true);
+    expect((out.parsed.result as { found: Array<{ data: Record<string, unknown> }> }).found[0].data).toEqual({ n: 1 });
+    expect((out.parsed.result as { missing: Array<{ pk: string }> }).missing).toEqual([{ pk: "BG#9", sk: "s" }]);
+  });
+
+  it("increment_item is gated, then atomic — REST sees the same counter", async () => {
+    const appId = createdApp!.app_id;
+    await toolCall("increment_item", { app_id: appId, table: "users", pk: "IC#1", sk: "s" });
+    const out = await toolCall("increment_item", { app_id: appId, table: "users", pk: "IC#1", sk: "s", by: 4, confirmed: true });
+    expect(out.parsed.ok).toBe(true);
+    expect((out.parsed.result as { counter: number }).counter).toBe(4);
+
+    // REST get shows the same row + counter
+    const got = await toolCall("get_item", { app_id: appId, table: "users", pk: "IC#1", sk: "s" });
+    expect((got.parsed.result as { counter: number }).counter).toBe(4);
+  });
+});
 
 describe("MCP read-only tools", () => {
   it("list_apps / get_app / list_tables see the whole platform", async () => {
@@ -279,6 +308,10 @@ describe("MCP confirmation gate (mutations)", () => {
     const batch = await toolCall("batch_put_item", { app_id: appId, table: "users", items: [{ pk: "x1", data: { v: 1 } }] });
     expect(batch.parsed.code).toBe("confirmation_required");
     expect((batch.parsed.what_would_happen as { action: string }).action).toBe("batch_put_item");
+
+    const inc = await toolCall("increment_item", { app_id: appId, table: "users", pk: "x1" });
+    expect(inc.parsed.code).toBe("confirmation_required");
+    expect((inc.parsed.what_would_happen as { action: string }).action).toBe("increment_item");
 
     // nothing changed: no table created, no item written, app still active
     const after = await call("GET", "/v1/tables", undefined, { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key });
