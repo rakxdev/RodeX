@@ -4,7 +4,7 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
-## [Unreleased] — Serverless-data trio: batch/get + increment + TTL
+## [0.3.0] — 2026-08-12 · Serverless-data trio: batch/get + increment + TTL
 
 ### Added
 - **`POST /v1/batch/get`** — up to 50 keys in one call; missing keys are
