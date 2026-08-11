@@ -37,7 +37,10 @@ jobs:
       - name: Dashboard build
         run: cd dashboard && npm run build
       - name: Packages build + tests (SDK + MCP wrapper)
-        run: npm run build:packages && npm run test:packages
+        run: |
+          npm install --prefix packages/rodexdb --no-audit --no-fund
+          npm install --prefix packages/rodex-mcp --no-audit --no-fund
+          npm run build:packages && npm run test:packages
 
       - name: Build gate (worker bundles)
         run: cd gateway && npx wrangler deploy --dry-run | grep -q "Total Upload"
