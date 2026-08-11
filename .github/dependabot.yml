@@ -7,3 +7,26 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+
+  - package-ecosystem: npm
+    directory: /packages/rodexdb
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: /packages/rodex-mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
