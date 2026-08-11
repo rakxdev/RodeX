@@ -86,6 +86,16 @@ budget BEFORE anything is written, so a batch that would blow the budget
 answers 429 with nothing stored. One HTTP round-trip, same budget math as N
 single puts.
 
+**Batch & multi-read accounting:** `POST /v1/batch/put` consumes N writes
+(as documented); `POST /v1/batch/get` consumes **N reads** (N keys); both are
+reserved BEFORE the call so a batch that would blow the budget answers 429
+with nothing executed. `POST /v1/item/increment` is exactly **one write**
+(atomic `ADD` — no hidden read).
+
+**Row TTL:** rows written with `ttl` expire and are deleted by DynamoDB for
+**free** (0 WCU). Physical deletion can lag up to ~48 h after expiry; the
+gateway filters expired rows on every read path, so clients never see them.
+
 **Meter honesty:** the usage meters distinguish two sources — request counters
 (used/limit/remaining) are LIVE (peeked from the limiter DO, zero
 consumption); storage bytes/items come from DynamoDB `DescribeTable`, which

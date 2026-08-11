@@ -41,9 +41,11 @@ class RodexClient:
                 raise RodexError(e.code, err.get("message", e.reason), err.get("retry_after"))
         raise RodexError(0, "unreachable")
 
-    def put(self, table, pk, sk, payload, overwrite=False, request_id=None):
-        """Envelope shape — canonical; stores payload FLAT under data."""
-        return self._call("/v1/item/put", {"table": table, "item": {"pk": pk, "sk": sk, "data": payload},
+    def put(self, table, pk, sk, payload, overwrite=False, request_id=None, ttl=None):
+        """Envelope shape — canonical; stores payload FLAT under data. ttl = unix seconds to auto-expire."""
+        item = {"pk": pk, "sk": sk, "data": payload}
+        if ttl is not None: item["ttl"] = ttl
+        return self._call("/v1/item/put", {"table": table, "item": item,
                                            "overwrite": overwrite, **({"request_id": request_id} if request_id else {})})
 
     def batch_put(self, table, items, overwrite=False, request_id=None):
@@ -60,6 +62,15 @@ class RodexClient:
         if sk_prefix is not None: body["sk_prefix"] = sk_prefix
         if start_key is not None: body["start_key"] = start_key
         return self._call("/v1/query", body)
+
+    def get_many(self, table, keys, strong=False):
+        """keys: list of (pk, sk) — up to 50, one round-trip. Returns (found, missing)."""
+        res = self._call("/v1/batch/get", {"table": table, "keys": [{"pk": p, "sk": s} for p, s in keys], "strong": strong})["result"]
+        return res["found"], res["missing"]
+
+    def increment(self, table, pk, sk, by=1):
+        """Atomic counter — one write, race-free. Returns the new value."""
+        return self._call("/v1/item/increment", {"table": table, "pk": pk, "sk": sk, "by": by})["result"]["counter"]
 
     def delete(self, table, pk, sk, expected_version=None):
         body = {"table": table, "pk": pk, "sk": sk}
@@ -94,7 +105,15 @@ db = RodexClient("https://rodex-gateway.rakxdev.workers.dev", "app_…", "rok_�
 # hot path: 1 read + 1 write per item (the crawler pattern)
 if db.get("crawled_tests", shard_of(test_id)).get("ok"):
     pass  # already crawled — skip
-db.put("crawled_tests", shard_of(test_id), test_id, {"s3_key": k, "has_answers": True})
+db.put("crawled_tests", shard_of(test_id), test_id, {"s3_key": k, "has_answers": True},
+       ttl=int(time.time()) + 86400)   # optional: row auto-expires in 24 h
+
+# even hotter: check 50 rows in ONE call (crawler dedupe; sk = test_id)
+found, missing = db.get_many("crawled_tests", [(shard_of(t), t) for t in batch])
+todo = [m["sk"] for m in missing]   # test ids not yet crawled
+
+# counters: zero reads, race-free
+views = db.increment("pages", "PAGE#7", "views")
 
 # bulk: 50 rows per call, one HTTP round-trip (no client pacing needed)
 db.batch_put("crawled_tests", [(shard_of(t), t, row) for t, row in batch])

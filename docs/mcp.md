@@ -33,7 +33,7 @@ creation and deletion included. The one safety mechanism is the
 ## The confirmation gate (non-negotiable)
 
 Every mutation tool (`create_*`, `delete_*`, `put_item`, `update_item`,
-`delete_item`, `batch_put_item`) requires `confirmed: true` in its arguments. Without it the
+`delete_item`, `batch_put_item`, `increment_item`) requires `confirmed: true` in its arguments. Without it the
 server refuses with:
 
 ```json
@@ -47,7 +47,7 @@ the console manual) to: **gather everything → present the full plan → get on
 approval → execute step by step**. The server enforces the gate regardless of
 what the agent "thinks" it was told.
 
-## Tools (22)
+## Tools (24)
 
 | Tool | Kind | Confirmation | Notes |
 |---|---|---|---|
@@ -65,6 +65,8 @@ what the agent "thinks" it was told.
 | `delete_table` | **mutate** | ✅ | irreversible — ALL data in the table |
 | `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 20 KB cap |
 | `batch_put_item` | **mutate** | ✅ | up to 50 items in one call; all-or-nothing validation; consumes N writes |
+| `batch_get_item` | read | — | up to 50 keys in one call; missing keys listed, not errors; N reads |
+| `increment_item` | **mutate** | ✅ | atomic counter (by, default 1); 1 write, race-free; returns new value |
 | `update_item` | **mutate** | ✅ | version-guarded (`expected_version` → 409) |
 | `delete_item` | **mutate** | ✅ | exact pk/sk |
 
@@ -137,7 +139,7 @@ Never paste the key into a chat — reference `${env:RODEX_MCP_KEY}`.
   protection, spec-required); non-browser clients send no Origin and are fine.
 - **`nodejs_compat`** compatibility flag is required (the Agents SDK uses
   `node:async_hooks` internally).
-- **Testing**: 20+ integration tests drive real JSON-RPC over HTTP (auth
+- **Testing**: 25+ integration tests drive real JSON-RPC over HTTP (auth
   matrix, handshake, tool discovery, gate refusals, full item lifecycle,
   structured errors, the MCP≡REST wire-shape contract test, and an
   end-to-end write-burst proving both budgets bite exactly and name

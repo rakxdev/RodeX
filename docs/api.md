@@ -47,6 +47,9 @@ or the canonical **envelope** (identical to what reads return):
 
 - `pk` required (≤ 500 chars); `sk` optional (default `"~"`).
 - A `data` key inside `item` selects the envelope; mixing it with flat fields → 400.
+- Optional `ttl` (integer, unix seconds) — the row **expires after this** and
+  deletes itself for free (DynamoDB TTL; physical deletion lags up to ~48 h,
+  but the gateway never returns an expired row). `ttl` is echoed in responses.
 - **Strict bodies:** unknown TOP-LEVEL keys on any item endpoint are rejected
   with 400 + the allowed list — never silently ignored. (The old `data`-at-top-
   level mistake now fails loudly instead of storing an empty row.)
@@ -62,13 +65,40 @@ or the canonical **envelope** (identical to what reads return):
     { "pk": "USER#2", "sk": "PROFILE", "data": { "name": "S" } }
   ], "overwrite": false, "request_id": "batch-1" }
 ```
-- Up to **50 items** per call; each item takes the same two shapes as `put`.
+- Up to **50 items** per call; each item takes the same two shapes as `put`
+  (envelope or flat), plus optional `ttl`.
 - **All-or-nothing validation:** any invalid item (missing pk, bad shape, > 20 KB)
   rejects the WHOLE batch with 400/413 and nothing is written.
 - **Budget honesty:** a batch of N consumes **N writes** from the app's
   120 writes/min (reserved before any write). 429 when the batch would exceed it.
 - Per-item result array: `items[]` with `{ pk, sk, ok, item }` or
   `{ pk, sk, ok: false, error }`. `request_id` makes the whole batch idempotent.
+
+### `POST /v1/batch/get`
+```json
+{ "table": "users", "keys": [
+    { "pk": "USER#1", "sk": "PROFILE" },
+    { "pk": "USER#2" }
+  ], "strong": false }
+```
+- Up to **50 keys** per call; `sk` optional (defaults to `"~"`), exactly like
+  `put`. All keys validated first — any bad key → 400, nothing returned.
+- **Missing keys are NOT errors**: response is
+  `{ requested, found: [items…], missing: [{pk, sk}…] }`.
+- **Budget honesty:** N keys consume **N reads** from the 240 reads/min
+  (reserved before the call). `strong: true` = consistent reads (2× cost).
+- TTL-expired rows are reported as missing.
+
+### `POST /v1/item/increment` — atomic counters
+```json
+{ "table": "users", "pk": "PAGE#7", "sk": "views", "by": 1 }
+```
+- Atomic add to the row's counter — **one write, zero reads, race-free**
+  (DynamoDB `ADD`). Creates the row if missing; `by` defaults to 1, negative
+  decrements. Returns the row with the **new counter value** (`result.counter`)
+  plus `incremented_by`.
+- Counter rows read back as `{ pk, sk, data: {}, counter, version, … }` and are
+  visible to `get` / `query` / `batch/get` like any row.
 
 ### `POST /v1/item/get`
 ```json
