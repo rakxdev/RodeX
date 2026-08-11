@@ -597,14 +597,14 @@ curl -X POST $GW/v1/table/create \\
             <H>CONNECTING AGENTS</H>
             <P><span className="text-ink">Cursor</span> — <code className="text-ink">.cursor/mcp.json</code>:</P>
             <Code>{`{ "mcpServers": {
-  "rodex": {
+  "rodexdb": {
     "url": "${GW}/mcp",
     "headers": { "Authorization": "Bearer ${'${env:RODEX_MCP_KEY}'}" }
   }
 } }`}</Code>
             <P><span className="text-ink">Claude Code / CLI agents</span>:</P>
             <Code>{`export RODEX_MCP_KEY=rok_mcp_…
-claude mcp add --transport http rodex ${GW}/mcp \\
+claude mcp add --transport http rodexdb ${GW}/mcp \\
   --header "Authorization: Bearer $RODEX_MCP_KEY"`}</Code>
             <P><span className="text-ink">stdio-only clients</span> (Claude Desktop, anything that only runs
             local servers) — the official bridge:</P>

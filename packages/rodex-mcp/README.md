@@ -21,7 +21,7 @@ The key is required — via `--key` or the `RODEX_MCP_KEY` env var.
 ```json
 {
   "mcpServers": {
-    "rodex": {
+    "rodexdb": {
       "command": "npx",
       "args": ["-y", "rodex-mcp", "--key", "your-rok_mcp-key"]
     }
