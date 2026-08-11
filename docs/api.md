@@ -158,6 +158,11 @@ See [docs/python.md](python.md) for a working example.
 | `POST /v1/admin/mcp/keys/:id/view` | re-view the raw master key — **anytime**, no window |
 | `DELETE /v1/admin/mcp/keys/:id` | destroy a master key (instant revocation; no rotation exists) |
 
+> **Meter honesty:** request counters are LIVE (peeked, zero consumption);
+> storage bytes/items are AWS-sampled (~6 h lag — fresh tables show 0 until
+> the first sweep). Exact counts any time: the sharded scan recipe
+> ([docs/python.md](python.md) `scan_all`). See [docs/faq.md](faq.md).
+
 ## Keys
 
 - API keys are **branded**: `rok_` + 43 base64url chars (256-bit). Old

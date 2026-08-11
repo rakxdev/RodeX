@@ -102,6 +102,9 @@ export default function UsageMeters({ appId }: { appId: string }) {
       <div className="font-mono text-[9.5px] tracking-[0.12em] text-inkdim">
         {usage ? `${usage.storage.tables} table(s) · 25 GB account-wide · item/byte counts lag ~6 h (AWS DescribeTable sampling)` : "—"}
       </div>
+      <div className="font-mono text-[9px] tracking-[0.12em] text-inkdim">
+        EXACT COUNT ANY TIME → SHARDED SCAN RECIPE (docs/python.md scan_all)
+      </div>
 
       {/* footer */}
       <div className="flex items-center gap-2 mt-4 font-mono text-[9px] tracking-[0.16em] text-inkdim">

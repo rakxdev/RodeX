@@ -91,3 +91,8 @@ with a `request_id` are always safe to retry. Full math:
   For real use, deploy your own — it is the same code, one button.
 - **License?** Personal/educational use; commercial strictly forbidden —
   see [LICENSE](../LICENSE).
+
+- **Storage meter shows 0 / stale?** That's AWS's ~6-hour sample of the table
+  counters (fresh tables show 0 until the first sweep). Data is unaffected —
+  verify any time with the sharded scan recipe (docs/python.md `scan_all`).
+  Full explanation: [docs/faq.md](faq.md#1-my-storage-meter-shows-0-b--0-items--but-im-storing-data).

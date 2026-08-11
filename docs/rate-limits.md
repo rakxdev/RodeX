@@ -102,6 +102,11 @@ consumption); storage bytes/items come from DynamoDB `DescribeTable`, which
 AWS samples **roughly every 6 hours**, so a fresh table can report 0 items for
 a while even though rows are readable. `sampled_at` marks the snapshot time.
 
+Real-time item counts are deliberately NOT built: a live counter drifts (TTL
+rows delete at AWS with no signal back), and full scans on refresh would burn
+the free read budget. Exact counts on demand = the sharded scan recipe
+([docs/python.md](python.md)). Full rationale: [docs/faq.md](faq.md).
+
 ## 5. Per-table provisioned capacity (the second ceiling)
 
 Every app data table provisions **5 WCU + 5 RCU** (free pool is 25+25
