@@ -130,14 +130,14 @@ describe("MCP discovery", () => {
     const tools = ((out.body as { result: { tools: Array<{ name: string; description: string }> } }).result?.tools) ?? [];
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      "create_app", "create_table", "delete_app", "delete_item", "delete_table",
+      "batch_put_item", "create_app", "create_table", "delete_app", "delete_item", "delete_table",
       "force_delete_app", "get_app", "get_app_usage", "get_instructions", "get_item",
       "health", "list_apps", "list_tables", "put_item", "query", "recover_app",
       "resume_app", "rotate_app_key", "suspend_app", "update_item", "view_app_key",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
-      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
+      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "batch_put_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
         expect(t.description.toLowerCase()).toContain("confirmed: true");
       }
     }
@@ -185,8 +185,8 @@ describe("MCP read-only tools", () => {
 
     const got = await toolCall("get_item", { app_id: appId, table: "users", pk: "u1" });
     expect(got.parsed.ok).toBe(true);
-    // the payload object is stored under the item's `data` field (REST contract)
-    expect((got.parsed.result as { data: { data: { name: string } } }).data.data.name).toBe("Rakesh");
+    // MCP and REST share ONE canonical shape: the payload is stored FLAT under `data`
+    expect((got.parsed.result as { data: { name: string } }).data.name).toBe("Rakesh");
 
     const q = await toolCall("query", { app_id: appId, table: "users", pk: "u1" });
     expect(q.parsed.ok).toBe(true);
@@ -276,6 +276,10 @@ describe("MCP confirmation gate (mutations)", () => {
     const view = await toolCall("view_app_key", { app_id: appId });
     expect(view.parsed.code).toBe("confirmation_required");
 
+    const batch = await toolCall("batch_put_item", { app_id: appId, table: "users", items: [{ pk: "x1", data: { v: 1 } }] });
+    expect(batch.parsed.code).toBe("confirmation_required");
+    expect((batch.parsed.what_would_happen as { action: string }).action).toBe("batch_put_item");
+
     // nothing changed: no table created, no item written, app still active
     const after = await call("GET", "/v1/tables", undefined, { "X-App-Id": appId, "X-Api-Key": createdApp!.api_key });
     expect((await after.json()) as unknown).toEqual((await before.json()) as unknown);
@@ -283,6 +287,48 @@ describe("MCP confirmation gate (mutations)", () => {
     expect((apps.parsed.apps as Array<{ status: string }>)[0].status).toBe("active");
     const q = await toolCall("query", { app_id: appId, table: "users", pk: "x1" });
     expect((q.parsed.result as { items: unknown[] }).items.length).toBe(0);
+  });
+
+  it("MCP write ≡ REST write — one canonical stored shape (contract test)", async () => {
+    const appId = createdApp!.app_id;
+    const apiKey = createdApp!.api_key;
+
+    // write the SAME logical item twice on the same pk/sk: once via MCP, once via REST flat
+    const mcp = await toolCall("put_item", {
+      app_id: appId, table: "users", pk: "CON#1", sk: "s", data: { via: "mcp", n: 1 },
+      overwrite: true, confirmed: true,
+    });
+    expect(mcp.parsed.ok).toBe(true);
+    expect((mcp.parsed.result as { data: Record<string, unknown> }).data).toEqual({ via: "mcp", n: 1 });
+
+    const mcpRow = await call("POST", "/v1/item/get", { table: "users", pk: "CON#1", sk: "s" }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+    const mcpRead = (await mcpRow.json()) as { result: { data: Record<string, unknown> } };
+    // MCP-written row reads back FLAT — identical to a REST flat write
+    expect(mcpRead.result.data).toEqual({ via: "mcp", n: 1 });
+
+    await call("POST", "/v1/item/put", { table: "users", item: { pk: "CON#1", sk: "s", via: "rest", n: 2 }, overwrite: true }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+    const restRead = await toolCall("get_item", { app_id: appId, table: "users", pk: "CON#1", sk: "s" });
+    expect((restRead.parsed.result as { data: Record<string, unknown> }).data).toEqual({ via: "rest", n: 2 });
+
+    // both interfaces read the other's rows with the same flat shape
+    const restViaMCP = await toolCall("get_item", { app_id: appId, table: "users", pk: "CON#1", sk: "s" });
+    expect((restViaMCP.parsed.result as { data: Record<string, unknown> }).data).toEqual({ via: "rest", n: 2 });
+  });
+
+  it("batch_put_item writes up to 50 items when confirmed", async () => {
+    const appId = createdApp!.app_id;
+    const items = Array.from({ length: 5 }, (_, i) => ({ pk: `BAT#${i}`, sk: "s", data: { i } }));
+    const out = await toolCall("batch_put_item", { app_id: appId, table: "users", items, confirmed: true });
+    expect(out.parsed.ok).toBe(true);
+    expect((out.parsed.result as { written: number }).written).toBe(5);
+    expect((out.parsed.result as { items: Array<{ ok: boolean }> }).items.every((i) => i.ok)).toBe(true);
+
+    const q = await toolCall("query", { app_id: appId, table: "users", pk: "BAT#0" });
+    expect((q.parsed.result as { items: unknown[] }).items.length).toBe(1);
+
+    // batch rows are flat and MCP-readable
+    const one = await toolCall("get_item", { app_id: appId, table: "users", pk: "BAT#0", sk: "s" });
+    expect((one.parsed.result as { data: Record<string, unknown> }).data).toEqual({ i: 0 });
   });
 
   it("executes mutations when confirmed: true — full item lifecycle", async () => {

@@ -156,6 +156,45 @@ describe("items CRUD", () => {
     expect(gone.status).toBe(404);
   });
 
+  it("envelope put (item.data) stores flat — canonical shape everywhere", async () => {
+    const put = await post("/v1/item/put", A, { table: "users", item: { pk: "ENV#1", sk: "S", data: { name: "Env", ok: true } } });
+    expect(put.status).toBe(200);
+    // the echo shows the FLAT payload — the verification contract
+    expect(put.json.result.data).toEqual({ name: "Env", ok: true });
+
+    const get = await post("/v1/item/get", A, { table: "users", pk: "ENV#1", sk: "S" });
+    expect(get.json.result.data).toEqual({ name: "Env", ok: true });
+  });
+
+  it("top-level data on put → 400 (silent-drop trap is dead)", async () => {
+    const res = await post("/v1/item/put", A, { table: "users", item: { pk: "TRAP#1", sk: "S" }, data: { name: "x" } });
+    expect(res.status).toBe(400);
+    expect(res.json.error.message).toContain("Unknown field(s): data");
+    // nothing was stored
+    const get = await post("/v1/item/get", A, { table: "users", pk: "TRAP#1", sk: "S" });
+    expect(get.status).toBe(404);
+  });
+
+  it("envelope mixed with flat fields → 400", async () => {
+    const res = await post("/v1/item/put", A, { table: "users", item: { pk: "MIX#1", sk: "S", data: { a: 1 }, extra: 2 } });
+    expect(res.status).toBe(400);
+    expect(res.json.error.message).toContain("cannot be mixed");
+  });
+
+  it("unknown top-level keys on every item endpoint → 400", async () => {
+    const cases = [
+      ["/v1/item/get", { table: "users", pk: "x", bogus: 1 }],
+      ["/v1/item/update", { table: "users", pk: "x", sk: "s", data: {}, bogus: 1 }],
+      ["/v1/item/delete", { table: "users", pk: "x", sk: "s", bogus: 1 }],
+      ["/v1/query", { table: "users", pk: "x", bogus: 1 }],
+    ] as const;
+    for (const [path, body] of cases) {
+      const res = await post(path, A, body as unknown);
+      expect(res.status).toBe(400);
+      expect(res.json.error.message).toContain("Unknown field(s)");
+    }
+  });
+
   it("stale version update → 409 (mandatory test #3)", async () => {
     await post("/v1/item/put", A, { table: "users", item: { pk: "U#2", sk: "S", x: 1 } });
     const bad = await post("/v1/item/update", A, { table: "users", pk: "U#2", sk: "S", data: { x: 2 }, expected_version: 99 });
@@ -206,6 +245,71 @@ describe("idempotency (mandatory test #2)", () => {
 
     const q = await post("/v1/query", A, { table: "users", pk: "U#idem", limit: 100 });
     expect(q.json.result.items.length).toBe(1); // no duplicate row
+  });
+});
+
+describe("batch put", () => {
+  it("writes multiple items in one call with per-item results (flat data)", async () => {
+    const items = Array.from({ length: 3 }, (_, i) => ({ pk: `B#${i}`, sk: "s", data: { i } }));
+    const res = await post("/v1/batch/put", A, { table: "users", items });
+    expect(res.status).toBe(200);
+    expect(res.json.result.written).toBe(3);
+    expect(res.json.result.items.every((it: { ok: boolean }) => it.ok)).toBe(true);
+    expect(res.json.result.items[0].item.data).toEqual({ i: 0 }); // stored FLAT
+    const q = await post("/v1/query", A, { table: "users", pk: "B#0", limit: 10 });
+    expect(q.json.result.items.length).toBe(1);
+    expect(q.json.result.items[0].data).toEqual({ i: 0 });
+  });
+
+  it("flat items also work inside a batch (backward compatible)", async () => {
+    const res = await post("/v1/batch/put", A, { table: "users", items: [{ pk: "BF#1", sk: "s", name: "Flat" }] });
+    expect(res.json.result.written).toBe(1);
+    const get = await post("/v1/item/get", A, { table: "users", pk: "BF#1", sk: "s" });
+    expect(get.json.result.data).toEqual({ name: "Flat" });
+  });
+
+  it("> 50 items → 400, nothing written", async () => {
+    const items = Array.from({ length: 51 }, (_, i) => ({ pk: `Z#${i}`, sk: "s", data: {} }));
+    const res = await post("/v1/batch/put", A, { table: "users", items });
+    expect(res.status).toBe(400);
+    expect(res.json.error.message).toContain("max 50");
+    const q = await post("/v1/query", A, { table: "users", pk: "Z#", limit: 100 });
+    expect(q.json.result.items.length).toBe(0);
+  });
+
+  it("one invalid item rejects the WHOLE batch (nothing written)", async () => {
+    const res = await post("/v1/batch/put", A, {
+      table: "users",
+      items: [{ pk: "OK#1", sk: "s", data: { a: 1 } }, { sk: "no-pk" }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.json.error.message).toContain("items[1]");
+    const q = await post("/v1/query", A, { table: "users", pk: "OK#", limit: 10 });
+    expect(q.json.result.items.length).toBe(0);
+  });
+
+  it("oversized item in a batch keeps 413 semantics", async () => {
+    const big = "x".repeat(21 * 1024);
+    const res = await post("/v1/batch/put", A, { table: "users", items: [{ pk: "BIG#1", sk: "s", data: { blob: big } }] });
+    expect(res.status).toBe(413);
+  });
+
+  it("batch with request_id replays identically", async () => {
+    const body = { table: "users", items: [{ pk: "ID#1", sk: "s", data: { v: 1 } }], request_id: "batch-req-0001" };
+    const a = await post("/v1/batch/put", A, body);
+    const b = await post("/v1/batch/put", A, body);
+    expect(a.json).toEqual(b.json);
+    expect(b.headers.get("x-idempotent-replay")).toBe("true");
+  });
+
+  it("batch of N consumes N write budget units (50 + 50 + 21 > 120 → 429)", async () => {
+    await post("/v1/batch/put", A, { table: "users", items: Array.from({ length: 50 }, (_, i) => ({ pk: `W#${i}`, sk: "s", data: {} })) });
+    await post("/v1/batch/put", A, { table: "users", items: Array.from({ length: 50 }, (_, i) => ({ pk: `Y#${i}`, sk: "s", data: {} })) });
+    const big = await post("/v1/batch/put", A, {
+      table: "users",
+      items: Array.from({ length: 21 }, (_, i) => ({ pk: `X#${i}`, sk: "s", data: {} })),
+    });
+    expect(big.status).toBe(429);
   });
 });
 
