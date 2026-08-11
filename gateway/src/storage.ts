@@ -52,12 +52,16 @@ export interface AppRow {
 export interface StoredItem {
   pk: string;
   sk: string;
-  /** JSON string of the app's payload (everything except pk/sk) */
+  /** JSON string of the app's payload (everything except pk/sk/ttl) */
   data: string;
   /** version, bumped on every update (conditional writes use this) */
   v: number;
   created: number;
   updated: number;
+  /** unix seconds — row expires after this (DynamoDB TTL; gateway filters on read) */
+  ttl?: number;
+  /** atomic counter value (increment rows) */
+  counter?: number;
 }
 
 export interface QueryResult {
@@ -110,8 +114,12 @@ export interface Storage {
   storageSize(physical: string): Promise<{ bytes: number; items: number } | null>;
 
   // items
-  putItem(physical: string, item: { pk: string; sk: string; data: string }, opts?: PutOptions): Promise<StoredItem>;
+  putItem(physical: string, item: { pk: string; sk: string; data: string; ttl?: number }, opts?: PutOptions): Promise<StoredItem>;
   getItem(physical: string, pk: string, sk: string, strong?: boolean): Promise<StoredItem | null>;
+  /** multi-get: one call for up to 50 keys; null = missing (or expired) */
+  getItems(physical: string, keys: Array<{ pk: string; sk: string }>, strong?: boolean): Promise<Array<StoredItem | null>>;
+  /** atomic counter: ADD by to the row's numeric `ctr` (creates the row if missing). Returns the new counter. */
+  increment(physical: string, pk: string, sk: string, by: number): Promise<StoredItem>;
   updateItem(physical: string, pk: string, sk: string, data: string, expectedVersion?: number): Promise<StoredItem>;
   deleteItem(physical: string, pk: string, sk: string, expectedVersion?: number): Promise<void>;
   queryItems(physical: string, pk: string, skPrefix: string | undefined, limit: number, startKey?: string): Promise<QueryResult>;

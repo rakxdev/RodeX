@@ -4,6 +4,28 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [0.3.0] — 2026-08-12 · Serverless-data trio: batch/get + increment + TTL
+
+### Added
+- **`POST /v1/batch/get`** — up to 50 keys in one call; missing keys are
+  listed, not errors; N keys = N reads (weighted, reserved first); `strong`
+  for consistent reads.
+- **`POST /v1/item/increment`** — atomic counters (DynamoDB `ADD`): one write,
+  zero reads, race-free; auto-creates the row; negative `by` decrements.
+- **Row TTL** — optional `ttl` (unix seconds) on put/batch items; rows expire
+  and DynamoDB deletes them for free (~48 h lag); the gateway filters expired
+  rows on every read path so clients never see them.
+- **MCP `batch_get_item`** (read, ungated) + **`increment_item`** (mutation,
+  confirmation-gated) — 24 tools total.
+
+### Changed
+- `put` / `batch/put` echo `ttl`; counter rows read back with `counter`.
+- Docs + Python client updated (get_many, increment, ttl).
+
+### Tests
+- 170 → **182** (batch/get weight proof, increment atomicity + budget, TTL
+  expiry across get/query/batch-get, MCP trio tools).
+
 ## [0.2.2] — 2026-08-12 · Real-user review fixes (live-verified by the tstbk-crawler)
 
 ### Fixed

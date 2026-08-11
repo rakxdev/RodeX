@@ -65,6 +65,8 @@ export interface ParsedItem {
   pk: string;
   sk: string;
   data: string;
+  /** unix seconds — row auto-expires after this (DynamoDB TTL) */
+  ttl?: number;
 }
 
 /** Strict request-body validation: unknown top-level keys are rejected (never silently ignored). */
@@ -96,7 +98,7 @@ export function parseItem(item: unknown): ParsedItem {
   if (sk.length > SK_MAX_CHARS) throw badRequest(`item.sk too long (max ${SK_MAX_CHARS} chars)`);
   if ("data" in it) {
     // envelope form — the payload is item.data, stored flat
-    const extra = Object.keys(it).filter((k) => k !== "pk" && k !== "sk" && k !== "data");
+    const extra = Object.keys(it).filter((k) => k !== "pk" && k !== "sk" && k !== "data" && k !== "ttl");
     if (extra.length > 0) {
       throw badRequest(
         `item.data envelope cannot be mixed with flat fields (${extra.join(", ")}) — use either item:{pk,sk,data} or item:{pk,sk,...fields}, not both`,
@@ -104,15 +106,35 @@ export function parseItem(item: unknown): ParsedItem {
     }
     const data = it["data"];
     if (typeof data !== "object" || data === null || Array.isArray(data)) throw badRequest("item.data must be an object");
-    return { pk, sk, data: JSON.stringify(data) };
+    return { pk, sk, data: JSON.stringify(data), ...ttlOf(it) };
   }
-  const { pk: _p, sk: _s, ...rest } = it;
+  const { pk: _p, sk: _s, ttl: _t, ...rest } = it;
   const data = JSON.stringify(rest);
-  return { pk, sk, data };
+  return { pk, sk, data, ...ttlOf(it) };
+}
+
+/** Optional `ttl` (unix seconds, integer) — row expires after this. */
+function ttlOf(it: Record<string, unknown>): { ttl?: number } {
+  const raw = it["ttl"];
+  if (raw === undefined) return {};
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw <= 0) {
+    throw badRequest("item.ttl must be a positive integer (unix seconds)");
+  }
+  return { ttl: raw };
 }
 
 function itemToJson(it: StoredItem): Record<string, unknown> {
-  return { pk: it.pk, sk: it.sk, data: JSON.parse(it.data), version: it.v, created: it.created, updated: it.updated };
+  const out: Record<string, unknown> = {
+    pk: it.pk,
+    sk: it.sk,
+    data: JSON.parse(it.data),
+    version: it.v,
+    created: it.created,
+    updated: it.updated,
+  };
+  if (it.ttl !== undefined) out.ttl = it.ttl;
+  if (it.counter !== undefined) out.counter = it.counter;
+  return out;
 }
 
 /** Idempotency wrapper: replay returns the stored response body. */
@@ -208,6 +230,62 @@ export async function handleDelete(ctx: AppContext, body: Record<string, unknown
 }
 
 export const BATCH_MAX_ITEMS = 50;
+
+export async function handleBatchGet(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "keys", "strong"]);
+  const table = reqString(body, "table");
+  assertOwned(ctx, table);
+  const keysRaw = body["keys"];
+  if (!Array.isArray(keysRaw) || keysRaw.length === 0) {
+    throw badRequest(`Field 'keys' must be a non-empty array of {pk, sk?} (max ${BATCH_MAX_ITEMS})`);
+  }
+  if (keysRaw.length > BATCH_MAX_ITEMS) {
+    throw badRequest(`Batch too large: ${keysRaw.length} keys (max ${BATCH_MAX_ITEMS}) — split into multiple calls`);
+  }
+  // validate ALL keys first — any bad key rejects the whole call
+  const keys: Array<{ pk: string; sk: string }> = keysRaw.map((raw, i) => {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw badRequest(`keys[${i}] must be an object {pk, sk?}`);
+    const pk = (raw as Record<string, unknown>)["pk"];
+    if (typeof pk !== "string" || pk.length === 0) throw badRequest(`keys[${i}].pk is required (non-empty string)`);
+    if (pk.length > PK_MAX_CHARS) throw badRequest(`keys[${i}].pk too long (max ${PK_MAX_CHARS} chars)`);
+    const skRaw = (raw as Record<string, unknown>)["sk"];
+    const sk = skRaw === undefined ? "~" : skRaw;
+    if (typeof sk !== "string" || sk.length === 0) throw badRequest(`keys[${i}].sk must be a non-empty string`);
+    if (sk.length > SK_MAX_CHARS) throw badRequest(`keys[${i}].sk too long (max ${SK_MAX_CHARS} chars)`);
+    return { pk, sk };
+  });
+  const strong = body["strong"] === true;
+  // N keys consume N reads (reserved upfront)
+  await gateAppRequest(ctx.env, ctx.appId, "read", keys.length);
+  const physical = physicalName(ctx.appId, table);
+  const found = await ctx.storage.getItems(physical, keys, strong);
+  const missing: Array<{ pk: string; sk: string }> = [];
+  const items: Array<Record<string, unknown>> = [];
+  keys.forEach((k, i) => {
+    const it = found[i];
+    if (!it) missing.push(k);
+    else items.push(itemToJson(it));
+  });
+  return { ok: true as const, result: { table, requested: keys.length, found: items, missing } };
+}
+
+export async function handleIncrement(ctx: AppContext, body: Record<string, unknown>) {
+  rejectUnknown(body, ["table", "pk", "sk", "by"]);
+  const table = reqString(body, "table");
+  assertOwned(ctx, table);
+  const pk = reqString(body, "pk");
+  if (pk.length > PK_MAX_CHARS) throw badRequest(`pk too long (max ${PK_MAX_CHARS} chars)`);
+  const raw = body["sk"];
+  const sk = raw === undefined ? "~" : reqString(body, "sk");
+  const byRaw = body["by"];
+  const by = byRaw === undefined ? 1 : byRaw;
+  if (typeof by !== "number" || !Number.isInteger(by)) throw badRequest("by must be an integer (default 1; negative decrements)");
+  await gateAppRequest(ctx.env, ctx.appId, "write");
+  const physical = physicalName(ctx.appId, table);
+  await ctx.storage.ensureTable(physical);
+  const item = await ctx.storage.increment(physical, pk, sk, by);
+  return { ok: true as const, result: { ...itemToJson(item), table, incremented_by: by } };
+}
 
 export async function handleBatchPut(ctx: AppContext, body: Record<string, unknown>) {
   rejectUnknown(body, ["table", "items", "overwrite", "request_id"]);

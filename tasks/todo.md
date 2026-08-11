@@ -1,13 +1,12 @@
-# Todo — Real-user review fixes  (ALL DONE — committed locally, deployed live, NOT pushed)
+# Todo — Serverless-data trio (batch/get + increment + TTL) — ALL DONE
 
-- [x] T1: rate weight support (rate.ts, rate-do.ts, localCheck) + tests
-- [x] T2: strict body validation + envelope unwrap in items.ts + tests
-- [x] T3: `/v1/batch/put` endpoint + tests
-- [x] T4: MCP `batch_put_item` + contract test + tests
-- [x] T5: docs (api, mcp, rate-limits, python.md, testing, CHANGELOG, README, review status)
-- [x] T6: dashboard (DocsPage, UsageMeters copy)
-- [x] T7: full verification (vitest 170, tsc, eslint, bundle, dashboard build)
-- [x] T8: deploy + live-verify + local commits (NO PUSH)
+- [x] T1: storage (mock + aws): getItems, increment, ttl — unit tests
+- [x] T2: items.ts: ttl parse/echo, handleBatchGet, handleIncrement + routes — api tests
+- [x] T3: mcp.ts: batch_get_item + increment_item + manual — mcp tests
+- [x] T4: docs (api, mcp, rate-limits, python, testing, CHANGELOG, README) + dashboard DocsPage
+- [x] T5: full verify (vitest 182, tsc, eslint, bundles, dashboard build)
+- [x] T6: deploy + live-verify + cleanup + local commits (NO PUSH)
 
-Live-verified 2026-08-12 against production: trap → 400 · envelope stored flat ·
-MCP≡REST flat · batch 3/51/invalid · MCP gate · 22 tools · cleanup done · prod healthy.
+Live-verified 2026-08-12 against production: batch/get found+missing · increment 1→6→4 ·
+TTL future-readable/past-404/query-excluded · MCP batch_get_item (ungated) + increment_item (gated) ·
+24 tools · cleanup done · prod healthy.

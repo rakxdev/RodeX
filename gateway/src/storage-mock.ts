@@ -146,19 +146,59 @@ export class MockStorage implements Storage {
     return pk + KEY_SEP + sk;
   }
 
-  async putItem(physical: string, item: { pk: string; sk: string; data: string }, opts: PutOptions = {}): Promise<StoredItem> {
+  async putItem(physical: string, item: { pk: string; sk: string; data: string; ttl?: number }, opts: PutOptions = {}): Promise<StoredItem> {
     const t = this.table(physical);
     const k = this.key(item.pk, item.sk);
     if (!opts.overwrite && t.has(k)) throw conflict("Item already exists — use update or overwrite:true");
     const now = Math.floor(Date.now() / 1000);
     const stored: StoredItem = { pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now };
+    if (item.ttl !== undefined) stored.ttl = item.ttl;
     t.set(k, stored);
     return { ...stored };
   }
 
+  /** TTL: expired rows are treated as missing (and lazily purged) — the gateway never lies. */
+  private expired(it: StoredItem): boolean {
+    return it.ttl !== undefined && it.ttl < Math.floor(Date.now() / 1000);
+  }
+
   async getItem(physical: string, pk: string, sk: string): Promise<StoredItem | null> {
-    const it = this.table(physical).get(this.key(pk, sk));
-    return it ? { ...it } : null;
+    const t = this.table(physical);
+    const k = this.key(pk, sk);
+    const it = t.get(k);
+    if (!it) return null;
+    if (this.expired(it)) {
+      t.delete(k);
+      return null;
+    }
+    return { ...it };
+  }
+
+  async getItems(physical: string, keys: Array<{ pk: string; sk: string }>): Promise<Array<StoredItem | null>> {
+    const t = this.table(physical);
+    return keys.map(({ pk, sk }) => {
+      const k = this.key(pk, sk);
+      const it = t.get(k);
+      if (!it) return null;
+      if (this.expired(it)) {
+        t.delete(k);
+        return null;
+      }
+      return { ...it };
+    });
+  }
+
+  async increment(physical: string, pk: string, sk: string, by: number): Promise<StoredItem> {
+    const t = this.table(physical);
+    const k = this.key(pk, sk);
+    const now = Math.floor(Date.now() / 1000);
+    const cur = t.get(k);
+    const counter = (cur?.counter ?? 0) + by;
+    const stored: StoredItem = cur
+      ? { ...cur, counter, updated: now, v: cur.v + 1 }
+      : { pk, sk, data: "{}", v: 1, created: now, updated: now, counter };
+    t.set(k, stored);
+    return { ...stored };
   }
 
   async updateItem(physical: string, pk: string, sk: string, data: string, expectedVersion?: number): Promise<StoredItem> {
@@ -187,6 +227,10 @@ export class MockStorage implements Storage {
 
   async queryItems(physical: string, pk: string, skPrefix: string | undefined, limit: number): Promise<QueryResult> {
     const t = this.table(physical);
+    const now = Math.floor(Date.now() / 1000);
+    for (const [k, it] of t) {
+      if (it.ttl !== undefined && it.ttl < now) t.delete(k); // lazy TTL purge
+    }
     const rows = [...t.values()].filter((i) => i.pk === pk && (!skPrefix || i.sk.startsWith(skPrefix)));
     rows.sort((a, b) => (a.sk < b.sk ? -1 : a.sk > b.sk ? 1 : 0));
     const page = rows.slice(0, limit);

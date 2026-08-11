@@ -313,6 +313,117 @@ describe("batch put", () => {
   });
 });
 
+
+describe("batch get", () => {
+  it("fetches multiple keys in one call; missing keys listed, not errors", async () => {
+    await post("/v1/batch/put", A, { table: "users", items: [
+      { pk: "G#1", sk: "s", data: { n: 1 } },
+      { pk: "G#2", sk: "s", data: { n: 2 } },
+      { pk: "G#3", data: { n: 3 } }, // sk defaults to ~
+    ] });
+    const res = await post("/v1/batch/get", A, { table: "users", keys: [
+      { pk: "G#1", sk: "s" }, { pk: "G#2", sk: "s" }, { pk: "G#4", sk: "s" },
+    ] });
+    expect(res.status).toBe(200);
+    expect(res.json.result.found.length).toBe(2);
+    expect(res.json.result.found[0].data).toEqual({ n: 1 });
+    expect(res.json.result.missing).toEqual([{ pk: "G#4", sk: "s" }]);
+    // sk defaults to ~ in keys too
+    const skDef = await post("/v1/batch/get", A, { table: "users", keys: [{ pk: "G#3" }] });
+    expect(skDef.json.result.found.length).toBe(1);
+  });
+
+  it("> 50 keys → 400; bad key → 400 (nothing returned)", async () => {
+    const big = Array.from({ length: 51 }, (_, i) => ({ pk: `Z#${i}` }));
+    expect((await post("/v1/batch/get", A, { table: "users", keys: big })).status).toBe(400);
+    const bad = await post("/v1/batch/get", A, { table: "users", keys: [{ pk: "G#1", sk: "s" }, { sk: "nopk" }] });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error.message).toContain("keys[1]");
+  });
+
+  it("N keys consume N reads (4×50 ok, 5th ×50 → 429)", async () => {
+    const keys50 = Array.from({ length: 50 }, (_, i) => ({ pk: `R#${i}` }));
+    for (let i = 0; i < 4; i++) {
+      expect((await post("/v1/batch/get", A, { table: "users", keys: keys50 })).status).toBe(200);
+    }
+    expect((await post("/v1/batch/get", A, { table: "users", keys: keys50 })).status).toBe(429);
+  });
+});
+
+describe("increment", () => {
+  it("creates the counter row and adds atomically", async () => {
+    const a = await post("/v1/item/increment", A, { table: "users", pk: "CNT#1", sk: "views" });
+    expect(a.status).toBe(200);
+    expect(a.json.result.counter).toBe(1);
+    expect(a.json.result.incremented_by).toBe(1);
+    expect(a.json.result.data).toEqual({});
+
+    const b = await post("/v1/item/increment", A, { table: "users", pk: "CNT#1", sk: "views", by: 5 });
+    expect(b.json.result.counter).toBe(6);
+    expect(b.json.result.version).toBe(2);
+  });
+
+  it("decrements with negative by; sk defaults to ~", async () => {
+    await post("/v1/item/increment", A, { table: "users", pk: "CNT#2", by: 10 });
+    const d = await post("/v1/item/increment", A, { table: "users", pk: "CNT#2", by: -3 });
+    expect(d.json.result.counter).toBe(7);
+    const get = await post("/v1/item/get", A, { table: "users", pk: "CNT#2", sk: "~" });
+    expect(get.json.result.counter).toBe(7);
+    expect(get.json.result.data).toEqual({});
+  });
+
+  it("validation: bad by → 400, missing table → 400", async () => {
+    expect((await post("/v1/item/increment", A, { table: "users", pk: "X", by: 1.5 })).status).toBe(400);
+    expect((await post("/v1/item/increment", A, { table: "users", pk: "X", bogus: 1 })).status).toBe(400);
+  });
+
+  it("increment counts against the write budget (1 write each)", async () => {
+    // a single increment is just one write — a 120-increment burst trips at the boundary
+    for (let i = 0; i < 120; i++) {
+      expect((await post("/v1/item/increment", A, { table: "users", pk: `W#${i}` })).status).toBe(200);
+    }
+    expect((await post("/v1/item/increment", A, { table: "users", pk: "W#120" })).status).toBe(429);
+  });
+});
+
+describe("row ttl", () => {
+  it("future ttl → row readable, ttl echoed", async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const put = await post("/v1/item/put", A, { table: "users", item: { pk: "T#1", sk: "s", data: { x: 1 }, ttl: future } });
+    expect(put.json.result.ttl).toBe(future);
+    const get = await post("/v1/item/get", A, { table: "users", pk: "T#1", sk: "s" });
+    expect(get.json.result.ttl).toBe(future);
+    expect(get.json.result.data).toEqual({ x: 1 });
+  });
+
+  it("past ttl → 404 on get, excluded from query and batch/get", async () => {
+    const past = Math.floor(Date.now() / 1000) - 10;
+    await post("/v1/item/put", A, { table: "users", item: { pk: "T#2", sk: "s", data: { x: 2 }, ttl: past } });
+    expect((await post("/v1/item/get", A, { table: "users", pk: "T#2", sk: "s" })).status).toBe(404);
+
+    await post("/v1/item/put", A, { table: "users", item: { pk: "T#3", sk: "s", data: { x: 3 }, ttl: past } });
+    const q = await post("/v1/query", A, { table: "users", pk: "T#", limit: 100 });
+    expect(q.json.result.items.length).toBe(0);
+
+    const bg = await post("/v1/batch/get", A, { table: "users", keys: [{ pk: "T#3", sk: "s" }] });
+    expect(bg.json.result.found.length).toBe(0);
+    expect(bg.json.result.missing).toEqual([{ pk: "T#3", sk: "s" }]);
+  });
+
+  it("ttl works in flat form and in batch items; invalid ttl → 400", async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const flat = await post("/v1/item/put", A, { table: "users", item: { pk: "T#4", sk: "s", ttl: future, name: "flat" } });
+    expect(flat.json.result.ttl).toBe(future);
+    expect(flat.json.result.data).toEqual({ name: "flat" });
+
+    const b = await post("/v1/batch/put", A, { table: "users", items: [{ pk: "T#5", sk: "s", data: { x: 5 }, ttl: future }] });
+    expect(b.json.result.items[0].item.ttl).toBe(future);
+
+    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "T#6", ttl: "not-a-number" } })).status).toBe(400);
+    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "T#6", ttl: -5 } })).status).toBe(400);
+  });
+});
+
 describe("table create (mandatory test #6 extension)", () => {
   it("creates with prefix, lists, and dedupes", async () => {
     const c = await post("/v1/table/create", A, { name: "sessions" });

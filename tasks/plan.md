@@ -1,65 +1,67 @@
-# Plan — Real-user review fixes (Round: correctness + batch)
+# Plan — Serverless-data trio: batch/get + increment + row TTL
 
-Source: `docs/REAL_USER_REVIEW.md` (tstbk-crawler consumer, 2026-08-12) —
-every factual claim was independently verified live by the founder's agent.
-This plan fixes the accepted items only. **No push** — commits stay local;
-deploys happen manually after verification.
+Spec (per spec-driven-development). Scope approved by the founder after deep
+research: build the standard serverless-data trio that the market leaders
+(Serverless Framework, Upstash) ship — on our zero-cost stack. **No push** —
+commits local; deploy manual; user orders push/release later.
 
-## Scope decision (approved by founder)
+## Objective
 
-| Item | Verdict |
-|---|---|
-| P0 silent empty writes (accept → 400) | ✅ FIX |
-| P0 one canonical write shape (MCP ≡ REST) | ✅ FIX (envelope-in-item unwrap; backward compatible) |
-| P0 echo documented as verification contract | ✅ FIX (docs) |
-| P1 contract test MCP ≡ REST | ✅ FIX (test) |
-| P2 `/v1/batch/put` + MCP `batch_put_item` | ✅ FIX (per-item rate weight, ≤50) |
-| P2 sharding recipe in docs | ✅ FIX (docs) |
-| P2 storage meter honest labeling | ✅ FIX (docs + dashboard copy; AWS ~6h ItemCount lag) |
-| P3 Python client snippet | ✅ FIX (docs) |
-| P2 row TTL | ❌ SKIP (low value, delayed deletes) |
-| P3 row-count endpoint | ❌ SKIP (no cheap truthful source) |
+Complete the trio next to `/v1/batch/put` so RodexDB outperforms free-tier
+alternatives without over-engineering:
+
+1. `POST /v1/batch/get` — up to 50 keys, one round-trip (the crawler's
+   "166 gets" hot path → 4 calls). N keys = N reads (weighted, reserved first).
+2. `POST /v1/item/increment` — atomic counters via DynamoDB `UpdateItem ADD`
+   (1 write, 0 reads, no races). Auto-creates the row if missing.
+3. Row TTL — optional `ttl` (unix seconds) on put/batch items; rows expire and
+   delete themselves for free. Gateway filters expired rows on read (never
+   lies); AWS deletes physically within ~48 h (documented).
+
+Deliberately NOT building (research verdict): realtime, webhooks, SQL/FTS/
+vector, transactions, schema validation, export endpoint.
 
 ## Design decisions
 
-1. **`put` dual shapes, strict everywhere** — `item: {pk, sk, ...fields}` (flat,
-   unchanged) OR `item: {pk, sk, data: {...}}` (envelope). A `data` key inside
-   `item` selects the envelope; mixing envelope + extra fields → 400. All
-   `/v1/item/*` + `/v1/query` bodies reject unknown TOP-LEVEL keys → 400 with
-   the allowed list. Never accept-and-drop again.
-2. **MCP put_item already sends `item:{pk,sk,data}`** → envelope unwrap makes
-   MCP rows flat automatically; no MCP code change needed for put_item.
-3. **Rate weights** — `gateAppRequest(env, appId, kind, weight)` and the
-   RateLimiterDO check accept `weight` (default 1, backward compatible).
-   A batch of N consumes N writes against 120/min; checked BEFORE writing.
-4. **Batch semantics** — validate ALL items first (any invalid → 400, nothing
-   written); then write sequentially, per-item result array
-   (`{pk, sk, ok, item|error}`); `request_id` idempotent for the whole batch;
-   `overwrite` applies to all items.
-5. **Meter** — API keeps `sampled_at`; docs + dashboard label item counts as
-   AWS-sampled (up to ~6h lag); request meters stay "live".
+1. **Counter storage**: a dedicated top-level numeric attribute `ctr` on the
+   physical item (atomic `ADD` needs a real numeric attribute — cannot add
+   inside the JSON `data` string). Counter rows read back as
+   `{ pk, sk, data: {}, counter, version, created, updated }`; normal rows are
+   unchanged. `by` is an integer (negative = decrement), default 1, returned
+   as the new counter value.
+2. **TTL metadata**: `ttl` is a reserved key inside `item` (like pk/sk), stored
+   as the physical `ttl` attribute; tables get DynamoDB TTL enabled on
+   `ensureTable` (idempotent). Echo includes `ttl`. Reads (get/query/batch-get)
+   filter expired rows server-side. update/delete do not manage ttl.
+3. **batch/get**: keys = `[{pk, sk?}]`, sk defaults `"~"`, `strong` optional
+   (consistent reads). All keys validated first (any bad → 400, nothing
+   returned). Response: `{requested, found: [items], missing: [{pk, sk}]}`.
+   Missing keys are NOT errors (batch semantics).
+4. **MCP**: `batch_get_item` (read, no gate) + `increment_item` (mutation,
+   confirmation-gated) — 24 tools. MCP manual updated.
+5. **Budgets**: batch/get N keys = N reads (weighted read gate); increment =
+   1 write. Both name their budget on 429 like everything else.
 
 ## Tasks
 
-- [ ] T1: rate weight support (rate.ts, rate-do.ts, localCheck) + tests
-- [ ] T2: strict body validation + envelope unwrap in items.ts + tests
-- [ ] T3: `/v1/batch/put` endpoint + tests
-- [ ] T4: MCP `batch_put_item` + contract test (MCP write ≡ REST write) + tests
-- [ ] T5: docs — api.md (dual shapes, 400 rule, echo contract, batch, sharding
-        recipe, Python link), mcp.md (batch tool), rate-limits.md (batch
-        accounting), docs/python.md (new), docs/testing.md (new tests),
-        CHANGELOG.md, README.md, REAL_USER_REVIEW.md status note
-- [ ] T6: dashboard — DocsPage put/batch/python/meter additions, UsageMeters
-        sampled-label copy
-- [ ] T7: full verification: vitest, tsc, eslint, bundle, dashboard build
-- [ ] T8: deploy gateway + dashboard, live-verify all fixes, commit locally
+- [ ] T1: storage interface + mock + AWS: `getItems`, `increment`, ttl in
+      putItem/getItem/queryItems + ttl on ensureTable (aws) — unit tests
+- [ ] T2: items.ts: `ttl` in parseItem + itemToJson, `handleBatchGet`,
+      `handleIncrement`; routes in index.ts — api tests
+- [ ] T3: mcp.ts: `batch_get_item` + `increment_item` + manual — mcp tests
+- [ ] T4: docs: api.md, mcp.md, rate-limits.md, python.md, testing.md,
+      CHANGELOG [Unreleased], README badge; dashboard DocsPage
+- [ ] T5: full verify (vitest, tsc, eslint, bundles, dashboard build)
+- [ ] T6: deploy gateway + dashboard; live-verify all three + 24 tools;
+      cleanup; local commits (NO PUSH)
 
-## Verification (acceptance)
+## Success criteria
 
-- Envelope put (`item.data`) → stored flat; echo shows flat payload
-- Top-level `data` on put → 400 with clear message (was silent 200 drop)
-- Unknown top-level key on any item endpoint → 400
-- MCP put_item row ≡ REST flat row (same stored shape)
-- batch/put: 50 ok, 51 → 400, invalid item → 400 whole batch, weights count
-- Live prod: gateway + dashboard healthy after deploy; meter label updated
-- Full test suite green; no push (commits local only)
+- batch/get: 50 ok / 51 → 400 / missing listed / weight proof (4×50 reads ok,
+  5th 50 → 429)
+- increment: creates counter, adds, decrements, echo shows counter, races
+  impossible (atomic)
+- ttl: future ttl → readable + echoed; past ttl → 404 and excluded from
+  query/batch-get; works in batch items
+- MCP: 24 tools; batch_get_item read (no gate); increment_item gated
+- 170 + new tests green; prod live-verified; no push

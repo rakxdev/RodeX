@@ -424,7 +424,15 @@ export class AwsStorage implements Storage {
     // poll up to ~20 s (max 10 extra subrequests — free-plan budget safe)
     for (let i = 0; i < 10; i++) {
       const s = await this.tableStatus(physical);
-      if (s === "ACTIVE") return;
+      if (s === "ACTIVE") {
+        // enable free auto-expiry for rows carrying a `ttl` attribute
+        // (idempotent at AWS; only newly-created tables reach this branch)
+        await this.call("UpdateTimeToLive", {
+          TableName: physical,
+          TimeToLiveSpecification: { AttributeName: "ttl", Enabled: true },
+        }).catch(() => {}); // best-effort — read-side filtering guarantees honesty anyway
+        return;
+      }
       await new Promise((r) => setTimeout(r, 2000));
     }
     throw serviceUnavailable("Table did not become ready in time");
@@ -479,26 +487,44 @@ export class AwsStorage implements Storage {
 
   private itemFromDdb(item: DdbItem): StoredItem {
     const u = unmarshal(item);
-    return {
+    const out: StoredItem = {
       pk: u.pk as string,
       sk: u.sk as string,
-      data: u.data as string,
+      data: (u.data as string) ?? "{}", // counter-only rows have no data attr
       v: u.v as number,
       created: u.created as number,
       updated: u.updated as number,
     };
+    if (typeof u.ttl === "number") out.ttl = u.ttl;
+    if (typeof u.ctr === "number") out.counter = u.ctr;
+    return out;
   }
 
-  async putItem(physical: string, item: { pk: string; sk: string; data: string }, opts: PutOptions = {}): Promise<StoredItem> {
+  /** TTL: expired rows are treated as missing server-side (never lie on reads). */
+  private expired(it: StoredItem): boolean {
+    return it.ttl !== undefined && it.ttl < Math.floor(Date.now() / 1000);
+  }
+
+  async putItem(physical: string, item: { pk: string; sk: string; data: string; ttl?: number }, opts: PutOptions = {}): Promise<StoredItem> {
     const now = Math.floor(Date.now() / 1000);
+    const stored: StoredItem = { pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now };
+    if (item.ttl !== undefined) stored.ttl = item.ttl;
     await this.call("PutItem", {
       TableName: physical,
-      Item: marshal({ pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now }),
+      Item: marshal({
+        pk: item.pk,
+        sk: item.sk,
+        data: item.data,
+        v: 1,
+        created: now,
+        updated: now,
+        ...(item.ttl !== undefined ? { ttl: item.ttl } : {}),
+      }),
       ...(opts.overwrite
         ? {}
         : { ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)" }),
     });
-    return { pk: item.pk, sk: item.sk, data: item.data, v: 1, created: now, updated: now };
+    return stored;
   }
 
   async getItem(physical: string, pk: string, sk: string, strong?: boolean): Promise<StoredItem | null> {
@@ -507,7 +533,51 @@ export class AwsStorage implements Storage {
       Key: marshal({ pk, sk }),
       ...(strong ? { ConsistentRead: true } : {}),
     });
-    return out.Item ? this.itemFromDdb(out.Item) : null;
+    if (!out.Item) return null;
+    const it = this.itemFromDdb(out.Item);
+    return this.expired(it) ? null : it;
+  }
+
+  async getItems(physical: string, keys: Array<{ pk: string; sk: string }>, strong?: boolean): Promise<Array<StoredItem | null>> {
+    if (keys.length === 0) return [];
+    const out = await this.call<{ Responses?: Record<string, DdbItem[]>; UnprocessedKeys?: Record<string, unknown> }>(
+      "BatchGetItem",
+      {
+        RequestItems: {
+          [physical]: {
+            Keys: keys.map((k) => marshal(k)),
+            ...(strong ? { ConsistentRead: true } : {}),
+          },
+        },
+      },
+    );
+    const found = new Map<string, DdbItem>();
+    for (const it of out.Responses?.[physical] ?? []) {
+      const u = unmarshal(it);
+      found.set(`${u.pk}\u0000${u.sk}`, it);
+    }
+    return keys.map((k) => {
+      const it = found.get(`${k.pk}\u0000${k.sk}`);
+      if (!it) return null;
+      const item = this.itemFromDdb(it);
+      return this.expired(item) ? null : item;
+    });
+  }
+
+  /** Atomic counter: UpdateItem ADD on the numeric `ctr` attribute — 1 write, 0 reads, race-free. */
+  async increment(physical: string, pk: string, sk: string, by: number): Promise<StoredItem> {
+    const now = Math.floor(Date.now() / 1000);
+    const out = await this.call<{ Attributes?: DdbItem }>("UpdateItem", {
+      TableName: physical,
+      Key: marshal({ pk, sk }),
+      // #c = ctr (ADD), #u = updated, #d = data, #v = version — all reserved-safe aliases
+      UpdateExpression: "SET #u = :now, #v = if_not_exists(#v, :one), #cr = if_not_exists(#cr, :now), #d = if_not_exists(#d, :empty) ADD #c :by",
+      ExpressionAttributeNames: { "#u": "updated", "#v": "v", "#cr": "created", "#d": "data", "#c": "ctr" },
+      ExpressionAttributeValues: marshal({ ":now": now, ":one": 1, ":empty": "{}", ":by": by }),
+      ReturnValues: "ALL_NEW",
+    });
+    if (!out.Attributes) throw notFound("Item not found");
+    return this.itemFromDdb(out.Attributes);
   }
 
   async updateItem(physical: string, pk: string, sk: string, data: string, expectedVersion?: number): Promise<StoredItem> {
@@ -560,8 +630,11 @@ export class AwsStorage implements Storage {
       }
     }
     const out = await this.call<{ Items?: DdbItem[]; LastEvaluatedKey?: DdbItem }>("Query", params);
+    const items = (out.Items || [])
+      .map((i) => this.itemFromDdb(i))
+      .filter((it) => !this.expired(it)); // never surface expired rows
     return {
-      items: (out.Items || []).map((i) => this.itemFromDdb(i)),
+      items,
       hasMore: Boolean(out.LastEvaluatedKey),
       startKey: out.LastEvaluatedKey ? JSON.stringify(out.LastEvaluatedKey) : undefined,
     };

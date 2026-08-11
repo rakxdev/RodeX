@@ -274,7 +274,10 @@ curl -X POST $GW/v1/table/create \\
 { "table": "users", "item": { "pk": "USER#1", "data": { "name": "rakxdev" } } }
 
 // strict: unknown top-level keys → 400 (never silently dropped)
-// the response echoes the stored row — assert result.data to verify the write`}</Code>
+// the response echoes the stored row — assert result.data to verify the write
+
+// optional ttl (unix seconds) — the row expires and deletes itself for free:
+{ "table": "users", "item": { "pk": "SES#1", "data": { "token": "..." }, "ttl": 1893456000 } }`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/batch/put</span> — up to 50 rows, one call</H>
@@ -288,6 +291,20 @@ curl -X POST $GW/v1/table/create \\
 }
 → per-item results; a batch of N consumes N of the 120 writes/min;
   one invalid item rejects the WHOLE batch (nothing written)`}</Code>
+              </div>
+              <div>
+                <H><Method verb="POST" /> <span className="text-ink">/v1/batch/get</span> — up to 50 rows, one call</H>
+                <Code>{`{
+  "table": "users",
+  "keys": [ { "pk": "USER#1", "sk": "PROFILE" }, { "pk": "USER#2" } ]
+}
+→ { "requested": 2, "found": [...], "missing": [...] }   // missing ≠ error
+// N keys = N reads from the 240/min budget`}</Code>
+              </div>
+              <div>
+                <H><Method verb="POST" /> <span className="text-ink">/v1/item/increment</span> — atomic counter</H>
+                <Code>{`{ "table": "users", "pk": "PAGE#7", "sk": "views", "by": 1 }
+→ { "counter": 42, "incremented_by": 1, ... }   // one write, zero reads, race-free`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/item/get</span> — read one row</H>
@@ -720,7 +737,7 @@ const user = await db.get("users", "u1");`}</Code>
 // or the live instance (key from the console MCP page):
 npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
             <P>
-              Same 22 tools, same confirmation gate — any local MCP client
+              Same 24 tools, same confirmation gate — any local MCP client
               (Claude Desktop, VS Code) can now drive your data. Full guide:{" "}
               <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/developers.md" target="_blank" rel="noreferrer">docs/developers.md</a>.
             </P>
