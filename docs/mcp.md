@@ -33,7 +33,7 @@ creation and deletion included. The one safety mechanism is the
 ## The confirmation gate (non-negotiable)
 
 Every mutation tool (`create_*`, `delete_*`, `put_item`, `update_item`,
-`delete_item`) requires `confirmed: true` in its arguments. Without it the
+`delete_item`, `batch_put_item`) requires `confirmed: true` in its arguments. Without it the
 server refuses with:
 
 ```json
@@ -47,7 +47,7 @@ the console manual) to: **gather everything → present the full plan → get on
 approval → execute step by step**. The server enforces the gate regardless of
 what the agent "thinks" it was told.
 
-## Tools (14)
+## Tools (22)
 
 | Tool | Kind | Confirmation | Notes |
 |---|---|---|---|
@@ -64,12 +64,20 @@ what the agent "thinks" it was told.
 | `create_table` | **mutate** | ✅ | name pattern `^[a-z0-9][a-z0-9_-]{0,41}$` |
 | `delete_table` | **mutate** | ✅ | irreversible — ALL data in the table |
 | `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 20 KB cap |
+| `batch_put_item` | **mutate** | ✅ | up to 50 items in one call; all-or-nothing validation; consumes N writes |
 | `update_item` | **mutate** | ✅ | version-guarded (`expected_version` → 409) |
 | `delete_item` | **mutate** | ✅ | exact pk/sk |
 
 All tools return structured JSON text blocks: `{"ok":true,"result":…}` or
 `{"ok":false,"code":<status>,"message":…}` — never raw crashes. Errors map to
 the REST contract codes (400/403/404/409/413/429).
+
+## One wire shape (REST = MCP)
+
+MCP items use the same envelope as REST: `{ pk, sk?, data: {…} }` and the
+payload is stored **flat** under `data` — a row written through `put_item` is
+physically identical to one written through `POST /v1/item/put`. Mixing
+interfaces is safe (locked by a contract test in the CI gate).
 
 ## Budgets
 
@@ -129,7 +137,8 @@ Never paste the key into a chat — reference `${env:RODEX_MCP_KEY}`.
   protection, spec-required); non-browser clients send no Origin and are fine.
 - **`nodejs_compat`** compatibility flag is required (the Agents SDK uses
   `node:async_hooks` internally).
-- **Testing**: 15 integration tests drive real JSON-RPC over HTTP (auth
+- **Testing**: 20+ integration tests drive real JSON-RPC over HTTP (auth
   matrix, handshake, tool discovery, gate refusals, full item lifecycle,
-  structured errors, and an end-to-end write-burst proving both budgets bite
-  exactly and name themselves).
+  structured errors, the MCP≡REST wire-shape contract test, and an
+  end-to-end write-burst proving both budgets bite exactly and name
+themselves).

@@ -4,6 +4,40 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [Unreleased] — Real-user review fixes (2026-08-12, live-verified by the tstbk-crawler)
+
+### Fixed
+- **P0 — silent empty writes are impossible now**: `put` rejects unknown
+  top-level body keys with 400 + the allowed list (a `data` envelope at the
+  top level used to be accepted with 200 and silently stored an empty row).
+  Every `/v1/item/*` and `/v1/query` body is strict — never accept-and-drop.
+- **P0 — one canonical write shape**: `item: {pk, sk, data: {...}}` (the
+  envelope) is now accepted by `put` and stored flat — identical to the flat
+  form and to what reads return. MCP `put_item` and REST now produce
+  physically identical rows (contract-tested). Envelope + flat fields mixed
+  in one item → 400.
+- **P0 — verification contract documented**: the `put`/batch responses echo
+  the stored row (`result.data`); docs now tell clients to assert it.
+
+### Added
+- **`POST /v1/batch/put`** — up to 50 items in one call: all-or-nothing
+  validation (one bad item rejects the whole batch, nothing written), a
+  batch of N consumes N writes from the 120/min budget (reserved upfront),
+  per-item `{pk, sk, ok, item|error}` results, `request_id` idempotency.
+- **MCP `batch_put_item`** — same capabilities behind the confirmation gate
+  (22 tools total now).
+- **Rate weights** — `RateLimiterDO` supports weighted checks (batch writes);
+  single unit requests are unchanged.
+- **`docs/python.md`** — zero-dependency Python client (the crawler's
+  production module) + the sharded full-table scan recipe.
+- **Docs**: sharding recipe in the API reference; strict-shape rules; meter
+  sampling truth (item counts lag up to ~6 h — AWS DescribeTable), request
+  meters stay live; batch budget accounting.
+
+### Tests
+- 157 → **170** (envelope/400/strictness matrix, batch endpoint suite, MCP
+  batch tool, MCP≡REST contract test, weighted budget proof).
+
 ## [MCP] — 2026-08-09 · The universal master-key interface (on feat/mcp, unpushed)
 
 ### Added
