@@ -18,6 +18,7 @@ import { createStorage } from "./storage";
 import {
   handleDelete,
   handleGet,
+  handleBatchPut,
   handlePut,
   handleQuery,
   handleUpdate,
@@ -121,6 +122,12 @@ app.post("/v1/item/put", async (c) => {
 app.post("/v1/item/get", async (c) => {
   const ctx = await appCtx(c);
   return c.json(await handleGet(ctx, await parseBody(c)));
+});
+
+app.post("/v1/batch/put", async (c) => {
+  const ctx = await appCtx(c);
+  const { body, replay } = await handleBatchPut(ctx, await parseBody(c));
+  return c.newResponse(body, 200, { "Content-Type": "application/json", ...(replay ? { "X-Idempotent-Replay": "true" } : {}) });
 });
 
 app.post("/v1/item/update", async (c) => {

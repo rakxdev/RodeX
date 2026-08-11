@@ -30,12 +30,45 @@ Drops the physical table and deregisters it — **all data is gone**. 403 if the
 app does not own the table (no existence leak), 400 bad name, 404 unknown app.
 
 ### `POST /v1/item/put`
+
+Two item shapes are accepted — both store the payload **flat** under `data`:
+
 ```json
 { "table": "users", "item": { "pk": "USER#1", "sk": "PROFILE", "name": "R" },
   "overwrite": false, "request_id": "req-1" }
 ```
+
+or the canonical **envelope** (identical to what reads return):
+
+```json
+{ "table": "users", "item": { "pk": "USER#1", "sk": "PROFILE", "data": { "name": "R" } },
+  "overwrite": false, "request_id": "req-1" }
+```
+
 - `pk` required (≤ 500 chars); `sk` optional (default `"~"`).
+- A `data` key inside `item` selects the envelope; mixing it with flat fields → 400.
+- **Strict bodies:** unknown TOP-LEVEL keys on any item endpoint are rejected
+  with 400 + the allowed list — never silently ignored. (The old `data`-at-top-
+  level mistake now fails loudly instead of storing an empty row.)
+- **Verification contract:** the response echoes the stored row
+  (`result.data` = what was persisted, `result.version`, timestamps). Clients
+  that care should assert `result.data` equals what they sent.
 - Without `overwrite`, existing row → 409. Payload > 20 KB → 413.
+
+### `POST /v1/batch/put`
+```json
+{ "table": "users", "items": [
+    { "pk": "USER#1", "data": { "name": "R" } },
+    { "pk": "USER#2", "sk": "PROFILE", "data": { "name": "S" } }
+  ], "overwrite": false, "request_id": "batch-1" }
+```
+- Up to **50 items** per call; each item takes the same two shapes as `put`.
+- **All-or-nothing validation:** any invalid item (missing pk, bad shape, > 20 KB)
+  rejects the WHOLE batch with 400/413 and nothing is written.
+- **Budget honesty:** a batch of N consumes **N writes** from the app's
+  120 writes/min (reserved before any write). 429 when the batch would exceed it.
+- Per-item result array: `items[]` with `{ pk, sk, ok, item }` or
+  `{ pk, sk, ok: false, error }`. `request_id` makes the whole batch idempotent.
 
 ### `POST /v1/item/get`
 ```json
@@ -63,6 +96,11 @@ consistent read (costs 2×). 404 if missing.
 Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 `has_more`, `next_start_key`.
 
+`pk` is an **exact** match — there is no scan-all operation. To enumerate a
+whole table, shard client-side: `pk = SHARD#<md5(key) % 100>`, then query
+`SHARD#0 … SHARD#99` with pagination (the recipe used by the tstbk-crawler).
+See [docs/python.md](python.md) for a working example.
+
 ## Admin endpoints (session cookie or GitHub OAuth)
 
 | Method/Path | Purpose |
@@ -77,7 +115,7 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 | `POST /v1/admin/apps` `{name, description?}` | optional app note (≤200 chars) |
 | `GET /v1/admin/apps` | list apps |
 | `GET /v1/admin/apps/:id` | app detail |
-| `GET /v1/admin/apps/:id/usage` | live meters — limiter counters (peek, no consumption) + storage size (60 s cache) |
+| `GET /v1/admin/apps/:id/usage` | live meters — limiter counters (peek, no consumption) + storage size (60 s cache; item/byte counts come from AWS DescribeTable and lag up to ~6 h)
 | `POST /v1/admin/apps/:id/rotate-key` | new key (old invalid instantly) |
 | `POST /v1/admin/apps/:id/view-key` | decrypt + show the raw key inside its 48 h recovery window |
 | `POST /v1/admin/apps/:id/suspend` / `resume` | block/unblock traffic |
@@ -104,10 +142,12 @@ Returns `items[]` (each with `data` parsed, `version`, `created`, `updated`),
 The gateway serves the Model Context Protocol at `/mcp` (Streamable HTTP,
 JSON-RPC) — see [docs/mcp.md](mcp.md). Master keys (`rok_mcp_…`, managed via
 the console MCP page and the admin endpoints above) unlock **full platform
-access**: 14 tools over every app/table/item. Every mutation requires
-`confirmed: true` (the confirmation gate); without it the server refuses with
-`confirmation_required`. MCP budgets: 600 total / 120 writes / 240 reads per
-minute, counted by the same single-point limiter.
+access**: 22 tools over every app/table/item (incl. `batch_put_item`). Every
+mutation requires `confirmed: true` (the confirmation gate); without it the
+server refuses with `confirmation_required`. MCP budgets: 600 total / 120
+writes / 240 reads per minute, counted by the same single-point limiter.
+MCP writes share ONE wire shape with REST (`{pk, sk?, data}` envelope) — rows
+written through either interface are physically identical.
 
 ## Error codes
 

@@ -80,6 +80,18 @@ The 429 names its budget (total / writes / reads / platform / admin) so a
 client always knows which ceiling it hit. A rare DO restart merely starts a
 fresh window (over-allow of at most one minute, never a lock-out).
 
+**Batch accounting:** `POST /v1/batch/put` (≤ 50 items) consumes **N write
+units** from the app's 120 writes/min — the whole batch is checked against the
+budget BEFORE anything is written, so a batch that would blow the budget
+answers 429 with nothing stored. One HTTP round-trip, same budget math as N
+single puts.
+
+**Meter honesty:** the usage meters distinguish two sources — request counters
+(used/limit/remaining) are LIVE (peeked from the limiter DO, zero
+consumption); storage bytes/items come from DynamoDB `DescribeTable`, which
+AWS samples **roughly every 6 hours**, so a fresh table can report 0 items for
+a while even though rows are readable. `sampled_at` marks the snapshot time.
+
 ## 5. Per-table provisioned capacity (the second ceiling)
 
 Every app data table provisions **5 WCU + 5 RCU** (free pool is 25+25

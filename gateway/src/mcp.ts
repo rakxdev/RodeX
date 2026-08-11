@@ -23,7 +23,7 @@ import { decryptKey, hashKey } from "./auth";
 import { createStorage } from "./storage";
 import { usageSnapshot } from "./usage";
 import type { AppContext } from "./items";
-import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate } from "./items";
+import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate, handleBatchPut, BATCH_MAX_ITEMS } from "./items";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
 import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
@@ -125,6 +125,7 @@ EVERY app, table, and item on the platform.
 - force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
 - create_table / delete_table — table lifecycle (MUTATION — confirm)
 - put_item / update_item / delete_item — item lifecycle (MUTATION — confirm)
+- batch_put_item — up to 50 items in ONE call (MUTATION — confirm; consumes N writes)
 
 ## Budgets
 
@@ -137,7 +138,9 @@ apply too (per-app 600 total / 120 writes / 240 reads per minute).
 - Items are { pk, sk?, data: {...} } — sk defaults to "~" on put/get.
 - Writes are idempotent: pass request_id to retry safely; updates are
   version-guarded (expected_version → 409 on conflict).
-- Items cap at 20 KB; query limit max 100.
+- batch_put_item writes items with the SAME wire shape as put_item — REST
+  and MCP rows are physically identical (flat data).
+- Items cap at 20 KB; query limit max 100; batch max 50 items.
 - Returned results are JSON text blocks — read them carefully before
   proposing the next step.`;
 
@@ -487,6 +490,36 @@ function buildMcpServer(env: Env): McpServer {
         if (request_id !== undefined) body["request_id"] = request_id;
         if (overwrite) body["overwrite"] = true;
         return unwrap(await handlePut(ctx, body));
+      });
+    },
+  );
+
+  server.registerTool(
+    "batch_put_item",
+    {
+      description:
+        `Write up to ${BATCH_MAX_ITEMS} items in ONE call — same wire shape as put_item ({pk, sk?, data}), each item stored flat. Consumes N writes from the 120/min budget. Pass request_id to make the whole batch idempotent; overwrite: true force-replaces (resets versions). Validation is all-or-nothing: any invalid item rejects the whole batch. MUTATION: show the user the item count and table, get approval, then confirmed: true.`,
+      inputSchema: {
+        app_id: z.string().min(1),
+        table: z.string().min(1).max(42),
+        items: z
+          .array(z.object({ pk: pkSchema, sk: skSchema.optional(), data: dataSchema }))
+          .min(1)
+          .max(BATCH_MAX_ITEMS),
+        overwrite: z.boolean().optional(),
+        request_id: z.string().min(8).max(64).optional(),
+        confirmed: confirmedSchema,
+      },
+    },
+    async ({ app_id, table, items, overwrite, request_id, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "batch_put_item", app_id, table, count: items.length });
+      return safe(async () => {
+        const ctx = await ctxFor(env, app_id);
+        await gateMCPRequest(env, "write", items.length);
+        const body: Record<string, unknown> = { table, items };
+        if (overwrite) body["overwrite"] = true;
+        if (request_id !== undefined) body["request_id"] = request_id;
+        return unwrap(await handleBatchPut(ctx, body));
       });
     },
   );

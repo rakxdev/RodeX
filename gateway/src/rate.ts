@@ -31,17 +31,17 @@ export function resetRateCounters(): void {
 }
 
 /** Strict fixed-window counter. Returns retry_after seconds when over. */
-function checkWindow(counters: Map<string, { start: number; count: number }>, key: string, limit: number, now: number): number | null {
+function checkWindow(counters: Map<string, { start: number; count: number }>, key: string, limit: number, now: number, weight = 1): number | null {
   if (limit <= 0) return null;
   let c = counters.get(key);
   if (!c || c.start + RATE_WINDOW_SECONDS <= now) {
     c = { start: now, count: 0 };
     counters.set(key, c);
   }
-  if (c.count >= limit) {
+  if (c.count + weight > limit) {
     return Math.max(1, c.start + RATE_WINDOW_SECONDS - now);
   }
-  c.count += 1;
+  c.count += weight;
   return null;
 }
 
@@ -49,13 +49,15 @@ interface RateCheck {
   key: string;
   limit: number;
   budget?: string;
+  /** Units consumed by this check (batch writes) — default 1. */
+  weight?: number;
 }
 
 /** Local fixed-window check; returns {retry,budget} when over. */
-function localCheck(checks: Array<{ key: string; limit: number; budget?: string }>): { retry: number; budget: string } | null {
+function localCheck(checks: Array<{ key: string; limit: number; budget?: string; weight?: number }>): { retry: number; budget: string } | null {
   const now = Math.floor(Date.now() / 1000);
-  for (const { key, limit, budget } of checks) {
-    const retry = checkWindow(localCounters, key, limit, now);
+  for (const { key, limit, budget, weight } of checks) {
+    const retry = checkWindow(localCounters, key, limit, now, weight);
     if (retry !== null) return { retry, budget: budget ?? "rate" };
   }
   return null;
@@ -82,12 +84,13 @@ function fail(result: { retry: number; budget: string }): never {
   throw tooManyRequests(result.retry, `Rate limit exceeded — ${result.budget} budget, retry in ${result.retry}s`);
 }
 
-/** Per-app gate: total + write/read budget + platform pool — all strict. */
-export async function gateAppRequest(env: Env, appId: string, kind: "write" | "read"): Promise<void> {
+/** Per-app gate: total + write/read budget + platform pool — all strict.
+ * `weight` lets one HTTP request consume N units (batch writes). */
+export async function gateAppRequest(env: Env, appId: string, kind: "write" | "read", weight = 1): Promise<void> {
   const checks: RateCheck[] = [
-    { key: appId, limit: RATE_TOTAL_PER_APP, budget: "total" },
-    { key: `${appId}:${kind}`, limit: kind === "write" ? RATE_WRITES_PER_APP : RATE_READS_PER_APP, budget: kind === "write" ? "writes" : "reads" },
-    { key: "platform:all", limit: RATE_PLATFORM, budget: "platform" },
+    { key: appId, limit: RATE_TOTAL_PER_APP, budget: "total", weight },
+    { key: `${appId}:${kind}`, limit: kind === "write" ? RATE_WRITES_PER_APP : RATE_READS_PER_APP, budget: kind === "write" ? "writes" : "reads", weight },
+    { key: "platform:all", limit: RATE_PLATFORM, budget: "platform", weight },
   ];
   const result = await doCheck(env, checks);
   if (result) fail(result);
@@ -105,11 +108,11 @@ export async function gateMCPTotal(env: Env): Promise<void> {
   if (result) fail(result);
 }
 
-/** MCP tool gate: total + kind budget (writes/reads). */
-export async function gateMCPRequest(env: Env, kind: "write" | "read"): Promise<void> {
+/** MCP tool gate: total + kind budget (writes/reads). Weight = items in a batch. */
+export async function gateMCPRequest(env: Env, kind: "write" | "read", weight = 1): Promise<void> {
   const result = await doCheck(env, [
-    { key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total" },
-    { key: `mcp:${kind}`, limit: kind === "write" ? MCP_RATE_WRITES : MCP_RATE_READS, budget: kind === "write" ? "mcp-writes" : "mcp-reads" },
+    { key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total", weight },
+    { key: `mcp:${kind}`, limit: kind === "write" ? MCP_RATE_WRITES : MCP_RATE_READS, budget: kind === "write" ? "mcp-writes" : "mcp-reads", weight },
   ]);
   if (result) fail(result);
 }

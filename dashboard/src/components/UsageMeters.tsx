@@ -100,13 +100,13 @@ export default function UsageMeters({ appId }: { appId: string }) {
         <span className="text-ink">{usage ? `${fmtBytes(usage.storage.bytes)} used · ${usage.storage.items.toLocaleString("en-IN")} items` : "—"}</span>
       </div>
       <div className="font-mono text-[9.5px] tracking-[0.12em] text-inkdim">
-        {usage ? `${usage.storage.tables} table(s) · 25 GB account-wide · sampled every 60 s` : "—"}
+        {usage ? `${usage.storage.tables} table(s) · 25 GB account-wide · item/byte counts lag ~6 h (AWS DescribeTable sampling)` : "—"}
       </div>
 
       {/* footer */}
       <div className="flex items-center gap-2 mt-4 font-mono text-[9px] tracking-[0.16em] text-inkdim">
         <span className={`w-1.5 h-1.5 rounded-full ${error ? "bg-redx" : busy ? "bg-amberx animate-pulse" : "bg-ok"}`} aria-hidden="true" />
-        {error ? "METER OFFLINE — RETRYING" : lastAt ? `LIVE · SAMPLED ${istDate(lastAt / 1000)} IST` : "CONNECTING…"}
+        {error ? "METER OFFLINE — RETRYING" : lastAt ? `REQUESTS LIVE · STORAGE AWS-SAMPLED ${istDate(lastAt / 1000)} IST` : "CONNECTING…"}
         <button
           type="button"
           onClick={load}

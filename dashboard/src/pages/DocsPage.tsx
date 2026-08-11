@@ -268,7 +268,26 @@ curl -X POST $GW/v1/table/create \\
   "overwrite": false,
   "request_id": "req-1"
 }
-→ 200 version 1 · duplicate without overwrite → 409`}</Code>
+→ 200 version 1 · duplicate without overwrite → 409
+
+// envelope form (canonical — same as what reads return):
+{ "table": "users", "item": { "pk": "USER#1", "data": { "name": "rakxdev" } } }
+
+// strict: unknown top-level keys → 400 (never silently dropped)
+// the response echoes the stored row — assert result.data to verify the write`}</Code>
+              </div>
+              <div>
+                <H><Method verb="POST" /> <span className="text-ink">/v1/batch/put</span> — up to 50 rows, one call</H>
+                <Code>{`{
+  "table": "users",
+  "items": [
+    { "pk": "USER#1", "data": { "name": "a" } },
+    { "pk": "USER#2", "sk": "PROFILE", "data": { "name": "b" } }
+  ],
+  "request_id": "batch-1"
+}
+→ per-item results; a batch of N consumes N of the 120 writes/min;
+  one invalid item rejects the WHOLE batch (nothing written)`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/item/get</span> — read one row</H>
@@ -312,7 +331,11 @@ curl -X POST $GW/v1/table/create \\
               <P className="mt-3">
                 <code className="text-ink">limit</code> max 100. When <code className="text-ink">has_more</code> is
                 true, pass <code className="text-ink">next_start_key</code> back as{" "}
-                <code className="text-ink">start_key</code> for the next page.
+                <code className="text-ink">start_key</code> for the next page.{" "}
+                <code className="text-ink">pk</code> is exact — no scan-all; to enumerate a whole table, shard:
+                <code className="text-ink">pk = SHARD#&lt;md5(key) % 100&gt;</code> and query every shard
+                (recipe + code in{" "}
+                <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/python.md" target="_blank" rel="noreferrer">docs/python.md</a>).
               </P>
             </div>
           </Section>
@@ -685,13 +708,19 @@ const user = await db.get("users", "u1");`}</Code>
               <code className="text-ink">RodexError</code> with status + code. Runnable example:{" "}
               <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/examples/sdk-bot.mjs" target="_blank" rel="noreferrer">sdk-bot.mjs</a>.
             </P>
+            <H>PYTHON — ZERO-DEPENDENCY CLIENT</H>
+            <P>
+              <code className="text-ink">docs/python.md</code> ships a copy-paste stdlib client (put / batch / get /
+              query / delete + the sharded scan recipe) — the module the tstbk-crawler runs in production:{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/python.md" target="_blank" rel="noreferrer">docs/python.md</a>.
+            </P>
             <H>LOCAL AGENTS — THE MCP BRIDGE</H>
             <Code>{`npx -y rodex-mcp --url https://your-name.workers.dev/mcp --key $RODEX_MCP_KEY
 
 // or the live instance (key from the console MCP page):
 npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
             <P>
-              Same 21 tools, same confirmation gate — any local MCP client
+              Same 22 tools, same confirmation gate — any local MCP client
               (Claude Desktop, VS Code) can now drive your data. Full guide:{" "}
               <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/developers.md" target="_blank" rel="noreferrer">docs/developers.md</a>.
             </P>
