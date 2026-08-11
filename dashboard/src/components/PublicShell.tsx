@@ -26,7 +26,7 @@ export function PublicHeader({ tag }: { tag: string }) {
         <Link
           to="/usage"
           aria-current={tag === "USAGE" ? "true" : undefined}
-          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+          className={`hidden sm:inline-flex font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
             tag === "USAGE" ? "text-gold bg-panel2" : "text-inkdim hover:text-ink"
           }`}
         >
@@ -35,7 +35,7 @@ export function PublicHeader({ tag }: { tag: string }) {
         <Link
           to="/credits"
           aria-current={tag === "CREDITS" ? "true" : undefined}
-          className={`font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
+          className={`hidden sm:inline-flex font-mono text-[10px] sm:text-[10.5px] tracking-[0.16em] px-2.5 py-1.5 rounded-md transition-colors ${
             tag === "CREDITS" ? "text-gold bg-panel2" : "text-inkdim hover:text-gold"
           }`}
         >

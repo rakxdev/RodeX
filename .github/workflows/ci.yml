@@ -32,6 +32,12 @@ jobs:
 
       - name: Unit tests
         run: npm test
+      - name: Dashboard typecheck
+        run: cd dashboard && npx tsc --noEmit
+      - name: Dashboard build
+        run: cd dashboard && npm run build
+      - name: Packages build + tests (SDK + MCP wrapper)
+        run: npm run build:packages && npm run test:packages
 
       - name: Build gate (worker bundles)
         run: cd gateway && npx wrangler deploy --dry-run | grep -q "Total Upload"

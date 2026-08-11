@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, Github, Layers, Server, Wrench } from "lucide-react";
+import { ArrowUpRight, ExternalLink, Layers, Server, Wrench } from "lucide-react";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
 import SplitFlap from "@/components/SplitFlap";
@@ -130,7 +130,7 @@ export default function CreditsPage() {
           </div>
           <div className="ml-auto flex flex-wrap justify-center gap-2 shrink-0">
             <FoldButton size="sm" onClick={() => window.open(PROFILE, "_blank")}>
-              PROFILE <Github className="w-3.5 h-3.5" />
+              PROFILE <ExternalLink className="w-3.5 h-3.5" />
             </FoldButton>
             <FoldButton variant="ghost" size="sm" onClick={() => window.open(REPO, "_blank")}>
               SOURCE CODE <ArrowUpRight className="w-3.5 h-3.5" />

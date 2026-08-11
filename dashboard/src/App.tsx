@@ -49,7 +49,7 @@ export default function AppShell() {
     }`;
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion="never">
       <div className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-40 flex items-center gap-3 px-4 sm:px-5 py-3 border-b border-line bg-bg/85 backdrop-blur">
           <Link to="/apps" className="flex items-center gap-3">

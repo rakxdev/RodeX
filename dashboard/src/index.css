@@ -59,15 +59,9 @@ body {
   background: rgba(217, 182, 74, 0.35);
 }
 
-/* OS-level reduced motion fallback (belt to MotionConfig's suspenders) */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+/* NOTE: no OS-level reduced-motion kill-all here — the 0.01ms override made
+   infinite animations (marquee) flicker at turbo speed on desktops with the
+   OS setting on. All animations run at their designed speeds everywhere. */
 
 /* safe areas for notched phones */
 @supports (padding: env(safe-area-inset-bottom)) {

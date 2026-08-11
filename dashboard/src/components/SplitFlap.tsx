@@ -148,8 +148,10 @@ export default function SplitFlap({
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) setAnimate(false);
+    // flips ALWAYS animate — the OS "reduce motion" setting is intentionally
+    // ignored (founder call): desktop was rendered static while mobile was
+    // clean. The `armed` delay still prevents an initial half-flash.
+    setAnimate(true);
     const t = window.setTimeout(() => setArmed(true), delay);
     return () => clearTimeout(t);
   }, [delay]);
