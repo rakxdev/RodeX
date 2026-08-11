@@ -19,6 +19,8 @@ import {
   handleDelete,
   handleGet,
   handleBatchPut,
+  handleBatchGet,
+  handleIncrement,
   handlePut,
   handleQuery,
   handleUpdate,
@@ -128,6 +130,16 @@ app.post("/v1/batch/put", async (c) => {
   const ctx = await appCtx(c);
   const { body, replay } = await handleBatchPut(ctx, await parseBody(c));
   return c.newResponse(body, 200, { "Content-Type": "application/json", ...(replay ? { "X-Idempotent-Replay": "true" } : {}) });
+});
+
+app.post("/v1/batch/get", async (c) => {
+  const ctx = await appCtx(c);
+  return c.json(await handleBatchGet(ctx, await parseBody(c)));
+});
+
+app.post("/v1/item/increment", async (c) => {
+  const ctx = await appCtx(c);
+  return c.json(await handleIncrement(ctx, await parseBody(c)));
 });
 
 app.post("/v1/item/update", async (c) => {
