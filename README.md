@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/rakxdev/RodeX/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rakxdev/RodeX/ci.yml?style=flat-square&label=quality%20gate&logo=github" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/tests-143%20passing-6a7c5c?style=flat-square&logo=vitest" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-157%20passing-6a7c5c?style=flat-square&logo=vitest" alt="tests" />
   <img src="https://img.shields.io/badge/cost-%240%20forever-d9b64a?style=flat-square" alt="cost" />
   <img src="https://img.shields.io/badge/stack-DynamoDB%20·%20Workers%20·%20Pages-2a2c28?style=flat-square" alt="stack" />
   <img src="https://img.shields.io/badge/license-personal%20use-6a7c5c?style=flat-square" alt="license" />
