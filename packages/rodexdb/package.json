@@ -1,6 +1,6 @@
 {
   "name": "rodexdb",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Official TypeScript client for RodexDB \u2014 per-app keys & tables on DynamoDB, one clean API. Point it at any RodexDB gateway (your own deploy or the live instance).",
   "keywords": [
     "rodexdb",

@@ -4,7 +4,7 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
-## [Unreleased] — Real-user review fixes (2026-08-12, live-verified by the tstbk-crawler)
+## [0.2.2] — 2026-08-12 · Real-user review fixes (live-verified by the tstbk-crawler)
 
 ### Fixed
 - **P0 — silent empty writes are impossible now**: `put` rejects unknown
