@@ -100,7 +100,7 @@ or the canonical **envelope** (identical to what reads return):
   `put`. All keys validated first — any bad key → 400, nothing returned.
 - **Missing keys are NOT errors**: response is
   `{ requested, found: [items…], missing: [{pk, sk}…] }`.
-- **Budget honesty:** N keys consume **N reads** from the 240 reads/min
+- **Budget honesty:** N keys consume **N reads** from the active mode budget (800/min NORMAL; guardrails in PERFORMANCE)
   (reserved before the call). `strong: true` = consistent reads (2× cost).
 - TTL-expired rows are reported as missing.
 

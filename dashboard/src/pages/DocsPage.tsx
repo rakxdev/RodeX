@@ -524,42 +524,50 @@ curl -X POST $GW/v1/table/create \\
           </Section>
 
           <Section cell="09" title="LIMITS" anchor="limits">
-            <P>Engineered so the always-free DynamoDB budget is never hit — these are the contract.</P>
+            <P>
+              Capacity-mode aware: <span className="text-ink">NORMAL</span> keeps the provisioned DynamoDB free tier honest;
+              <span className="text-ink"> PERFORMANCE</span> uses on-demand billing with guardrails only. Data rules are identical in both modes.
+            </P>
             <table className="doc-table">
               <thead>
                 <tr>
                   <th>Bound</th>
-                  <th>Limit</th>
+                  <th>NORMAL · provisioned · $0</th>
+                  <th>PERFORMANCE · on-demand</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Item size</td>
-                  <td>≤ 20 KB per row (413 above)</td>
+                  <td>Item size · both modes</td>
+                  <td colSpan={2}>≤ 400 KB per row (413 above) · reads return the full row in one call</td>
                 </tr>
                 <tr>
                   <td>Per app · total</td>
-                  <td>600 req/min (429 with retry_after)</td>
+                  <td>2 000 req/min</td>
+                  <td>500 000 req/min guardrail</td>
                 </tr>
                 <tr>
                   <td>Per app · writes</td>
-                  <td>120 / min</td>
+                  <td>800 write-units/min (1 unit per KB)</td>
+                  <td>100 000 write-units/min guardrail</td>
                 </tr>
                 <tr>
                   <td>Per app · reads</td>
-                  <td>240 / min</td>
+                  <td>800 reads/min</td>
+                  <td>400 000 reads/min guardrail</td>
                 </tr>
                 <tr>
                   <td>Platform pool</td>
-                  <td>1 000 req/min across apps</td>
+                  <td>2 400 units/min across apps</td>
+                  <td>2 000 000 units/min guardrail</td>
                 </tr>
                 <tr>
                   <td>Admin surface</td>
-                  <td>60 req/min</td>
+                  <td colSpan={2}>60 req/min</td>
                 </tr>
                 <tr>
                   <td>Storage</td>
-                  <td>25 GB DynamoDB free tier · ap-southeast-1</td>
+                  <td colSpan={2}>25 GB DynamoDB free tier · ap-southeast-1</td>
                 </tr>
               </tbody>
             </table>
