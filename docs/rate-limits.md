@@ -73,14 +73,25 @@ Worst-case math with our caps:
   Ten apps = 40/s × 2.5 RCU = 25 RCU/s ✔ (pool 25, exactly).
 - Meta/idempotency writes (≈1–2 per request) reserve the remaining 5 WCU.
 
-| Limit | Value | Why |
-|---|---|---|
-| Per app, total | 2 000 / min NORMAL | generous, physics-honest |
-| Per app, writes | 800 write-units / min NORMAL | half the 25 WCU/s pool with margin |
-| Per app, reads | 800 / min NORMAL | half the 25 RCU/s pool with margin |
-| Platform (all apps) | 2 400 / min NORMAL | shared free-tier safety net |
-| Admin endpoints | 60 / min | human-only |
-| Cron purge | 1 / min | free plan allows 5 cron triggers |
+<!-- BEGIN GENERATED: rate-limits -->
+### Common caps (both modes)
+| Cap | Value |
+|---|---|
+| Item size (hard) | ≤ 400 KB (413 above) |
+| Recommended row | ≤ 20 KB (1 unit per KB — cost-friendly) |
+| Batch put | ≤ 50 items · ≤ 400 KB total |
+| Query limit | ≤ 100 rows |
+| Admin surface | 60 req/min |
+| Storage | 25 GB free (ap-southeast-1) |
+
+### Per-app budgets (per 60 s window)
+| Budget | NORMAL | PERFORMANCE |
+|---|---:|---:|
+| Total req/min | 2 000 | 500 000 guardrail |
+| Write units/min | 800 | 100 000 guardrail |
+| Reads/min | 800 | 400 000 guardrail |
+| Platform pool/min | 2 400 | 2 000 000 guardrail |
+<!-- END GENERATED: rate-limits -->
 
 Workers free = 100k requests/day for ALL our endpoints combined. Even if every
 limit above were hit constantly, that's ~1.4M/day theoretical — so the **daily

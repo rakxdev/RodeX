@@ -1,24 +1,11 @@
 import { motion } from "framer-motion";
 import { pageTransition, fadeUp, stagger, foldIn } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
+import { STATS } from "@/generated/contract";
 
-const writes = [
-  { k: "writes / min · NORMAL", v: "800", note: "write-units per app — put / update / delete (1 unit per KB)" },
-  { k: "reads / min · NORMAL", v: "800", note: "per app — get / query (strong reads cost 2×)" },
-];
-
-const reads = [
-  { k: "total / min · NORMAL", v: "2 000", note: "per app — writes + reads combined" },
-  { k: "platform pool · NORMAL", v: "2 400", note: "shared by all your apps" },
-  { k: "PERFORMANCE mode", v: "guardrails", note: "on-demand billing — 500 000 total / 100 000 writes / 400 000 reads · switch from console or MCP" },
-  { k: "admin surface", v: "60", note: "dashboard + API management" },
-];
-
-const storage = [
-  { k: "item size · BOTH MODES", v: "≤ 400 KB", note: "413 above the cap · reads return the full row in one call (20 KB recommended for cheap writes)" },
-  { k: "storage", v: "25 GB", note: "DynamoDB always-free tier · ap-southeast-1" },
-  { k: "daily workers", v: "100 000", note: "requests/day, shared by gateway + dashboard" },
-];
+const writes = STATS.writeBudget;
+const reads = STATS.readPlatform;
+const storage = STATS.storageCaps;
 
 const groups = [
   { title: "WRITE BUDGET", rows: writes },

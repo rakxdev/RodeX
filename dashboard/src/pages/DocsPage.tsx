@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
 import type { ReactNode } from "react";
+import { CELL09, CONTRACT_STRINGS } from "@/generated/contract";
 
 const GW = "https://rodex-gateway.rakxdev.workers.dev";
 
@@ -537,38 +538,19 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Item size · both modes</td>
-                  <td colSpan={2}>≤ 400 KB per row (413 above) · reads return the full row in one call</td>
-                </tr>
-                <tr>
-                  <td>Per app · total</td>
-                  <td>2 000 req/min</td>
-                  <td>500 000 req/min guardrail</td>
-                </tr>
-                <tr>
-                  <td>Per app · writes</td>
-                  <td>800 write-units/min (1 unit per KB)</td>
-                  <td>100 000 write-units/min guardrail</td>
-                </tr>
-                <tr>
-                  <td>Per app · reads</td>
-                  <td>800 reads/min</td>
-                  <td>400 000 reads/min guardrail</td>
-                </tr>
-                <tr>
-                  <td>Platform pool</td>
-                  <td>2 400 units/min across apps</td>
-                  <td>2 000 000 units/min guardrail</td>
-                </tr>
-                <tr>
-                  <td>Admin surface</td>
-                  <td colSpan={2}>60 req/min</td>
-                </tr>
-                <tr>
-                  <td>Storage</td>
-                  <td colSpan={2}>25 GB DynamoDB free tier · ap-southeast-1</td>
-                </tr>
+                {Object.values(CELL09).map((row) => (
+                  <tr key={row.bound}>
+                    <td>{row.bound}</td>
+                    {row.normal === row.performance ? (
+                      <td colSpan={2}>{row.normal}</td>
+                    ) : (
+                      <>
+                        <td>{row.normal}</td>
+                        <td>{row.performance}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </Section>
@@ -600,7 +582,7 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
                 <tr>
                   <td><code>429</code> on everything</td>
-                  <td>&gt; 2 000 total req/min (NORMAL)</td>
+                  <td>&gt; {CONTRACT_STRINGS.NORMAL_TOTAL_V} total req/min (NORMAL)</td>
                   <td>back off, cache responses, gossip between instances</td>
                 </tr>
                 <tr>
@@ -615,7 +597,7 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
                 <tr>
                   <td><code>413</code> instead of 429</td>
-                  <td>payload over 400 KB — different ceiling</td>
+                  <td>payload over {CONTRACT_STRINGS.ITEM_SIZE.replace("≤ ", "")} — different ceiling</td>
                   <td>shrink the row; store blobs elsewhere</td>
                 </tr>
               </tbody>
@@ -702,7 +684,7 @@ claude mcp add --transport http rodexdb ${GW}/mcp \\
 
             <H>BUDGETS</H>
             <P>
-              MCP traffic: <span className="text-ink">2 000 total / 800 write-units / 800 reads per minute</span>{" "}(NORMAL — guardrails only in PERFORMANCE)
+              MCP traffic: <span className="text-ink">{CONTRACT_STRINGS.MCP_SURFACE_LINE} per minute</span>{" "}(NORMAL — guardrails only in PERFORMANCE)
               (platform-wide), counted by the same single-point limiter as app traffic. App budgets also apply
               — an agent's writes show up in the app's LIVE METERS. 429s name the budget and carry retry seconds.
             </P>
@@ -774,7 +756,7 @@ npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
                 <tr><td><code>403</code></td><td>not your table · app suspended / deleting</td></tr>
                 <tr><td><code>404</code></td><td>row or app not found</td></tr>
                 <tr><td><code>409</code></td><td>conflict — duplicate row, version mismatch</td></tr>
-                <tr><td><code>413</code></td><td>payload over 400 KB</td></tr>
+                <tr><td><code>413</code></td><td>payload over {CONTRACT_STRINGS.ITEM_SIZE.replace("≤ ", "")}</td></tr>
                 <tr><td><code>415</code></td><td>POST without Content-Type: application/json</td></tr>
                 <tr><td><code>429</code></td><td>rate limit — retry after <code>retry_after</code> seconds</td></tr>
                 <tr><td><code>502 / 503</code></td><td>infrastructure — safe to retry</td></tr>

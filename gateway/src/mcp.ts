@@ -29,6 +29,7 @@ import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables
 import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
 import { APP_NAME_PATTERN, KEY_RECOVERY_WINDOW_SECONDS, TABLE_NAME_PATTERN } from "./limits";
+import { LIMITS, CONTRACT_STRINGS } from "./generated/contract";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -118,8 +119,8 @@ EVERY app, table, and item on the platform.
 - get_app_usage — live request budgets (total/writes/reads used this minute) + storage size (read)
 - get_platform_capacity — NORMAL/PERFORMANCE mode + every table's billing mode (read)
 - get_item — one item (pk required; sk defaults to "~") (read)
-- batch_get_item — up to 50 keys in ONE call; missing keys reported, not errors (read)
-- query — pk + optional sk_prefix, limit <= 100, pagination (read)
+- batch_get_item — up to ${LIMITS.maxBatchItems} keys in ONE call; missing keys reported, not errors (read)
+- query — pk + optional sk_prefix, limit <= ${LIMITS.maxQueryLimit}, pagination (read)
 - create_app / delete_app — app lifecycle (MUTATION — confirm)
 - rotate_app_key — new app key, old one dies instantly; new key returned once (MUTATION — confirm)
 - view_app_key — re-view an app's raw key inside its 48 h recovery window (SECRET — confirm)
@@ -131,18 +132,18 @@ EVERY app, table, and item on the platform.
   PERFORMANCE (on-demand, pay-per-request) — platform-wide (MUTATION — confirm)
 - put_item / update_item / delete_item — item lifecycle (MUTATION — confirm)
 - increment_item — atomic counter (MUTATION — confirm; 1 write, race-free)
-- batch_put_item — up to 50 items in ONE call (MUTATION — confirm; consumes N writes)
+- batch_put_item — up to ${LIMITS.maxBatchItems} items in ONE call (MUTATION — confirm; consumes N writes)
 
 ## Budgets
 
-NORMAL mode (provisioned, $0): MCP 2 000 total / 800 write-units / 800 reads
-per minute platform-wide; app budgets 2 000 total / 800 write-units / 800
+NORMAL mode (provisioned, $0): MCP ${CONTRACT_STRINGS.NORMAL_TOTAL_V} total / ${CONTRACT_STRINGS.NORMAL_WRITES_V} write-units / ${CONTRACT_STRINGS.NORMAL_READS_V} reads
+per minute platform-wide; app budgets ${CONTRACT_STRINGS.NORMAL_TOTAL_V} total / ${CONTRACT_STRINGS.NORMAL_WRITES_V} write-units / ${CONTRACT_STRINGS.NORMAL_READS_V}
 reads per minute (the free tier's 25 WCU+25 RCU/s pool, honest).
-PERFORMANCE mode (on-demand billing): guardrails only — MCP 500 000 total /
-100 000 write-units / 400 000 reads; app budgets 500 000 / 100 000 / 400 000.
+PERFORMANCE mode (on-demand billing): guardrails only — MCP ${CONTRACT_STRINGS.PERF_TOTAL_V} total /
+${CONTRACT_STRINGS.PERF_WRITES_V} write-units / ${CONTRACT_STRINGS.PERF_READS_V} reads; app budgets ${CONTRACT_STRINGS.PERF_TOTAL_V} / ${CONTRACT_STRINGS.PERF_WRITES_V} / ${CONTRACT_STRINGS.PERF_READS_V}.
 App budgets apply to MCP traffic too.
 429 responses name the budget and carry retry_after seconds. App budgets
-apply too (per-app 2 000 total / 800 write-units / 800 reads per minute in NORMAL).
+apply too (per-app ${CONTRACT_STRINGS.NORMAL_TOTAL_V} total / ${CONTRACT_STRINGS.NORMAL_WRITES_V} write-units / ${CONTRACT_STRINGS.NORMAL_READS_V} reads per minute in NORMAL).
 
 ## Conventions
 
@@ -152,7 +153,7 @@ apply too (per-app 2 000 total / 800 write-units / 800 reads per minute in NORMA
 - batch_put_item writes items with the SAME wire shape as put_item — REST
   and MCP rows are physically identical (flat data).
 - batch_get_item / increment_item match their REST twins exactly.
-- Items cap at 20 KB; query limit max 100; batch max 50 items/keys.
+- Items cap at ${CONTRACT_STRINGS.ITEM_SIZE}; query limit max ${LIMITS.maxQueryLimit}; batch max ${LIMITS.maxBatchItems} items/keys.
 - Returned results are JSON text blocks — read them carefully before
   proposing the next step.`;
 
@@ -290,13 +291,13 @@ function buildMcpServer(env: Env): McpServer {
   server.registerTool(
     "query",
     {
-      description: "Query items by pk, optionally filtered by sk_prefix. limit ≤ 100; paginate with next_start_key until has_more is false.",
+      description: `Query items by pk, optionally filtered by sk_prefix. limit ≤ ${LIMITS.maxQueryLimit}; paginate with next_start_key until has_more is false.`,
       inputSchema: {
         app_id: z.string().min(1),
         table: z.string().min(1).max(42),
         pk: pkSchema,
         sk_prefix: z.string().max(500).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
+        limit: z.number().int().min(1).max(LIMITS.maxQueryLimit).optional(),
         start_key: z.string().optional(),
       },
     },

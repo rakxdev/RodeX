@@ -85,11 +85,12 @@ interfaces is safe (locked by a contract test in the CI gate).
 
 ## Budgets
 
-| Surface | Per minute | Key |
-|---|---|---|
-| MCP total (platform-wide) | 2 000 (guardrail 500 000 in PERFORMANCE) | `mcp:total` |
-| MCP writes | 800 units (guardrail 100 000) | `mcp:write` |
-| MCP reads | 800 (guardrail 400 000) | `mcp:read` |
+<!-- BEGIN GENERATED: mcp-capacity -->
+| Mode | MCP total/min | MCP write-units/min | MCP reads/min |
+|---|---:|---:|---:|
+| NORMAL (provisioned) | 2 000 | 800 | 800 |
+| PERFORMANCE (on-demand) | 500 000 | 100 000 | 400 000 (guardrail) |
+<!-- END GENERATED: mcp-capacity -->
 
 MCP budgets live in the **same single-point RateLimiterDO** as app budgets
 (ADR-003). App budgets also apply to MCP traffic (an agent's writes count

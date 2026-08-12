@@ -5,7 +5,8 @@
 import type { Context } from "hono";
 import { badRequest, forbidden, notFound, HttpError, payloadTooLarge } from "./errors";
 import type { Env } from "./env";
-import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS, wcuUnits, jsonBytes, MAX_ITEM_BYTES } from "./limits";
+import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS, wcuUnits, jsonBytes, MAX_QUERY_LIMIT } from "./limits";
+import { LIMITS } from "./generated/contract";
 import { capacityModeOf, gateAppRequest } from "./rate";
 import { physicalName } from "./registry";
 import type { Storage, StoredItem } from "./storage";
@@ -33,14 +34,14 @@ export function assertOwned(ctx: AppContext, logical: string): void {
 /** Parse JSON body with a sane size cap. */
 export async function parseBody(c: Context<{ Bindings: Env }>): Promise<Record<string, unknown>> {
   const len = Number(c.req.header("content-length") || 0);
-  if (len > 1_000_000) throw badRequest("Request body too large (max 1 MB)");
+  if (len > LIMITS.maxRequestBytes) throw badRequest("Request body too large (max 1 MB)");
   let raw: string;
   try {
     raw = await c.req.text();
   } catch {
     throw badRequest("Could not read request body");
   }
-  if (raw.length > 1_000_000) throw badRequest("Request body too large (max 1 MB)");
+  if (raw.length > LIMITS.maxRequestBytes) throw badRequest("Request body too large (max 1 MB)");
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -179,7 +180,7 @@ export async function withIdem<T extends { ok: true; result: unknown }>(
 // ── route handlers ───────────────────────────────────────────────────────────
 
 /** Total serialized bytes per batch call — a batch can never burst the WCU ceiling. */
-export const BATCH_MAX_BYTES = MAX_ITEM_BYTES;
+export const BATCH_MAX_BYTES = LIMITS.maxBatchBytes;
 
 export async function handlePut(ctx: AppContext, body: Record<string, unknown>) {
   rejectUnknown(body, ["table", "item", "request_id", "overwrite"]);
@@ -251,7 +252,7 @@ export async function handleDelete(ctx: AppContext, body: Record<string, unknown
   });
 }
 
-export const BATCH_MAX_ITEMS = 50;
+export const BATCH_MAX_ITEMS = LIMITS.maxBatchItems;
 
 export async function handleBatchGet(ctx: AppContext, body: Record<string, unknown>) {
   rejectUnknown(body, ["table", "keys", "strong"]);
@@ -379,8 +380,8 @@ export async function handleQuery(ctx: AppContext, body: Record<string, unknown>
   const pk = reqString(body, "pk");
   const skPrefix = body["sk_prefix"];
   if (skPrefix !== undefined && typeof skPrefix !== "string") throw badRequest("sk_prefix must be a string");
-  const limit = reqNumber(body, "limit") ?? 100;
-  if (limit < 1 || limit > 100) throw badRequest("limit must be between 1 and 100");
+  const limit = reqNumber(body, "limit") ?? MAX_QUERY_LIMIT;
+  if (limit < 1 || limit > MAX_QUERY_LIMIT) throw badRequest(`limit must be between 1 and ${MAX_QUERY_LIMIT}`);
   const startKey = body["start_key"] as string | undefined;
   const out = await ctx.storage.queryItems(physicalName(ctx.appId, table), pk, skPrefix, limit, startKey);
   return {

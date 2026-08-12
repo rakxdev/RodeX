@@ -4,6 +4,31 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [0.5.1] — 2026-08-12 · Canonical contract + generated docs (drift-proof)
+
+### Added
+- **Single canonical contract** — `contract/rodex-contract.json` is now the
+  one source for every public limit/capacity value (NORMAL + PERFORMANCE
+  budgets, 400 KB item cap, batch/query/admin caps, storage, MCP budgets).
+- **Deterministic generator** — `npm run contract:generate` produces the
+  gateway + dashboard typed modules, generated Markdown tables, README limit
+  row, and OpenAPI `x-rodex-capacity` metadata from that one file.
+- **Drift guards** — `npm run contract:check` fails CI when generated output
+  is stale, active pages/docs contain old public numbers, or the contract is
+  invalid (contract parity tests added; 182 gateway tests).
+- `docs/generated/` reference tables + generated sections embedded in
+  docs/capacity.md, docs/rate-limits.md, docs/mcp.md; ADR-007;
+  docs/contract-maintenance.md guide.
+
+### Changed
+- Gateway + dashboard now import public limits from the generated contract
+  module (runtime values unchanged — NORMAL 800/800/2 000/2 400, PERFORMANCE
+  100 000/400 000/500 000/2 000 000, 400 KB cap, 50-batch, 100-query).
+- Package versions aligned to 0.5.1 (root, gateway, dashboard, rodexdb, rodex-mcp).
+
+### Tests
+- 182 gateway tests (179 prior + 3 contract-parity).
+
 ## [0.5.0] — 2026-08-12 · Dual capacity modes + universal write safety
 
 ### Added

@@ -10,6 +10,7 @@ import TypeTerminal from "@/components/TypeTerminal";
 import TiltCard from "@/components/TiltCard";
 import Magnetic from "@/components/Magnetic";
 import SplitFlap from "@/components/SplitFlap";
+import { CONTRACT_STRINGS } from "@/generated/contract";
 
 function GatewayStatus() {
   const [state, setState] = useState<"checking" | "nominal" | "offline">("checking");
@@ -74,12 +75,12 @@ const steps = [
 ];
 
 const budget = [
-  { k: "CAPACITY MODES", v: "NORMAL $0 ↔ PERFORMANCE" },
-  { k: "ITEM SIZE · BOTH MODES", v: "≤ 400 KB" },
-  { k: "NORMAL · PER APP", v: "800 WU · 800 READS / MIN" },
-  { k: "PERFORMANCE · PER APP", v: "GUARDRAILS ONLY" },
-  { k: "PERFORMANCE BILLING", v: "ON-DEMAND · PAY/USE" },
-  { k: "STORAGE", v: "25 GB FREE" },
+  { k: "CAPACITY MODES", v: CONTRACT_STRINGS.MODES_CHIP },
+  { k: "ITEM SIZE · BOTH MODES", v: CONTRACT_STRINGS.ITEM_SIZE },
+  { k: "NORMAL · PER APP", v: CONTRACT_STRINGS.NORMAL_PER_APP_SHORT },
+  { k: "PERFORMANCE · PER APP", v: CONTRACT_STRINGS.PERF_GUARDRAILS },
+  { k: "PERFORMANCE BILLING", v: CONTRACT_STRINGS.PERF_BILLING },
+  { k: "STORAGE", v: CONTRACT_STRINGS.STORAGE_FREE },
 ];
 
 export default function LandingPage() {

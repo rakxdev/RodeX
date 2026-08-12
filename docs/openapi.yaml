@@ -6,6 +6,11 @@ info:
     through one HTTP API. Every app uses the same endpoints; only credentials
     differ. Human docs: docs/api.md. Spec version 1.0.0.
   version: 1.0.0
+  x-rodex-capacity: |
+    # BEGIN GENERATED: capacity
+    normal: { billing: provisioned, totalPerAppPerMinute: 2000, writeUnitsPerAppPerMinute: 800, readsPerAppPerMinute: 800, platformPerMinute: 2400, mcp: { total: 2000, writes: 800, reads: 800 } }
+    performance: { billing: on-demand, totalPerAppPerMinute: 500000, writeUnitsPerAppPerMinute: 100000, readsPerAppPerMinute: 400000, platformPerMinute: 2000000, mcp: { total: 500000, writes: 100000, reads: 400000 } }
+    # END GENERATED: capacity
 servers:
   - url: https://rodex-gateway.rakxdev.workers.dev
     description: Production
