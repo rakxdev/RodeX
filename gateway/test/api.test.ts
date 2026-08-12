@@ -328,10 +328,10 @@ describe("batch put", () => {
     expect(b.headers.get("x-idempotent-replay")).toBe("true");
   });
 
-  it("batch units add up: 20 × (5 × 20-unit rows) = 2000 → 21st batch → 429", async () => {
+  it("batch units add up: 8 × (5 × 20-unit rows) = 800 → 9th batch → 429", async () => {
     const row20 = "x".repeat(19 * 1024); // ~19 KB → 20 units
     const batch = { table: "users", items: Array.from({ length: 5 }, (_, i) => ({ pk: `W#${i}`, sk: "s", data: { blob: row20 } })) };
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 8; i++) {
       expect((await post("/v1/batch/put", A, batch)).status).toBe(200);
     }
     expect((await post("/v1/batch/put", A, batch)).status).toBe(429);
@@ -366,9 +366,9 @@ describe("batch get", () => {
     expect(bad.json.error.message).toContain("keys[1]");
   });
 
-  it("N keys consume N reads: 800 × 50 keys = 40 000 → 801st → 429", async () => {
+  it("N keys consume N reads: 16 × 50 keys = 800 → 17th → 429", async () => {
     const keys50 = Array.from({ length: 50 }, (_, i) => ({ pk: `R#${i}` }));
-    for (let i = 0; i < 800; i++) {
+    for (let i = 0; i < 16; i++) {
       expect((await post("/v1/batch/get", A, { table: "users", keys: keys50 })).status).toBe(200);
     }
     expect((await post("/v1/batch/get", A, { table: "users", keys: keys50 })).status).toBe(429);
@@ -402,11 +402,11 @@ describe("increment", () => {
     expect((await post("/v1/item/increment", A, { table: "users", pk: "X", bogus: 1 })).status).toBe(400);
   });
 
-  it("increment counts against the write budget (1 unit each; 2000 then 429)", async () => {
-    for (let i = 0; i < 2_000; i++) {
+  it("increment counts against the write budget (1 unit each; 800 then 429)", async () => {
+    for (let i = 0; i < 800; i++) {
       expect((await post("/v1/item/increment", A, { table: "users", pk: `W#${i}` })).status).toBe(200);
     }
-    expect((await post("/v1/item/increment", A, { table: "users", pk: "W#2000" })).status).toBe(429);
+    expect((await post("/v1/item/increment", A, { table: "users", pk: "W#800" })).status).toBe(429);
   }, 30_000);
 });
 
@@ -461,13 +461,13 @@ describe("bulk-load hardening (WCU-honest writes)", () => {
     expect(b.json.result.items[0].item.bytes).toBeGreaterThan(0);
   });
 
-  it("write budget is WCU-honest: 20-unit rows hit the 2 000-unit ceiling", async () => {
+  it("write budget is WCU-honest: 20-unit rows hit the 800-unit ceiling", async () => {
     const row20 = "y".repeat(19 * 1024); // ~19 KB → 20 units
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 40; i++) {
       const r = await post("/v1/item/put", A, { table: "users", item: { pk: `U#${i}`, sk: "s", data: { blob: row20 } } });
       expect(r.status).toBe(200);
     }
-    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "U#100", sk: "s", data: { blob: row20 } } })).status).toBe(429);
+    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "U#40", sk: "s", data: { blob: row20 } } })).status).toBe(429);
   }, 30_000);
 });
 

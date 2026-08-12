@@ -197,7 +197,7 @@ the console MCP page and the admin endpoints above) unlock **full platform
 access**: 26 tools over every app/table/item (incl. `batch_put_item`,
 `set_platform_capacity`). Every mutation requires `confirmed: true` (the
 confirmation gate); without it the server refuses with `confirmation_required`.
-MCP budgets: NORMAL 50 000 total / 2 000 write-units / 40 000 reads per
+MCP budgets: NORMAL 2 000 total / 800 write-units / 800 reads per
 minute — guardrails only in PERFORMANCE — counted by the same single-point
 limiter. See [docs/capacity.md](capacity.md).
 MCP writes share ONE wire shape with REST (`{pk, sk?, data}` envelope) — rows

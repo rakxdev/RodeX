@@ -41,8 +41,8 @@ AWS-SAMPLED"**.
 
 Item cap: **400 KB in both capacity modes** (DynamoDB's hard limit) — the old
 20 KB was a free-tier cost optimization, now just a recommendation (1 write
-unit per KB). NORMAL mode budgets: 2 000 write-units/min per app, 40 000
-reads/min; PERFORMANCE mode (on-demand billing): guardrails only. Reads are
+unit per KB). NORMAL mode budgets: 800 write-units/min per app, 800 reads/min (the free
+tier's 25 WCU+25 RCU/s pool, honest); PERFORMANCE mode (on-demand billing): guardrails only. Reads are
 **never size-gated** — a 400 KB row returns fully in ONE get. Switching modes
 never breaks existing rows (same caps both modes); see docs/capacity.md.
 
@@ -60,9 +60,9 @@ fit 20 KB (big ~18 KB rows = 1 row per call).
 ## 4. "Why do I get 429 rate limits? I barely did anything."
 
 Budgets are strict by design (ADR-003) so the free tier is never exceeded:
-**per app** 50 000 requests / **2 000 write-units** / 40 000 reads per
-minute (NORMAL mode; PERFORMANCE raises these to guardrails only);
-**platform-wide** 100 000/min. Every row costs `max(1, ceil(bytes/1024))`
+**per app** 2 000 requests / **800 write-units** / 800 reads per minute
+(NORMAL = the provisioned free tier made honest; PERFORMANCE raises these
+to guardrails only); **platform-wide** 2 400/min. Every row costs `max(1, ceil(bytes/1024))`
 write-units (≤ 1 KB = 1 unit — DynamoDB's own rule), so an 18 KB row costs
 18 units. A batch-get of N keys counts as **N reads**. 429s name their budget
 and carry `retry_after` seconds — treat the 429 as the meter and back off

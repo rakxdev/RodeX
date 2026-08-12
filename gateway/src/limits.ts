@@ -53,14 +53,18 @@ export interface RateProfile {
   mcpReads: number;
 }
 
+// NORMAL = the PROVISIONED free tier made honest: the account ceiling is
+// 25 WCU + 25 RCU per second (1 500 write-units/min + 1 500 read-units/min
+// shared by ALL tables). Per-app budgets take ~half the pool with margin:
+// 800 units/min ≈ 13/s — bursts ride AWS burst-credit (~5 min headroom).
 export const NORMAL_PROFILE: RateProfile = {
-  totalPerApp: 50_000,
-  writesPerApp: 2_000, // write-UNITS (1 per KB) — 100×20 KB rows/min
-  readsPerApp: 40_000,
-  platform: 100_000,
-  mcpTotal: 50_000,
-  mcpWrites: 2_000,
-  mcpReads: 40_000,
+  totalPerApp: 2_000,
+  writesPerApp: 800,
+  readsPerApp: 800,
+  platform: 2_400,
+  mcpTotal: 2_000,
+  mcpWrites: 800,
+  mcpReads: 800,
 };
 
 export const PERFORMANCE_PROFILE: RateProfile = {

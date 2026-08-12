@@ -9,7 +9,7 @@
  * storage from DescribeTable-style sizes with a 60 s cache.
  */
 import type { Env } from "./env";
-import { RATE_PLATFORM, RATE_READS_PER_APP, RATE_TOTAL_PER_APP, RATE_WRITES_PER_APP } from "./limits";
+import { profileFor } from "./rate";
 import { peekUsage } from "./rate";
 import { getApp, physicalName } from "./registry";
 import { createStorage } from "./storage";
@@ -49,11 +49,14 @@ export async function usageSnapshot(env: Env, appId: string): Promise<UsageSnaps
     limit,
     remaining: Math.max(0, limit - used(key)),
   });
+  // limits come from the ACTIVE capacity profile — the meters always show the
+  // numbers the gates actually enforce (NORMAL 800 / PERFORMANCE guardrails)
+  const p = await profileFor(env);
   const requests = {
-    total: request(row.appId, RATE_TOTAL_PER_APP),
-    writes: request(`${row.appId}:write`, RATE_WRITES_PER_APP),
-    reads: request(`${row.appId}:read`, RATE_READS_PER_APP),
-    platform: request("platform:all", RATE_PLATFORM),
+    total: request(row.appId, p.totalPerApp),
+    writes: request(`${row.appId}:write`, p.writesPerApp),
+    reads: request(`${row.appId}:read`, p.readsPerApp),
+    platform: request("platform:all", p.platform),
   };
   const now = Date.now();
   let bytes = 0;

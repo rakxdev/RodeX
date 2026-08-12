@@ -242,8 +242,8 @@ describe("MCP get_app_usage (meters for agents)", () => {
     // 3 puts + the setup table/create = 4 app writes consumed this minute
     const req = (before.parsed.result as { requests: { writes: { used: number; limit: number; remaining: number } } }).requests;
     expect(req.writes.used).toBe(4);
-    expect(req.writes.limit).toBe(2_000);
-    expect(req.writes.remaining).toBe(1_996);
+    expect(req.writes.limit).toBe(800);
+    expect(req.writes.remaining).toBe(796);
     const st = (before.parsed.result as { storage: { bytes: number; items: number; tables: number } }).storage;
     expect(st.tables).toBe(1);
     expect(st.items).toBe(3);

@@ -87,13 +87,13 @@ interfaces is safe (locked by a contract test in the CI gate).
 
 | Surface | Per minute | Key |
 |---|---|---|
-| MCP total (platform-wide) | 50 000 (guardrail 500 000 in PERFORMANCE) | `mcp:total` |
-| MCP writes | 2 000 units (guardrail 100 000) | `mcp:write` |
-| MCP reads | 40 000 (guardrail 400 000) | `mcp:read` |
+| MCP total (platform-wide) | 2 000 (guardrail 500 000 in PERFORMANCE) | `mcp:total` |
+| MCP writes | 800 units (guardrail 100 000) | `mcp:write` |
+| MCP reads | 800 (guardrail 400 000) | `mcp:read` |
 
 MCP budgets live in the **same single-point RateLimiterDO** as app budgets
 (ADR-003). App budgets also apply to MCP traffic (an agent's writes count
-against the app's 120 writes/min — visible in the app's LIVE METERS). 429s
+against the app's 800 write-units/min (NORMAL) — visible in the app's LIVE METERS). 429s
 name the budget and carry `retry_after`.
 
 ## Connecting agents

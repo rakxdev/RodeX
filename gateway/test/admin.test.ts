@@ -274,7 +274,7 @@ describe("admin app management", () => {
     }
     const before = await (await call("GET", `/v1/admin/apps/${app_id}/usage`, undefined, { Cookie: adminCookie })).json() as any;
     expect(before.result.requests.writes.used).toBeGreaterThanOrEqual(5);
-    expect(before.result.requests.writes.limit).toBe(2_000);
+    expect(before.result.requests.writes.limit).toBe(800);
     expect(before.result.requests.reads.used).toBe(0);
     expect(before.result.storage.tables).toBe(5);
     expect(typeof before.result.storage.items).toBe("number");
@@ -341,7 +341,7 @@ describe("platform capacity (NORMAL / PERFORMANCE)", () => {
     expect(bad.status).toBe(400);
   });
 
-  it("PERFORMANCE mode budgets are guardrails: > 2000 units still allowed", async () => {
+  it("PERFORMANCE mode budgets are guardrails: > 800 units still allowed", async () => {
     await call("POST", "/v1/admin/capacity", { mode: "performance" }, { Cookie: adminCookie });
     for (let i = 0; i < 50; i++) {
       const { done } = await processCapacityChunk(env(), 12);
@@ -360,7 +360,7 @@ describe("platform capacity (NORMAL / PERFORMANCE)", () => {
       if (done) break;
     }
     resetRateCounters();
-    for (let i = 0; i < 2_000; i++) {
+    for (let i = 0; i < 800; i++) {
       const r = await call("POST", "/v1/item/increment", { table: "cap_tbl", pk: `n${i}` }, { "X-App-Id": appId, "X-Api-Key": apiKey });
       expect(r.status).toBe(200);
     }

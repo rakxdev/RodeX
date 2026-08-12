@@ -42,7 +42,7 @@ export function resetModeCache(): void {
   modeCache = null;
 }
 
-async function profileFor(env: Env): Promise<RateProfile> {
+export async function profileFor(env: Env): Promise<RateProfile> {
   const mode = await capacityModeOf(env);
   if (mode === "performance") return PERFORMANCE_PROFILE;
   // internal test profile — seeded by the test suite only (capacity_mode=test)

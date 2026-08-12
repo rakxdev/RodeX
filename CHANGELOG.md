@@ -10,7 +10,7 @@ founder; each shipped round went through the protected-main PR flow with the
 - **Capacity modes (platform-wide)**: PERFORMANCE = all tables on-demand
   (pay-per-request, no throttling, budgets become guardrails: writes
   100 000 units/min, reads 400 000/min) · NORMAL = provisioned 5/5 ($0 free
-  tier, budgets 2 000 write-units / 40 000 reads per app/min).
+  tier, budgets 800 write-units / 800 reads per app/min — the free-tier pool made honest).
 - **Switch via dashboard** (AppsPage strip + confirm modal, SWITCHING… state)
   · **REST** `GET/POST /v1/admin/capacity` · **MCP** `get_platform_capacity`
   + `set_platform_capacity` (confirmation-gated) — 26 tools.
@@ -20,8 +20,8 @@ founder; each shipped round went through the protected-main PR flow with the
 - docs/capacity.md (matrix + cost ladder + AWS switching facts).
 
 ### Changed
-- Budgets in NORMAL were raised (120 → 2 000 write-units/min per app;
-  240 → 40 000 reads; 600 → 50 000 total; 1 000 → 100 000 platform) — 429s
+- Budgets in NORMAL were raised (120 → 800 write-units/min per app; 240 → 800 reads; 600 → 2 000 total;
+  1 000 → 2 400 platform — the real 25 WCU+25 RCU/s shared pool with margin) — 429s
   now only at genuinely absurd rates.
 - New tables created while PERFORMANCE are on-demand directly.
 
