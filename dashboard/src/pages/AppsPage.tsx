@@ -97,30 +97,40 @@ function CapacityStrip() {
     }
   }
 
-  const mode = cap?.mode ?? "normal";
+  const loading = cap === null;
+  const mode = cap?.mode ?? null;
   const switching = busy && pending !== null;
-  const tableCount = cap?.tables.length ?? 0;
+  const tableCount = cap?.tables.length ?? null;
+  // tables that still exist (mind: deleted apps' tables report null mode)
+  const known = (cap?.tables ?? []).filter((t) => t.mode !== null);
+  const ready = known.length > 0 && known.every((t) => t.mode === targetBilling(mode ?? "normal"));
+  const status = loading ? "LOADING CAPACITY…"
+    : switching ? "SWITCHING… (AWS TAKES MINUTES)"
+    : ready ? "ALL ACTIVE"
+    : known.length > 0 ? `${known.filter((t) => t.mode === targetBilling(mode ?? "normal")).length}/${known.length} READY`
+    : "NO LIVE TABLES";
 
   return (
     <div className="nameplate p-4 mb-6">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="font-mono text-[10px] tracking-[0.22em] text-inkdim">PLATFORM CAPACITY</div>
         <span className={`stamp ${mode === "performance" ? "stamp-active" : ""}`}>
-          {mode === "performance" ? "PERFORMANCE · ON-DEMAND · UNLIMITED" : "NORMAL · PROVISIONED · $0"}
+          {loading ? "CAPACITY · LOADING…" : mode === "performance" ? "PERFORMANCE · ON-DEMAND · UNLIMITED" : "NORMAL · PROVISIONED · $0"}
         </span>
         <span className="font-mono text-[9.5px] tracking-[0.12em] text-inkdim">
-          {tableCount} TABLE(S) · {switching ? "SWITCHING… (AWS TAKES MINUTES)" : cap?.tables.every((t) => t.mode === targetBilling(mode)) ? "ALL ACTIVE" : "SYNCING…"}
+          {tableCount === null ? "—" : `${tableCount} TABLE(S)`} · {status}
         </span>
         <FoldButton
           size="sm"
           className="ml-auto"
-          disabled={busy}
+          disabled={busy || loading}
           onClick={() => {
+            if (!mode) return;
             setPending(mode === "performance" ? "normal" : "performance");
             setConfirmOpen(true);
           }}
         >
-          {switching ? "SWITCHING…" : mode === "performance" ? "↩ SWITCH TO NORMAL ($0)" : "⚡ SWITCH TO PERFORMANCE"}
+          {loading ? "…" : switching ? "SWITCHING…" : mode === "performance" ? "↩ SWITCH TO NORMAL ($0)" : "⚡ SWITCH TO PERFORMANCE"}
         </FoldButton>
       </div>
       <div className="font-mono text-[9px] tracking-[0.14em] text-inkdim mt-2">
