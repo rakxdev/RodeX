@@ -45,12 +45,12 @@ tier: every row costs `max(1, ceil(bytes/1024))` (each row rounds UP to whole
 KB, exactly like DynamoDB's own sizing). Small rows are unchanged (≤ 1 KB =
 1 unit); big rows honestly cost more.
 
-| Row size | Write cost | Rows/min at 120 units | Good for |
+| Row size | Write cost | Rows/min at 800 units (NORMAL) | Good for |
 |---|---|---|---|
-| ≤ 1 KB | 1 unit | 120/min | keys, flags, sessions |
-| ~2 KB | 2 units | 60/min | small records |
-| ~10 KB | 10 units | 12/min | manifest chunks, blobs |
-| ~18 KB | 18 units | ~6/min | max-size rows (1 per batch call) |
+| ≤ 1 KB | 1 unit | 800/min | keys, flags, sessions |
+| ~2 KB | 2 units | 400/min | small records |
+| ~10 KB | 10 units | 80/min | manifest chunks, blobs |
+| ~18 KB | 18 units | ~44/min | big rows (1 per batch call) |
 
 The budget depends on the platform capacity mode (docs/capacity.md):
 
@@ -66,7 +66,7 @@ WHY NORMAL budgets are 800, not thousands: the pool is the wall).
 
 Worst-case math with our caps:
 
-- 1 write op ≤ 20 KB = ≤ 20 WCU. We allow **120 writes/min/app = 2/s**.
+- 1 write op ≤ 400 KB = ≤ 400 WCU. NORMAL allows **800 write-units/min/app ≈ 13/s — half the 25 WCU/s pool**, with DynamoDB burst credit for spikes (PERFORMANCE = guardrails only).
   Ten active apps at full tilt = 20/s → **≤ 20 WCU/s** ✔ (pool 25).
 - 1 read op ≤ 20 KB = 2.5 RCU eventual. We allow **240 reads/min/app = 4/s**.
   Ten apps = 40/s × 2.5 RCU = 25 RCU/s ✔ (pool 25, exactly).
@@ -105,7 +105,7 @@ client always knows which ceiling it hit. A rare DO restart merely starts a
 fresh window (over-allow of at most one minute, never a lock-out).
 
 **Batch accounting:** `POST /v1/batch/put` (≤ 50 items) consumes **N write
-units** from the app's 120 writes/min — the whole batch is checked against the
+units** from the app's 800 write-units/min (NORMAL) — the whole batch is checked against the
 budget BEFORE anything is written, so a batch that would blow the budget
 answers 429 with nothing stored. One HTTP round-trip, same budget math as N
 single puts.
@@ -175,7 +175,7 @@ unintended data, every path is idempotency-safe.
 | Mixed isolation (app A saturated, app B) | 125 + 1 | 120 / 200 | — | ✅ apps fully isolated |
 | 100 rapid writes, fresh 5-WCU table | 100 | 100 | 0 | ✅ no DB throttle (was ~36 at 1 WCU) |
 | 100 reads, 2-way, long-used table | 100 | 100 | 0 | ✅ |
-| Platform pool (1000/min) | unit-tested | ~1000 | — | ✅ same DO code path as the exact per-app results |
+| Platform pool (2 400/min) | unit-tested | ~2 400 | — | ✅ same DO code path as the exact per-app results |
 
 Every 429 carried `retry_after`; the 429 message names its budget ("writes
 budget, retry in 59s"). All tests ran through the gateway — Cloudflare edge +

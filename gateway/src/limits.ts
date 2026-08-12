@@ -115,7 +115,7 @@ export const MCP_KEY_DESC_MAX = 200;
 
 // ── per-table provisioned capacity ──────────────────────────────────────────
 // 5 WCU / 5 RCU per data table: sustained 5 writes/s + 5 reads/s per table,
-// well above the per-app budgets (120 writes/min ≈ 2/s). The always-free pool
+// well above the per-app budgets (800 write-units/min ≈ 13/s, NORMAL). The always-free pool
 // is 25+25 account-wide → up to 5 tables at 5/5 stay free. Existing tables
 // are auto-upgraded from the legacy 1/1 on their next touch.
 export const TABLE_WCU = 5;

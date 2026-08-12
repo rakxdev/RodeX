@@ -57,8 +57,8 @@ const features = [
   },
   {
     icon: Coins,
-    title: "FREE-TIER HONEST",
-    body: "Built on the DynamoDB always-free tier. Item caps and per-app budgets are engineered so your apps never hit a throttle — the limits are the contract.",
+    title: "TWO CAPACITY MODES",
+    body: "NORMAL runs provisioned at $0 with physics-honest budgets. PERFORMANCE switches the whole platform to DynamoDB on-demand for burst work — pay per use, guardrails only. Same data contract in both modes.",
   },
   {
     icon: Repeat,
@@ -70,15 +70,15 @@ const features = [
 const steps = [
   { n: "01", title: "FABRICATE AN APP", body: "One click on the app board. You receive an API key — revealed exactly once, sealed in gold. Rotate anytime; the old key dies instantly." },
   { n: "02", title: "CREATE A TABLE", body: "app_<id>_<name> — owned by your app alone. No other app can read, write, or delete it." },
-  { n: "03", title: "WRITE · READ · QUERY", body: "One documented contract: put, get, update, delete, query. Retries are safe, conflicts are loud, limits are honest." },
+  { n: "03", title: "WRITE · READ · QUERY", body: "One documented contract: put, get, update, delete, query. Switch NORMAL ↔ PERFORMANCE from the console or MCP — data rules never change." },
 ];
 
 const budget = [
-  { k: "ITEM SIZE", v: "≤ 20 KB" },
-  { k: "PER APP · REQS", v: "600 / min" },
-  { k: "PER APP · WRITES", v: "120 / min" },
-  { k: "PER APP · READS", v: "240 / min" },
-  { k: "PLATFORM POOL", v: "1 000 / min" },
+  { k: "CAPACITY MODES", v: "NORMAL $0 ↔ PERFORMANCE" },
+  { k: "ITEM SIZE · BOTH MODES", v: "≤ 400 KB" },
+  { k: "NORMAL · PER APP", v: "800 WU · 800 READS / MIN" },
+  { k: "PERFORMANCE · PER APP", v: "GUARDRAILS ONLY" },
+  { k: "PERFORMANCE BILLING", v: "ON-DEMAND · PAY/USE" },
   { k: "STORAGE", v: "25 GB FREE" },
 ];
 
@@ -142,7 +142,7 @@ export default function LandingPage() {
             </motion.h1>
             <motion.p variants={fadeUp} transition={{ delay: 0.05 }} className="mt-5 font-mono text-[12.5px] sm:text-[13.5px] leading-relaxed text-ink/80 max-w-md">
               One gateway, one documented API. Each of your bots and websites gets its own key and its own
-              tables — on DynamoDB's always-free tier, never throttled by design.
+              tables — with NORMAL $0 mode for everyday work and PERFORMANCE on-demand mode for burst backfills.
             </motion.p>
             <motion.div variants={fadeUp} transition={{ delay: 0.09 }} className="mt-6">
               <GatewayStatus />

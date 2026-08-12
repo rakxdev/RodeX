@@ -135,12 +135,14 @@ EVERY app, table, and item on the platform.
 
 ## Budgets
 
-NORMAL mode: MCP 50 000 total / 2 000 writes / 40 000 reads per minute
-platform-wide; app budgets 50 000 total / 2 000 write-units / 40 000 reads.
-PERFORMANCE mode (on-demand billing): guardrails only — 500 000 / 100 000 /
-400 000. App budgets apply to MCP traffic too.
+NORMAL mode (provisioned, $0): MCP 2 000 total / 800 write-units / 800 reads
+per minute platform-wide; app budgets 2 000 total / 800 write-units / 800
+reads per minute (the free tier's 25 WCU+25 RCU/s pool, honest).
+PERFORMANCE mode (on-demand billing): guardrails only — MCP 500 000 total /
+100 000 write-units / 400 000 reads; app budgets 500 000 / 100 000 / 400 000.
+App budgets apply to MCP traffic too.
 429 responses name the budget and carry retry_after seconds. App budgets
-apply too (per-app 600 total / 120 writes / 240 reads per minute).
+apply too (per-app 2 000 total / 800 write-units / 800 reads per minute in NORMAL).
 
 ## Conventions
 

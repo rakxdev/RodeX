@@ -150,7 +150,7 @@ function CapacityStrip() {
               ) : (
                 <>
                   <b className="text-gold">NORMAL</b> — all {tableCount} table(s) back to provisioned 5/5: $0 free tier,
-                  generous budgets (2 000 write-units/min per app).
+                  physics-honest budgets (800 write-units / 800 reads per app-min).
                 </>
               )}{" "}
               Switching takes minutes at AWS (max 4 switches/24 h per table).

@@ -152,7 +152,7 @@ describe("MCP discovery", () => {
     const manual = String(out.parsed.manual);
     expect(manual).toContain("CONFIRM EVERY MUTATION");
     expect(manual).toContain("confirmation_required");
-    expect(manual).toContain("600 total / 120 writes / 240 reads");
+    expect(manual).toContain("2 000 total / 800 write-units / 800 reads");
   });
 
   it("health reports the service", async () => {

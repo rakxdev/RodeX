@@ -83,7 +83,7 @@ can operate your data with one master key.
 | 🛡 **Version guarding** | `expected_version` → 409 on conflict, never silent clobber |
 | 📊 **Observability** | LIVE METERS per app: request budgets + storage (zero-cost peeks) |
 | 🤖 **MCP for agents** | Streamable HTTP at `/mcp`, 21 tools, master keys, confirmation gate |
-| 🚦 **Strict limits** | 600 total / 120 writes / 240 reads per app · 1000 platform · 60 admin — per minute |
+| 🚦 **Honest limits** | NORMAL: 800 write-units + 800 reads per app/min (the free tier, made truthful) · PERFORMANCE (on-demand): guardrails only — switch anytime from console/MCP |
 | 👤 **Console** | React + Tailwind console: app board, key seals, live meters, MCP page |
 | 🌐 **Public docs** | API reference, usage & limits, MCP manual — no login needed |
 

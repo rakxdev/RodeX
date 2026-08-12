@@ -582,22 +582,22 @@ curl -X POST $GW/v1/table/create \\
               <tbody>
                 <tr>
                   <td><code>429</code> on bursts of writes</td>
-                  <td>&gt; 120 writes in one minute</td>
+                  <td>&gt; 800 write-units in one minute (NORMAL)</td>
                   <td>queue writes client-side; spread over seconds; coalesce updates</td>
                 </tr>
                 <tr>
                   <td><code>429</code> on reads</td>
-                  <td>&gt; 240 reads/min — often N+1 gets</td>
+                  <td>&gt; 800 reads/min — often N+1 gets</td>
                   <td>one query with sk_prefix + limit instead of many gets</td>
                 </tr>
                 <tr>
                   <td><code>429</code> on everything</td>
-                  <td>&gt; 600 total req/min</td>
+                  <td>&gt; 2 000 total req/min (NORMAL)</td>
                   <td>back off, cache responses, gossip between instances</td>
                 </tr>
                 <tr>
                   <td><code>429</code> early on a fresh key</td>
-                  <td>platform pool (1 000/min) shared across apps</td>
+                  <td>platform pool (2 400/min) shared across apps</td>
                   <td>spread traffic; stagger cron jobs</td>
                 </tr>
                 <tr>
@@ -607,14 +607,16 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
                 <tr>
                   <td><code>413</code> instead of 429</td>
-                  <td>payload over 20 KB — different ceiling</td>
+                  <td>payload over 400 KB — different ceiling</td>
                   <td>shrink the row; store blobs elsewhere</td>
                 </tr>
               </tbody>
             </table>
             <P>
-              The honest math: 120 writes/min ≈ 2 writes/sec ≈ 2 WCU — under the table's burst capacity, so steady apps{" "}
-              <span className="text-ink">never see 429 by design</span>. The boundaries above are the contract; treat{" "}
+              The honest math (NORMAL): 800 write-units/min ≈ 13/s ≈ half the 25 WCU/s free pool — with DynamoDB burst credit, steady apps{" "}
+              <span className="text-ink">never see 429 by design</span>. PERFORMANCE mode (on-demand) raises these to{" "}
+              <span className="text-ink">guardrails only</span> — see{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/capacity.md" target="_blank" rel="noreferrer">docs/capacity.md</a>. The boundaries above are the contract; treat{" "}
               <span className="text-redx">429 as the meter</span> — if you ever see it, throttle to ~80% of the budget and it resolves within the minute.
             </P>
           </Section>
@@ -692,7 +694,7 @@ claude mcp add --transport http rodexdb ${GW}/mcp \\
 
             <H>BUDGETS</H>
             <P>
-              MCP traffic: <span className="text-ink">600 total / 120 writes / 240 reads per minute</span>{" "}
+              MCP traffic: <span className="text-ink">2 000 total / 800 write-units / 800 reads per minute</span>{" "}(NORMAL — guardrails only in PERFORMANCE)
               (platform-wide), counted by the same single-point limiter as app traffic. App budgets also apply
               — an agent's writes show up in the app's LIVE METERS. 429s name the budget and carry retry seconds.
             </P>

@@ -29,7 +29,8 @@ silently hit a throttle.
 - **On-demand DynamoDB**: no free tier (AWS re:Post confirmed) — rejected.
 
 ## Consequences
-- Storage math is the product: every budget (120 writes/min, 240 reads/min,
+> **Updated (v0.5.0):** budgets are capacity-mode-aware — see docs/capacity.md.
+- Storage math is the product: every budget (800 write-units/min, 800 reads/min,
   20 KB rows) is derived from the free pools, documented in docs/rate-limits.md,
   and enforced strictly by the gateway (ADR-003).
 - A second AWS account or R2 is the documented escape hatch if 25 GB is ever

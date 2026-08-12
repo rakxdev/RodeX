@@ -7,7 +7,9 @@ Accepted
 2026-08-09
 
 ## Context
-The gateway promises exact budgets (600 total / 120 writes / 240 reads per app,
+> **Updated (v0.5.0):** budgets are now capacity-mode-aware — see docs/capacity.md (NORMAL 2 000 / 800 / 800, PERFORMANCE guardrails).
+
+The gateway promises exact budgets (2 000 total / 800 write-units / 800 reads per app,
 1000 platform, 60 admin, per minute). The first implementation used Cloudflare's
 `[[ratelimits]]` edge bindings — **eventually consistent and per-location**.
 Live stress testing proved the gap: a 250-write sub-second burst passed ~223
