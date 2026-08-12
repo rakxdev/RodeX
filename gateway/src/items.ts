@@ -3,9 +3,9 @@
  * All writes are idempotency-safe when `request_id` is supplied.
  */
 import type { Context } from "hono";
-import { badRequest, forbidden, notFound, HttpError } from "./errors";
+import { badRequest, forbidden, notFound, HttpError, payloadTooLarge } from "./errors";
 import type { Env } from "./env";
-import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS } from "./limits";
+import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS, wcuUnits, jsonBytes, MAX_ITEM_BYTES } from "./limits";
 import { gateAppRequest } from "./rate";
 import { physicalName } from "./registry";
 import type { Storage, StoredItem } from "./storage";
@@ -134,7 +134,19 @@ function itemToJson(it: StoredItem): Record<string, unknown> {
   };
   if (it.ttl !== undefined) out.ttl = it.ttl;
   if (it.counter !== undefined) out.counter = it.counter;
+  // full stored representation incl. keys — the number DynamoDB charges on
+  out["bytes"] = itemStoredBytes(it);
   return out;
+}
+
+/** Full stored representation size (pk+sk+data wrapper) — DynamoDB sizes the whole item. */
+export function itemStoredBytes(it: Pick<StoredItem, "pk" | "sk" | "data">): number {
+  return jsonBytes({ pk: it.pk, sk: it.sk, data: JSON.parse(it.data) });
+}
+
+/** Write-cost of a parsed item in WCU units (min 1, rounded up per DynamoDB). */
+export function itemWcu(it: Pick<StoredItem, "pk" | "sk" | "data">): number {
+  return wcuUnits(itemStoredBytes(it));
 }
 
 /** Idempotency wrapper: replay returns the stored response body. */
@@ -161,14 +173,18 @@ export async function withIdem<T extends { ok: true; result: unknown }>(
 
 // ── route handlers ───────────────────────────────────────────────────────────
 
+/** Total serialized bytes per batch call — a batch can never burst the WCU ceiling. */
+export const BATCH_MAX_BYTES = MAX_ITEM_BYTES;
+
 export async function handlePut(ctx: AppContext, body: Record<string, unknown>) {
   rejectUnknown(body, ["table", "item", "request_id", "overwrite"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
-  await gateAppRequest(ctx.env, ctx.appId, "write");
   const requestId = body["request_id"] as string | undefined;
   const item = parseItem(body["item"]);
   assertItemSize(JSON.parse(item.data));
+  // budget is WCU-honest: this row costs max(1, ceil(bytes/1024)) write-units
+  await gateAppRequest(ctx.env, ctx.appId, "write", itemWcu(item));
   const overwrite = body["overwrite"] === true;
   const physical = physicalName(ctx.appId, table);
   return withIdem(ctx.storage, requestId, async () => {
@@ -197,12 +213,13 @@ export async function handleUpdate(ctx: AppContext, body: Record<string, unknown
   rejectUnknown(body, ["table", "pk", "sk", "data", "expected_version", "request_id"]);
   const table = reqString(body, "table");
   assertOwned(ctx, table);
-  await gateAppRequest(ctx.env, ctx.appId, "write");
   const requestId = body["request_id"] as string | undefined;
   const pk = reqString(body, "pk");
   const sk = reqString(body, "sk");
   const data = body["data"];
   assertItemSize(data);
+  // updates replace the payload — budget by the new row's write cost
+  await gateAppRequest(ctx.env, ctx.appId, "write", wcuUnits(jsonBytes({ pk, sk, data })));
   const expectedVersion = reqNumber(body, "expected_version");
   const physical = physicalName(ctx.appId, table);
   return withIdem(ctx.storage, requestId, async () => {
@@ -312,10 +329,19 @@ export async function handleBatchPut(ctx: AppContext, body: Record<string, unkno
       throw badRequest(`items[${i}]: ${msg}`);
     }
   });
+  // BYTE CAP: total serialized bytes must fit one call — a batch can never
+  // burst the WCU ceiling (≈1 max-size row per call for big rows).
+  const totalBytes = parsed.reduce((sum, p) => sum + itemStoredBytes(p), 0);
+  if (totalBytes > BATCH_MAX_BYTES) {
+    throw payloadTooLarge(
+      `Batch too large in bytes: ${totalBytes} B total (max ${BATCH_MAX_BYTES} B) — large rows: 1 row per call. Split into smaller calls`,
+    );
+  }
   const requestId = body["request_id"] as string | undefined;
   const overwrite = body["overwrite"] === true;
-  // Reserve the full write budget upfront (a batch of N consumes N writes).
-  await gateAppRequest(ctx.env, ctx.appId, "write", parsed.length);
+  // Reserve the full write budget upfront: each row costs max(1, ceil(bytes/1024)) units.
+  const units = parsed.reduce((sum, p) => sum + itemWcu(p), 0);
+  await gateAppRequest(ctx.env, ctx.appId, "write", units);
   const physical = physicalName(ctx.appId, table);
   return withIdem(ctx.storage, requestId, async () => {
     await ctx.storage.ensureTable(physical);
@@ -335,7 +361,8 @@ export async function handleBatchPut(ctx: AppContext, body: Record<string, unkno
         });
       }
     }
-    return { ok: true as const, result: { table, requested: parsed.length, written, items } };
+    const allOk = written === parsed.length;
+    return { ok: true as const, result: { table, requested: parsed.length, written, all_ok: allOk, items } };
   });
 }
 

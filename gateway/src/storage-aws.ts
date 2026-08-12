@@ -450,7 +450,9 @@ export class AwsStorage implements Storage {
   }
 
   async dropTable(physical: string): Promise<void> {
-    // empty the table first (DynamoDB cannot delete non-empty tables)
+    // empty the table first (DynamoDB cannot delete non-empty tables); deletes
+    // cost 1 WCU each → pace 20/call with a gap so big tables never throttle
+    // mid-drain (429-retry with backoff as belt-and-braces)
     for (let guard = 0; guard < 10; guard++) {
       const out = await this.call<{ Items?: DdbItem[]; LastEvaluatedKey?: DdbItem }>("Scan", {
         TableName: physical,
@@ -458,18 +460,32 @@ export class AwsStorage implements Storage {
       });
       const items = out.Items || [];
       if (items.length === 0) break;
-      for (let i = 0; i < items.length; i += 25) {
-        await this.call("BatchWriteItem", {
-          RequestItems: {
-            [physical]: items.slice(i, i + 25).map((it) => ({
-              DeleteRequest: { Key: { pk: it.pk, sk: it.sk } },
-            })),
-          },
-        });
+      for (let i = 0; i < items.length; i += 20) {
+        await this.pacedDeleteChunk(physical, items.slice(i, i + 20));
+        if (i + 20 < items.length) await new Promise((r) => setTimeout(r, 1000)); // keep ≤ ~20 WCU/s
       }
       if (!out.LastEvaluatedKey) break;
     }
     await this.call("DeleteTable", { TableName: physical });
+  }
+
+  /** One ≤20-item delete call with bounded 429 retry + backoff. */
+  private async pacedDeleteChunk(physical: string, items: DdbItem[]): Promise<void> {
+    const body = {
+      RequestItems: {
+        [physical]: items.map((it) => ({ DeleteRequest: { Key: { pk: it.pk, sk: it.sk } } })),
+      },
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.call("BatchWriteItem", body);
+        return;
+      } catch (e) {
+        const retryable = e instanceof HttpError && e.status === 429 && attempt < 5;
+        if (!retryable) throw e;
+        await new Promise((r) => setTimeout(r, (e.retryAfter ?? 1) * 1000 + attempt * 500));
+      }
+    }
   }
 
   async storageSize(physical: string): Promise<{ bytes: number; items: number } | null> {

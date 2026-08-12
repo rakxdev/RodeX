@@ -64,7 +64,7 @@ what the agent "thinks" it was told.
 | `create_table` | **mutate** | ✅ | name pattern `^[a-z0-9][a-z0-9_-]{0,41}$` |
 | `delete_table` | **mutate** | ✅ | irreversible — ALL data in the table |
 | `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 20 KB cap |
-| `batch_put_item` | **mutate** | ✅ | up to 50 items in one call; all-or-nothing validation; consumes N writes |
+| `batch_put_item` | **mutate** | ✅ | up to 50 items / ≤ 20 KB total; all-or-nothing validation; `all_ok` flag — check it |
 | `batch_get_item` | read | — | up to 50 keys in one call; missing keys listed, not errors; N reads |
 | `increment_item` | **mutate** | ✅ | atomic counter (by, default 1); 1 write, race-free; returns new value |
 | `update_item` | **mutate** | ✅ | version-guarded (`expected_version` → 409) |

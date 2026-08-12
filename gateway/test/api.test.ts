@@ -101,6 +101,26 @@ describe("auth & isolation", () => {
     expect(httpRes.headers.get("strict-transport-security")).toBeNull();
   });
 
+  it("CORS preflight allows every console method incl. DELETE (regression: console delete was blocked)", async () => {
+    for (const method of ["GET", "POST", "DELETE"]) {
+      const res = await handler.fetch(
+        new Request("https://localhost/v1/admin/apps/app_x", {
+          method: "OPTIONS",
+          headers: {
+            Origin: "https://rodexdb.pages.dev",
+            "Access-Control-Request-Method": method,
+          },
+        }),
+        env(),
+        {} as ExecutionContext,
+      );
+      const allow = res.headers.get("access-control-allow-methods") ?? "";
+      expect(allow).toContain(method);
+      expect(allow).toContain("OPTIONS");
+      expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:8787"); // env DASHBOARD_ORIGIN
+    }
+  });
+
   it("admin routes reject foreign Origin (CSRF depth)", async () => {
     const evil = await handler.fetch(
       new Request("http://localhost/v1/admin/me", { headers: { Origin: "https://evil.example.com" } }),
@@ -383,6 +403,68 @@ describe("increment", () => {
       expect((await post("/v1/item/increment", A, { table: "users", pk: `W#${i}` })).status).toBe(200);
     }
     expect((await post("/v1/item/increment", A, { table: "users", pk: "W#120" })).status).toBe(429);
+  });
+});
+
+describe("bulk-load hardening (WCU-honest writes)", () => {
+  it("all_ok=false surfaces per-item failures — a 200 is never a silent success", async () => {
+    await post("/v1/item/put", A, { table: "users", item: { pk: "DUP#1", sk: "s", data: { v: 1 } } });
+    const res = await post("/v1/batch/put", A, { table: "users", items: [
+      { pk: "DUP#2", sk: "s", data: { v: 2 } }, // fresh → ok
+      { pk: "DUP#1", sk: "s", data: { v: 9 } }, // exists, no overwrite → per-item 409
+    ] });
+    expect(res.status).toBe(200);
+    expect(res.json.result.all_ok).toBe(false);
+    expect(res.json.result.written).toBe(1);
+    const bad = res.json.result.items.find((i: { pk: string }) => i.pk === "DUP#1");
+    expect(bad.ok).toBe(false);
+    expect(String(bad.error)).toContain("Item already exists"); // 409 semantics
+    // the good row IS written
+    const g = await post("/v1/item/get", A, { table: "users", pk: "DUP#2", sk: "s" });
+    expect(g.json.result.data).toEqual({ v: 2 });
+  });
+
+  it("all_ok=true on full success; batch responses carry all_ok", async () => {
+    const res = await post("/v1/batch/put", A, { table: "users", items: [
+      { pk: "OK#10", sk: "s", data: { x: 1 } }, { pk: "OK#11", sk: "s", data: { x: 2 } },
+    ] });
+    expect(res.json.result.all_ok).toBe(true);
+    expect(res.json.result.written).toBe(2);
+  });
+
+  it("batch byte cap: total > 20 KB → 413, nothing written (no WCU bursts)", async () => {
+    const big = "x".repeat(12 * 1024); // ~12 KB payload → ~12.3 KB row
+    const res = await post("/v1/batch/put", A, { table: "users", items: [
+      { pk: "BC#1", sk: "s", data: { blob: big } },
+      { pk: "BC#2", sk: "s", data: { blob: big } },
+    ] });
+    expect(res.status).toBe(413);
+    expect(res.json.error.message).toContain("bytes");
+    const q = await post("/v1/query", A, { table: "users", pk: "BC#", limit: 100 });
+    expect(q.json.result.items.length).toBe(0);
+    // a single big row still fits (≤ 20 KB per row AND per call)
+    const single = await post("/v1/batch/put", A, { table: "users", items: [{ pk: "BC#3", sk: "s", data: { blob: big } }] });
+    expect(single.status).toBe(200);
+  });
+
+  it("every item response echoes its stored bytes (the WCU math is visible)", async () => {
+    const put = await post("/v1/item/put", A, { table: "users", item: { pk: "BY#1", sk: "s", data: { a: 1 } } });
+    expect(typeof put.json.result.bytes).toBe("number");
+    expect(put.json.result.bytes).toBeGreaterThan(0);
+    const get = await post("/v1/item/get", A, { table: "users", pk: "BY#1", sk: "s" });
+    expect(get.json.result.bytes).toBe(put.json.result.bytes);
+    const b = await post("/v1/batch/put", A, { table: "users", items: [{ pk: "BY#2", sk: "s", data: { b: 2 } }] });
+    expect(b.json.result.items[0].item.bytes).toBeGreaterThan(0);
+  });
+
+  it("write budget is WCU-honest: 2-unit rows hit the 120-unit ceiling (59×2 + 2 → 120, then 429)", async () => {
+    const twoUnit = "y".repeat(1900); // ~1.9 KB data → row ~1.95 KB → ceil → 2 units
+    for (let i = 0; i < 59; i++) {
+      const r = await post("/v1/item/put", A, { table: "users", item: { pk: `U#${i}`, sk: "s", data: { blob: twoUnit } } });
+      expect(r.status).toBe(200);
+    }
+    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "U#59", sk: "s", data: { blob: twoUnit } } })).status).toBe(200);
+    expect((await post("/v1/item/put", A, { table: "users", item: { pk: "U#60", sk: "s", data: { blob: twoUnit } } })).status).toBe(429);
   });
 });
 

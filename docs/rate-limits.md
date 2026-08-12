@@ -40,6 +40,23 @@ consistency** for get/query (option `strong: true` for the rare strict case).
 
 ## 3. Per-app and platform limits (why these numbers)
 
+Writes are charged in **WCU units** — the same unit DynamoDB charges the free
+tier: every row costs `max(1, ceil(bytes/1024))` (each row rounds UP to whole
+KB, exactly like DynamoDB's own sizing). Small rows are unchanged (≤ 1 KB =
+1 unit); big rows honestly cost more.
+
+| Row size | Write cost | Rows/min at 120 units | Good for |
+|---|---|---|---|
+| ≤ 1 KB | 1 unit | 120/min | keys, flags, sessions |
+| ~2 KB | 2 units | 60/min | small records |
+| ~10 KB | 10 units | 12/min | manifest chunks, blobs |
+| ~18 KB | 18 units | ~6/min | max-size rows (1 per batch call) |
+
+The budget is **120 write-units/min per app** (~120 KB/min — the original
+"120 writes" number, now size-honest). Reads stay count-based
+(240 reads/min; 4 KB per read unit at AWS). This keeps every app 12× under
+the account's 25 WCU/s physical ceiling with margin for bursts.
+
 Worst-case math with our caps:
 
 - 1 write op ≤ 20 KB = ≤ 20 WCU. We allow **120 writes/min/app = 2/s**.

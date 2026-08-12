@@ -49,10 +49,14 @@ class RodexClient:
                                            "overwrite": overwrite, **({"request_id": request_id} if request_id else {})})
 
     def batch_put(self, table, items, overwrite=False, request_id=None):
-        """items: list of (pk, sk, payload) triples — up to 50, one round-trip."""
+        """items: list of (pk, sk, payload) triples — up to 50 items / 20 KB total.
+        ALL_OR_NOTHING RULE: check result['all_ok'] — a 200 is not success.
+        Retry failed sk's individually with backoff."""
         body = {"table": table, "items": [{"pk": p, "sk": s, "data": d} for p, s, d in items],
                 "overwrite": overwrite, **({"request_id": request_id} if request_id else {})}
-        return self._call("/v1/batch/put", body)
+        res = self._call("/v1/batch/put", body)["result"]
+        assert res["all_ok"], f"batch partial: {res['written']}/{res['requested']} written — retry items with ok:false"
+        return res
 
     def get(self, table, pk, sk="~", strong=False):
         return self._call("/v1/item/get", {"table": table, "pk": pk, "sk": sk, "strong": strong})
@@ -129,6 +133,7 @@ all_rows = scan_all(db, "crawled_tests")
   also rejects wrong shapes with 400, so a silent drop is impossible).
 - `429` answers name their budget and carry `retry_after` — the client above
   sleeps and retries writes automatically.
-- A batch of N consumes N of the app's 120 writes/min — batch size × rate
-  must fit the budget.
+- A batch of N rows consumes `sum(max(1, ceil(bytes/1024)))` write-units —
+  rows ≤ 1 KB cost 1 unit each against the app's 120 write-units/min.
+  Keep batch TOTAL bytes ≤ 20 KB (~18 KB rows = 1 row per call).
 - Rows cap at 20 KB; `query` limit ≤ 100; batch ≤ 50 items.

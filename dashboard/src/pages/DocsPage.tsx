@@ -289,8 +289,12 @@ curl -X POST $GW/v1/table/create \\
   ],
   "request_id": "batch-1"
 }
-→ per-item results; a batch of N consumes N of the 120 writes/min;
-  one invalid item rejects the WHOLE batch (nothing written)`}</Code>
+→ { "written": 2, "all_ok": true, "items": [...], ... }
+// all_ok is the success signal — a 200 can contain per-item failures;
+// check all_ok and retry failed items (ok:false) with backoff.
+// total bytes ≤ 20 KB per call; every row costs max(1, ceil(bytes/1024))
+// write-units from the 120-unit/min budget (rows ≤ 1 KB = 1 unit);
+// every item echoes its bytes.`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/batch/get</span> — up to 50 rows, one call</H>

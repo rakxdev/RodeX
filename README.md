@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/rakxdev/RodeX/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rakxdev/RodeX/ci.yml?style=flat-square&label=quality%20gate&logo=github" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/tests-182%20passing-6a7c5c?style=flat-square&logo=vitest" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-188%20passing-6a7c5c?style=flat-square&logo=vitest" alt="tests" />
   <img src="https://img.shields.io/badge/cost-%240%20forever-d9b64a?style=flat-square" alt="cost" />
   <img src="https://img.shields.io/badge/stack-DynamoDB%20·%20Workers%20·%20Pages-2a2c28?style=flat-square" alt="stack" />
   <img src="https://img.shields.io/badge/license-personal%20use-6a7c5c?style=flat-square" alt="license" />
@@ -116,7 +116,7 @@ npm run dev                                       # gateway on :8787 (mock stora
 ```
 
 ```bash
-npm test                                          # 182 tests, mock storage
+npm test                                          # 188 tests, mock storage
 npm run typecheck                                 # strict TS
 npm run lint                                      # eslint
 cd dashboard && npm run dev                       # the console locally
@@ -271,7 +271,7 @@ POST /mcp                          → MCP (JSON-RPC, master-key auth)
 
 ## Testing & evidence
 
-- **182 tests** across the gateway: auth matrix, storage contract (mock + AWS marshaling),
+- **188 tests** across the gateway: auth matrix, storage contract (mock + AWS marshaling),
   registry lifecycle, strict rate budgets + DO atomicity, full-stack HTTP, admin surface,
   **MCP integration over real JSON-RPC** (auth, gate refusals, every tool, write-burst stress,
   the MCP≡REST wire-shape contract test), batch writes (size cap, all-or-nothing validation,

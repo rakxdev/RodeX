@@ -80,6 +80,12 @@ export function jsonBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
+/** DynamoDB's exact write-charge rule: every row rounds UP to whole KBs, min 1.
+ * 1 unit = 1 WCU of the free tier's 25/s (docs/rate-limits.md). */
+export function wcuUnits(bytes: number): number {
+  return Math.max(1, Math.ceil(bytes / 1024));
+}
+
 /** Size gate applied at the API boundary BEFORE any storage call (mock or AWS). */
 export function assertItemSize(payload: unknown): void {
   if (jsonBytes(payload) > MAX_ITEM_BYTES) {

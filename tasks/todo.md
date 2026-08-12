@@ -1,12 +1,12 @@
-# Todo — Serverless-data trio (batch/get + increment + TTL) — ALL DONE
+# Todo — v0.4.0 round (CORS + universal write safety) — ALL DONE, deployed, NOT pushed
 
-- [x] T1: storage (mock + aws): getItems, increment, ttl — unit tests
-- [x] T2: items.ts: ttl parse/echo, handleBatchGet, handleIncrement + routes — api tests
-- [x] T3: mcp.ts: batch_get_item + increment_item + manual — mcp tests
-- [x] T4: docs (api, mcp, rate-limits, python, testing, CHANGELOG, README) + dashboard DocsPage
-- [x] T5: full verify (vitest 182, tsc, eslint, bundles, dashboard build)
-- [x] T6: deploy + live-verify + cleanup + local commits (NO PUSH)
+- [x] T1: limits.ts wcuUnits + items.ts (parse→gate order, WCU weights, batch byte cap,
+      all_ok flag, bytes echo) + tests
+- [x] T2: storage-aws dropTable pacing (≤20/call, 1s gaps, 429 backoff)
+- [x] T3: docs sweep (api, rate-limits, mcp, python, faq, testing, README, CHANGELOG) + DocsPage
+- [x] T4: full verify (vitest 188, tsc, eslint, bundles, dashboard build)
+- [x] T5: deploy gateway 411fbb50 + dashboard; live-verified: CORS DELETE preflight,
+      byte cap 413, all_ok+bytes, WCU budget (6×18KB ok → 7th 429), paced drop; cleanup done
 
-Live-verified 2026-08-12 against production: batch/get found+missing · increment 1→6→4 ·
-TTL future-readable/past-404/query-excluded · MCP batch_get_item (ungated) + increment_item (gated) ·
-24 tools · cleanup done · prod healthy.
+Live notes: 413 msg names bytes; 429 names "writes budget" + retry_after; crawl-safe for
+≤1KB rows (1 unit). Big-row consumers (18KB) get ~6 rows/min — documented.

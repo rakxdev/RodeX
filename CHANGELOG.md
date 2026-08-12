@@ -4,6 +4,31 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [Unreleased] — v0.4.0 round: universal write safety (CORS + bulk-load hardening)
+
+### Fixed
+- **CORS: DELETE now allowed from the console** — app soft-delete and MCP
+  key delete were blocked by preflight since launch (day-one bug).
+- **delete_table pacing** — drains big-row tables with ≤20-item chunks,
+  1 s gaps and 429-retry backoff; cleanup no longer throttles mid-drain.
+
+### Changed (WCU-honest writes — the universal precaution, research-validated)
+- **Write budget is now size-honest**: 120 **write-units**/min where every
+  row costs `max(1, ceil(bytes/1024))` — DynamoDB's exact rounding rule.
+  Rows ≤ 1 KB = 1 unit (unchanged); an 18 KB row = 18 units; 429s name the
+  budget. Matches the OpenAI TPM / DynamoDB WCU capacity-unit precedent.
+- **`batch/put` byte cap**: total serialized bytes ≤ 20 KB per call, checked
+  before any write → 413. A WCU-burst batch is structurally impossible.
+- **`all_ok` flag** on batch responses (Elasticsearch `errors` precedent):
+  a 200 with failed items is now impossible to miss. Per-item errors still
+  carry `ok:false` + reason; retry guidance documented everywhere.
+- **`bytes` echoed on every item** (put/get/query/update/batch) — consumers
+  see the exact number the budget charges on.
+
+### Tests
+- 183 → **188** (all_ok matrix, batch byte cap, WCU-unit ceiling proof,
+  bytes echo, CORS preflight regression).
+
 ## [0.3.0] — 2026-08-12 · Serverless-data trio: batch/get + increment + TTL
 
 ### Added
