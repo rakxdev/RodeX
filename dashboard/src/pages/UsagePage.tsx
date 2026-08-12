@@ -1,23 +1,11 @@
 import { motion } from "framer-motion";
 import { pageTransition, fadeUp, stagger, foldIn } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
+import { STATS } from "@/generated/contract";
 
-const writes = [
-  { k: "writes / min", v: "120", note: "per app — put / update / delete" },
-  { k: "reads / min", v: "240", note: "per app — get / query (strong reads cost 2×)" },
-];
-
-const reads = [
-  { k: "total / min", v: "600", note: "per app — writes + reads combined" },
-  { k: "platform pool", v: "1 000", note: "across all apps, per Cloudflare location" },
-  { k: "admin surface", v: "60", note: "dashboard + API management" },
-];
-
-const storage = [
-  { k: "item size", v: "≤ 20 KB", note: "413 above the cap — keeps the 25-WCU budget safe" },
-  { k: "storage", v: "25 GB", note: "DynamoDB always-free tier · ap-southeast-1" },
-  { k: "daily workers", v: "100 000", note: "requests/day, shared by gateway + dashboard" },
-];
+const writes = STATS.writeBudget;
+const reads = STATS.readPlatform;
+const storage = STATS.storageCaps;
 
 const groups = [
   { title: "WRITE BUDGET", rows: writes },
@@ -63,10 +51,11 @@ export default function UsagePage() {
           <b>WHY IT NEVER THROTTLES</b> — THE MATH
         </h4>
         <p className="font-mono text-[12px] leading-relaxed text-inkdim">
-          The free tier grants 25 write units and 25 read units per second. A 20 KB item costs roughly 5 write units
-          at 4 KB per unit — so the 120 writes/min budget (~2/s) stays four times under the WU ceiling, and 240
-          reads/min (~4/s, or 2 strong reads) sits comfortably inside the RU budget. Even at the caps, the gateway
-          never asks DynamoDB for more than the free tier gives.
+          The free tier grants 25 write units and 25 read units per second — the WHOLE account pool. NORMAL mode gives
+          each app 800 write-units/min (~13/s, half the pool) and 800 reads/min — generous for real workloads, with
+          DynamoDB burst credit for spikes. PERFORMANCE mode (on-demand) lifts every budget to guardrails only:
+          the only ceiling left is cost, ~2¢ per backfill. Even at the NORMAL caps, the gateway never asks DynamoDB
+          for more than the free tier gives.
         </p>
       </motion.div>
 
@@ -132,7 +121,7 @@ export default function UsagePage() {
             <tr>
               <td><code>MCP — agents</code></td>
               <td>One master key (<code>rok_mcp_</code>) per agent; endpoint <code>…/mcp</code>; console-minted, viewable anytime, no rotation</td>
-              <td>0 — MCP budgets ride the same free limiter (600/120/240 per min); a few hash reads per request</td>
+              <td>0 — MCP budgets ride the same limiter (NORMAL 2 000/800/800 per min; PERFORMANCE guardrails); a few hash reads per request</td>
             </tr>
           </tbody>
         </table>
@@ -157,11 +146,11 @@ export default function UsagePage() {
               <td><code>429</code> with <code>retry_after: 1</code></td>
               <td>one of the per-app buckets topped out this minute</td>
               <td>wait <code>retry_after</code> seconds, retry — writes with <code>request_id</code> are always safe to retry</td>
-              <td>stay under 600 total / 120 writes / 240 reads per minute</td>
+              <td>stay under 2 000 total / 800 write-units / 800 reads per minute (NORMAL)</td>
             </tr>
             <tr>
               <td><code>429</code> on every call, all apps</td>
-              <td>platform pool (1 000/min) shared across your apps</td>
+              <td>platform pool (2 400/min) shared across your apps</td>
               <td>spread calls; stagger cron jobs by a few seconds</td>
               <td>run heavy jobs off-peak; cache hot reads</td>
             </tr>
@@ -173,16 +162,17 @@ export default function UsagePage() {
             </tr>
             <tr>
               <td><code>413</code> (not 429)</td>
-              <td>row over 20 KB — a size ceiling, not a rate</td>
+              <td>row over 400 KB — a size ceiling, not a rate</td>
               <td>reduce the payload</td>
               <td>keep rows small; store blobs elsewhere</td>
             </tr>
           </tbody>
         </table>
         <p className="font-mono text-[11px] leading-relaxed text-inkdim mt-4">
-          The numbers, exactly: <span className="text-ink">600 req/min total</span> ·{" "}
-          <span className="text-ink">120 writes/min</span> · <span className="text-ink">240 reads/min</span> per app —{" "}
-          <span className="text-ink">1 000 req/min platform pool</span> — <span className="text-ink">60 req/min admin</span>.
+          The numbers, exactly: <span className="text-ink">2 000 req/min total</span> ·{" "}
+          <span className="text-ink">800 write-units/min</span> · <span className="text-ink">800 reads/min</span> per app (NORMAL) —{" "}
+          <span className="text-ink">2 400 req/min platform pool</span> — <span className="text-ink">60 req/min admin</span>.
+          PERFORMANCE (on-demand): guardrails only — 500 000 / 100 000 / 400 000.
           Every 429 names its budget ({" "}
           <code className="text-ink">"Rate limit exceeded — writes budget, retry in 59s"</code>) and carries{" "}
           <code className="text-ink">retry_after</code>. Counters are single-point and strict — a 429 is a bucket,
@@ -198,10 +188,10 @@ export default function UsagePage() {
         </h4>
         <ol className="space-y-3">
           {[
-            ["Keep rows small", "20 KB is the ceiling, not a target. A 4 KB row costs half the write budget of a 19 KB row — store big payloads as a URL/object key, not inline."],
+            ["Keep rows cost-friendly", "400 KB is the hard cap, not a target. A 4 KB row costs 4 write-units vs 400 for a 400 KB row — store big payloads as a URL/object key, not inline."],
             ["Batch reads into queries", "Fetching 50 rows? One query with sk_prefix + limit 50 costs 1 read, not 50. Get-by-pk is for single lookups only."],
             ["Strong reads are 2×", "strong:true costs 2 read units — use it only when a stale read would break the app (e.g. right after a critical write), never in hot loops."],
-            ["Writes are the scarce budget", "120 writes/min per app. Prefer update (replace data) over delete+put; coalesce bursts; queue writes client-side if a batch exceeds the budget."],
+            ["Writes are the honest budget", "800 write-units/min per app in NORMAL (≈ half the free pool) — guardrails only in PERFORMANCE. Prefer update (replace data) over delete+put; coalesce bursts; queue writes client-side if a batch exceeds the budget."],
             ["Retries are always safe", "Send request_id on every write and retry freely — the gateway dedupes for 24 h. On 429/502/503, back off retry_after seconds (default 1)."],
             ["Guard against lost updates", "Read the version, update with expected_version, handle the 409 — your app never silently overwrites a concurrent change."],
             ["Treat 429 as the meter", "If you ever see 429, you are at the boundary: hold 1-2 s and throttle to ~80% of the budget. The gateway is built so this should be rare, not routine."],

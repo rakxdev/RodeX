@@ -1,6 +1,6 @@
 {
   "name": "rodex-mcp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "RodexDB as a stdio MCP server \u2014 connect ANY MCP client (Claude Desktop, VS Code, local agents) to a RodexDB gateway. Point it at your own deploy or the live instance.",
   "keywords": [
     "rodexdb",

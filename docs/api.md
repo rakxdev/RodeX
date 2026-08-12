@@ -48,8 +48,8 @@ or the canonical **envelope** (identical to what reads return):
 - `pk` required (≤ 500 chars); `sk` optional (default `"~"`).
 - A `data` key inside `item` selects the envelope; mixing it with flat fields → 400.
 - Responses echo the stored row with its **`bytes`** (full representation);
-  the write consumes `max(1, ceil(bytes/1024))` units from the 120-unit/min
-  budget (rows ≤ 1 KB = 1 unit — unchanged behavior for small rows).
+  the write consumes `max(1, ceil(bytes/1024))` units from the active budget
+  (NORMAL: 800 write-units/min; PERFORMANCE: 100 000 guardrail; rows ≤ 1 KB = 1 unit).
 - Optional `ttl` (integer, unix seconds) — the row **expires after this** and
   deletes itself for free (DynamoDB TTL; physical deletion lags up to ~48 h,
   but the gateway never returns an expired row). `ttl` is echoed in responses.
@@ -100,7 +100,7 @@ or the canonical **envelope** (identical to what reads return):
   `put`. All keys validated first — any bad key → 400, nothing returned.
 - **Missing keys are NOT errors**: response is
   `{ requested, found: [items…], missing: [{pk, sk}…] }`.
-- **Budget honesty:** N keys consume **N reads** from the 240 reads/min
+- **Budget honesty:** N keys consume **N reads** from the active mode budget (800/min NORMAL; guardrails in PERFORMANCE)
   (reserved before the call). `strong: true` = consistent reads (2× cost).
 - TTL-expired rows are reported as missing.
 

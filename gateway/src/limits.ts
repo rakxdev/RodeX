@@ -1,20 +1,18 @@
 /**
  * limits.ts — ALL hard caps in one place. Rationale for every number:
- * see docs/rate-limits.md (the math is derived from the free-tier pools).
+ * see docs/rate-limits.md and contract/rodex-contract.json.
  */
+import { LIMITS, NORMAL_PROFILE as GENERATED_NORMAL_PROFILE, PERFORMANCE_PROFILE as GENERATED_PERFORMANCE_PROFILE } from "./generated/contract";
 
-/** Max JSON bytes an app may PUT/UPDATE in one item.
- *  400 KB = DynamoDB's own hard item cap (kept with ~9 KB margin for keys).
- *  Small rows stay cost-friendly: 1 unit per KB against write budgets.
- *  docs/capacity.md explains the cost ladder. */
-export const MAX_ITEM_BYTES = 400_000;
+/** Max JSON bytes an app may PUT/UPDATE in one item. */
+export const MAX_ITEM_BYTES = LIMITS.maxItemBytes;
 export const ITEM_BYTES = MAX_ITEM_BYTES; // alias for readability in tests
 
 /** Max JSON body the gateway will parse (1 MB — comfortably under CF's 100 MB). */
-export const MAX_REQUEST_BYTES = 1_000_000;
+export const MAX_REQUEST_BYTES = LIMITS.maxRequestBytes;
 
 /** Max items returned by one query. */
-export const MAX_QUERY_LIMIT = 100;
+export const MAX_QUERY_LIMIT = LIMITS.maxQueryLimit;
 
 /** App display names (not keys): lowercase alnum, 1–40 chars. */
 export const APP_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
@@ -57,25 +55,9 @@ export interface RateProfile {
 // 25 WCU + 25 RCU per second (1 500 write-units/min + 1 500 read-units/min
 // shared by ALL tables). Per-app budgets take ~half the pool with margin:
 // 800 units/min ≈ 13/s — bursts ride AWS burst-credit (~5 min headroom).
-export const NORMAL_PROFILE: RateProfile = {
-  totalPerApp: 2_000,
-  writesPerApp: 800,
-  readsPerApp: 800,
-  platform: 2_400,
-  mcpTotal: 2_000,
-  mcpWrites: 800,
-  mcpReads: 800,
-};
+export const NORMAL_PROFILE: RateProfile = { ...GENERATED_NORMAL_PROFILE };
 
-export const PERFORMANCE_PROFILE: RateProfile = {
-  totalPerApp: 500_000,
-  writesPerApp: 100_000,
-  readsPerApp: 400_000,
-  platform: 2_000_000,
-  mcpTotal: 500_000,
-  mcpWrites: 100_000,
-  mcpReads: 400_000,
-};
+export const PERFORMANCE_PROFILE: RateProfile = { ...GENERATED_PERFORMANCE_PROFILE };
 
 /** Internal test profile — seeded by the test suite only (capacity_mode=test). */
 export const TEST_PROFILE: RateProfile = {
@@ -93,7 +75,7 @@ export const RATE_TOTAL_PER_APP = NORMAL_PROFILE.totalPerApp;
 export const RATE_WRITES_PER_APP = NORMAL_PROFILE.writesPerApp;
 export const RATE_READS_PER_APP = NORMAL_PROFILE.readsPerApp;
 export const RATE_PLATFORM = NORMAL_PROFILE.platform;
-export const RATE_ADMIN = 60; // console surface (unchanged in both modes)
+export const RATE_ADMIN = LIMITS.adminRequestsPerMinute; // console surface (unchanged in both modes)
 
 export const RATE_WINDOW_SECONDS = 60;
 
@@ -115,7 +97,7 @@ export const MCP_KEY_DESC_MAX = 200;
 
 // ── per-table provisioned capacity ──────────────────────────────────────────
 // 5 WCU / 5 RCU per data table: sustained 5 writes/s + 5 reads/s per table,
-// well above the per-app budgets (120 writes/min ≈ 2/s). The always-free pool
+// well above the per-app budgets (800 write-units/min ≈ 13/s, NORMAL). The always-free pool
 // is 25+25 account-wide → up to 5 tables at 5/5 stay free. Existing tables
 // are auto-upgraded from the legacy 1/1 on their next touch.
 export const TABLE_WCU = 5;

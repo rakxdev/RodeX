@@ -10,8 +10,8 @@ provisioned-only · on-demand max-throughput guardrail exists.
 
 - A1: Platform-wide switch (all apps/tables), one master toggle — confirmed.
 - A2: NORMAL mode budgets = generous, wall-free for realistic use:
-  writes 2 000 units/min · reads 40 000/min · total 50 000/min ·
-  platform 100 000/min (MCP same). 429 only at genuinely absurd rates.
+  writes 800 units/min · reads 800/min · total 2 000/min ·
+  platform 2 400/min (MCP same). 429 only at genuinely absurd rates.
 - A3: PERFORMANCE mode = guardrails only: writes 100 000/min · reads
   400 000/min · total 500 000/min · platform 2 000 000/min (under AWS
   4 000 WCU/s / 12 000 RCU/s per-table headroom).
@@ -70,7 +70,7 @@ modes, so switching can never break reading/writing existing rows.
 
 - 400 000-byte item: put + get returns full payload; 400 001 → 413
 - Batch total ≤ 400 000 ok; > cap → 413, nothing written
-- Normal budgets: 100×20 KB rows (2 000 units) ok → next 429
+- NORMAL budgets: 100×4 KB rows (400 units) ok → 429 once > 800 units in a minute
 - Performance mode: same 101st write OK (guardrails only)
 - POST capacity switches all tables + persists; GET reports per-table state
 - MCP: 26 tools; set_platform_capacity gated

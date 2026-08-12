@@ -99,7 +99,7 @@ RodeX/
 app.post("/v1/item/put", async (c) => {
   const ctx = await authenticate(c, env);              // 401
   const body = await parseJson(c);                     // 400
-  assertSize(body.item, env);                          // 413 (≤ 20 KB)
+  assertSize(body.item, env);                          // 413 (> 400 KB)
   await registry.assertTableAccess(ctx, body.table);   // 403
   const result = await storage.put(ctx, body, c.req.header("x-request-id"));
   return c.json({ ok: true, result });
@@ -119,12 +119,13 @@ app.post("/v1/item/put", async (c) => {
 
 ### 6.2 Item size policy (throttle-safe — critical math in docs/rate-limits.md)
 
-- **Write cap: 20 KB per item (413 above).** Rationale: free pool = 25 WCU;
-  one 20 KB write = 20 WCU ≤ 25 → never throttled. DynamoDB's 400 KB limit is
-  NOT usable on the free pool (a 400 KB write needs 400 WCU in one second → throttled).
-- Read: items ≤ 20 KB = ≤ 5 RCU strong / 2.5 RCU eventual. Gateway reads with
-  **eventually-consistent by default** (halves read cost), `strong: true` option.
-- No chunking in v1. Large payloads = future R2 feature (v2). Documented.
+- **Hard item cap: 400 KB per item (413 above) in both capacity modes.**
+  NORMAL charges write-units by item size; 20 KB or smaller is the recommended
+  cost-friendly shape. PERFORMANCE uses on-demand billing with guardrails.
+- Read: items up to 400 KB are returned in one call; 400 KB costs up to 100
+  strong read units / 50 eventual read units. Gateway reads are
+  **eventually-consistent by default** (halves read cost), with `strong: true` available.
+- No chunking in v1. Large payloads beyond 400 KB belong in object storage; store the URL in the row.
 
 ### 6.3 Soft delete (scheduled deletion)
 
@@ -153,10 +154,10 @@ Cloudflare location — documented approximation; see docs).
 
 | Scope | Limit | Basis |
 |---|---|---|
-| Per app — total API calls | 600 / min | burst-friendly; ≈ 10/s at one location |
-| Per app — writes (put/update/delete/create) | 120 / min | 2/s × ≤ 20 KB = ≤ 20 WCU/s worst case |
-| Per app — reads (get/query) | 240 / min | 4/s eventual ≈ ≤ 10 RCU/s |
-| Platform — all apps combined (per location) | 1 000 / min | guards shared 25+25 pool |
+| Per app — total API calls | NORMAL: 2 000 / min · PERFORMANCE: 500 000 guardrail | mode-aware contract |
+| Per app — writes (put/update/delete/create) | NORMAL: 800 write-units / min · PERFORMANCE: 100 000 guardrail | size-priced units |
+| Per app — reads (get/query) | NORMAL: 800 / min · PERFORMANCE: 400 000 guardrail | strong reads cost 2× |
+| Platform — all apps combined | NORMAL: 2 400 / min · PERFORMANCE: 2 000 000 guardrail | shared platform safety net |
 | Admin/dashboard endpoints | 60 / min | low, human-only |
 | DynamoDB throttling | mapped → **429 + Retry-After: 1** | never leaks 5xx; clients retry |
 

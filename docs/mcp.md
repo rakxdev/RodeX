@@ -63,8 +63,8 @@ what the agent "thinks" it was told.
 | `delete_app` | **mutate** | ✅ | soft delete (recoverable window, then purge) |
 | `create_table` | **mutate** | ✅ | name pattern `^[a-z0-9][a-z0-9_-]{0,41}$` |
 | `delete_table` | **mutate** | ✅ | irreversible — ALL data in the table |
-| `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 20 KB cap |
-| `batch_put_item` | **mutate** | ✅ | up to 50 items / ≤ 20 KB total; all-or-nothing validation; `all_ok` flag — check it |
+| `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 400 KB cap |
+| `batch_put_item` | **mutate** | ✅ | up to 50 items / ≤ 400 KB total; all-or-nothing validation; `all_ok` flag — check it |
 | `batch_get_item` | read | — | up to 50 keys in one call; missing keys listed, not errors; N reads |
 | `get_platform_capacity` | read | — | platform mode (normal/performance) + per-table billing mode |
 | `set_platform_capacity` | **mutate** | ✅ | switch the ENTIRE platform: normal ($0) ↔ performance (on-demand, unlimited) |
@@ -85,11 +85,12 @@ interfaces is safe (locked by a contract test in the CI gate).
 
 ## Budgets
 
-| Surface | Per minute | Key |
-|---|---|---|
-| MCP total (platform-wide) | 2 000 (guardrail 500 000 in PERFORMANCE) | `mcp:total` |
-| MCP writes | 800 units (guardrail 100 000) | `mcp:write` |
-| MCP reads | 800 (guardrail 400 000) | `mcp:read` |
+<!-- BEGIN GENERATED: mcp-capacity -->
+| Mode | MCP total/min | MCP write-units/min | MCP reads/min |
+|---|---:|---:|---:|
+| NORMAL (provisioned) | 2 000 | 800 | 800 |
+| PERFORMANCE (on-demand) | 500 000 | 100 000 | 400 000 (guardrail) |
+<!-- END GENERATED: mcp-capacity -->
 
 MCP budgets live in the **same single-point RateLimiterDO** as app budgets
 (ADR-003). App budgets also apply to MCP traffic (an agent's writes count

@@ -1,3 +1,11 @@
+# MCP Plan (historical) — budgets superseded by v0.5.0 capacity modes
+
+> **STATUS: HISTORICAL.** The 600/120/240 MCP budgets described below were
+> replaced in v0.5.0 by capacity modes — NORMAL (2 000/800/800 per min) and
+> PERFORMANCE (guardrails only, 500 000/100 000/400 000). See docs/capacity.md.
+> The architecture decisions (single worker, master-key auth, confirmation
+> gate) are still current; only the budget numbers changed.
+
 # Implementation Plan: MCP Server for RodeX (the Universal Gateway Interface)
 
 Status: **IMPLEMENTED — local branch feat/mcp, all phases A–E code+docs done, 137/137 tests, NOT pushed/deployed (per founder instruction)** · Source of truth: SPEC.md, PRODUCT.md, docs/decisions/ADR-001..005 · Research: official Cloudflare + MCP spec docs (2026-07)
@@ -38,7 +46,7 @@ Every tool is designed with rich instructions, and a hard **confirmation gate** 
 2. **Stateless Streamable HTTP server** using Cloudflare's current blessed path (`createMcpHandler` from `agents/mcp` — `McpAgent` is deprecated). JSON-only responses (no SSE) → never hits the free-plan wall-clock cap. Single endpoint `/mcp`, POST JSON-RPC. **Origin validated** on every request (spec-required DNS-rebinding protection): missing Origin (non-browser clients) allowed; browser origins allow-listed.
 3. **Master-key auth**: every request must carry `Authorization: Bearer rok_mcp_…`. The worker validates against `rodex_mcp_keys` (hash-only storage, HMAC-SHA256 with a dedicated `MCP_KEY_SECRET`). Invalid/missing → JSON-RPC error `-32001 Unauthorized` (never reveals whether a key exists). No OAuth endpoints at all.
 4. **Key lifecycle (console-only)**: gateway gains admin endpoints `POST/GET /v1/admin/mcp/keys`, `POST /v1/admin/mcp/keys/:id/view` (**anytime — AES-GCM ciphertext with NO expiry**, founder decision), `DELETE /v1/admin/mcp/keys/:id`. **No rotate endpoint by design.** Keys stored in new auto-provisioned table `rodex_mcp_keys` (5/5, consistent with ADR-001). Deleting a key destroys it forever.
-5. **MCP traffic budgets** (separate from app budgets, in-worker sliding-window counter — one personal worker ≈ single isolate, documented honest ceiling like the 5 RCU note): **600 total / 120 writes / 240 reads per minute platform-wide** for MCP. 429s name the budget.
+5. **MCP traffic budgets** (separate from app budgets, counted by the same single-point RateLimiterDO): NORMAL = **2 000 total / 800 write-units / 800 reads per minute**; PERFORMANCE = **500 000 / 100 000 / 400 000 guardrails**. 429s name the budget.
 6. **Confirmation gate (hard rule)**: every mutating tool requires `confirmed: true` in its arguments. Without it the server refuses with a structured `confirmation_required` response the agent must relay to the user. Tool descriptions + a `get_instructions` tool + the console manual all state the protocol: *gather everything, present the plan, ask, then execute*.
 7. **Gateway addition (small)**: `POST /v1/table/delete` — currently tables can't be deleted individually (only via app purge). Needed for full gateway access. Added with tests; does not change existing contracts.
 8. **Deploy order**: gateway first (key CRUD + table delete), then MCP worker, then dashboard page. All behind the protected-main PR flow.

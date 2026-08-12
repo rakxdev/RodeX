@@ -78,7 +78,7 @@ The agent gets the full 21-tool surface; every mutation still requires
 
 ## Budgets to keep in mind (per app, per minute)
 
-600 total · 120 writes · 240 reads — plus the platform pool (1000/min) and
+2 000 total · 800 write-units · 800 reads (NORMAL) — plus the platform pool (2 400/min) and
 the MCP pool. 429s name the budget and carry `retry_after` seconds; writes
 with a `request_id` are always safe to retry. Full math:
 [docs/rate-limits.md](rate-limits.md).

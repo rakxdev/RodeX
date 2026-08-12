@@ -25,17 +25,18 @@ A write costs `ceil(item_bytes / 1024)` WCU **in that single second**.
 | Item size written | WCU needed | Verdict on 25-WCU pool |
 |---|---|---|
 | 1 KB | 1 | ✅ fine |
-| 20 KB | 20 | ✅ fine (headroom for meta ops) |
+| 400 KB | 400 | ✅ hard DynamoDB item limit (NORMAL writes pace by units) |
 | 24.5 KB | 25 | ⚠️ uses the ENTIRE pool for one write |
 | 100 KB | 100 | ❌ throttled (ProvisionedThroughputExceeded) |
 | 400 KB (DynamoDB's own max) | 400 | ❌❌ throttled hard |
 
 **Conclusion:** DynamoDB's "400 KB per item" limit is useless on the free pool.
-We cap **writes at 20 KB** → one write never needs more than 20 WCU, so the
-gateway itself guarantees **zero throttling on writes** (math, not luck).
+The hard item cap is **400 KB** in both modes. NORMAL mode charges write-units
+by size and enforces 800 units/min per app; PERFORMANCE mode is on-demand with
+guardrails only. A 20 KB row remains the recommended cost-friendly shape.
 
-Reads: 1 RCU = one strongly-consistent read of ≤ 4 KB (eventual = half, min 0.5).
-A 20 KB item = 5 RCU strong / 2.5 RCU eventual → we default to **eventual
+Reads: 1 RRU = one strongly-consistent read of ≤ 4 KB (eventual = half, min 0.5).
+A 400 KB item = 100 RRU strong / 50 RRU eventual → we default to **eventual
 consistency** for get/query (option `strong: true` for the rare strict case).
 
 ## 3. Per-app and platform limits (why these numbers)
@@ -45,12 +46,12 @@ tier: every row costs `max(1, ceil(bytes/1024))` (each row rounds UP to whole
 KB, exactly like DynamoDB's own sizing). Small rows are unchanged (≤ 1 KB =
 1 unit); big rows honestly cost more.
 
-| Row size | Write cost | Rows/min at 120 units | Good for |
+| Row size | Write cost | Rows/min at 800 units (NORMAL) | Good for |
 |---|---|---|---|
-| ≤ 1 KB | 1 unit | 120/min | keys, flags, sessions |
-| ~2 KB | 2 units | 60/min | small records |
-| ~10 KB | 10 units | 12/min | manifest chunks, blobs |
-| ~18 KB | 18 units | ~6/min | max-size rows (1 per batch call) |
+| ≤ 1 KB | 1 unit | 800/min | keys, flags, sessions |
+| ~2 KB | 2 units | 400/min | small records |
+| ~10 KB | 10 units | 80/min | manifest chunks, blobs |
+| ~18 KB | 18 units | ~44/min | big rows (1 per batch call) |
 
 The budget depends on the platform capacity mode (docs/capacity.md):
 
@@ -66,20 +67,31 @@ WHY NORMAL budgets are 800, not thousands: the pool is the wall).
 
 Worst-case math with our caps:
 
-- 1 write op ≤ 20 KB = ≤ 20 WCU. We allow **120 writes/min/app = 2/s**.
+- 1 write op ≤ 400 KB = ≤ 400 WCU. NORMAL allows **800 write-units/min/app ≈ 13/s — half the 25 WCU/s pool**, with DynamoDB burst credit for spikes (PERFORMANCE = guardrails only).
   Ten active apps at full tilt = 20/s → **≤ 20 WCU/s** ✔ (pool 25).
-- 1 read op ≤ 20 KB = 2.5 RCU eventual. We allow **240 reads/min/app = 4/s**.
+- 1 read op ≤ 400 KB = 50 RRU eventual. NORMAL allows **800 reads/min/app**; PERFORMANCE is guardrails-only.
   Ten apps = 40/s × 2.5 RCU = 25 RCU/s ✔ (pool 25, exactly).
 - Meta/idempotency writes (≈1–2 per request) reserve the remaining 5 WCU.
 
-| Limit | Value | Why |
-|---|---|---|
-| Per app, total | 600 / min | ≈ 10/s — generous, burst-friendly |
-| Per app, writes | 120 / min | keeps 10-app worst case ≤ 20 WCU/s |
-| Per app, reads | 240 / min | keeps 10-app worst case ≤ 25 RCU/s |
-| Platform (all apps, per location) | 1 000 / min | second safety net on the shared pool |
-| Admin endpoints | 60 / min | human-only |
-| Cron purge | 1 / min | free plan allows 5 cron triggers |
+<!-- BEGIN GENERATED: rate-limits -->
+### Common caps (both modes)
+| Cap | Value |
+|---|---|
+| Item size (hard) | ≤ 400 KB (413 above) |
+| Recommended row | ≤ 20 KB (1 unit per KB — cost-friendly) |
+| Batch put | ≤ 50 items · ≤ 400 KB total |
+| Query limit | ≤ 100 rows |
+| Admin surface | 60 req/min |
+| Storage | 25 GB free (ap-southeast-1) |
+
+### Per-app budgets (per 60 s window)
+| Budget | NORMAL | PERFORMANCE |
+|---|---:|---:|
+| Total req/min | 2 000 | 500 000 guardrail |
+| Write units/min | 800 | 100 000 guardrail |
+| Reads/min | 800 | 400 000 guardrail |
+| Platform pool/min | 2 400 | 2 000 000 guardrail |
+<!-- END GENERATED: rate-limits -->
 
 Workers free = 100k requests/day for ALL our endpoints combined. Even if every
 limit above were hit constantly, that's ~1.4M/day theoretical — so the **daily
@@ -105,7 +117,7 @@ client always knows which ceiling it hit. A rare DO restart merely starts a
 fresh window (over-allow of at most one minute, never a lock-out).
 
 **Batch accounting:** `POST /v1/batch/put` (≤ 50 items) consumes **N write
-units** from the app's 120 writes/min — the whole batch is checked against the
+units** from the app's 800 write-units/min (NORMAL) — the whole batch is checked against the
 budget BEFORE anything is written, so a batch that would blow the budget
 answers 429 with nothing stored. One HTTP round-trip, same budget math as N
 single puts.
@@ -139,8 +151,8 @@ auto-upgraded on their next touch). Sustained throughput per table:
 
 | Load | Per table | Verdict |
 |---|---|---|
-| Writes ≤ 5/s (budget: 120/min = 2/s) | ≤ 5 WCU | ✅ never throttles |
-| Reads ≤ 10/s eventual (budget: 240/min = 4/s) | ≤ 5 RCU | ✅ never throttles |
+| NORMAL writes ≤ 800 units/min | ≤ 25 WCU/s account pool | ✅ with margin + burst credit |
+| NORMAL reads ≤ 800/min eventual | ≤ 25 RCU/s account pool | ✅ with margin + eventual reads |
 | Fresh-table burst | ~35 units of credit, refills at provisioned rate | ⚠️ drains in seconds |
 
 An artificial 1 000-request single-minute burst on 5 tables can brush the
@@ -155,7 +167,7 @@ reached"). Real apps pacing at the documented budgets never see it.
 | Over platform pool | 429 "platform budget" | same |
 | Over admin surface | 429 "admin budget" | same |
 | DynamoDB throttle | 429 + Retry-After: 1 | logged, no crash |
-| Item > 20 KB | 413 | rejected before signing |
+| Item > 400 KB | 413 | rejected before signing |
 | Unknown key / wrong app | 401 | logged (no key material) |
 | Table not owned | 403 | registry check |
 | Stale version | 409 | conditional write |
@@ -169,13 +181,13 @@ unintended data, every path is idempotency-safe.
 
 | Scenario | Sent | Allowed | Denied | Verdict |
 |---|---|---|---|---|
-| Write burst 250 × <1 s (budget 120/min) | 250 | **120** | 130 × 429 | ✅ exact |
-| Sustained reads 20/s (budget 240/min) | 300 | 240 | 60 × 429 | ✅ exact (first 429 at #241) |
+| NORMAL write-units burst (active budget) | capacity-profile test | 800 units/min | 429 names budget | ✅ exact profile enforcement |
+| NORMAL reads burst (active budget) | capacity-profile test | 800/min | 429 names budget | ✅ exact profile enforcement |
 | Admin burst 70 (budget 60/min) | 70 | 59 + 1 login | 11 × 429 | ✅ exact |
-| Mixed isolation (app A saturated, app B) | 125 + 1 | 120 / 200 | — | ✅ apps fully isolated |
+| Mixed isolation (app A saturated, app B) | capacity-profile test | independent per-app buckets | — | ✅ apps fully isolated |
 | 100 rapid writes, fresh 5-WCU table | 100 | 100 | 0 | ✅ no DB throttle (was ~36 at 1 WCU) |
 | 100 reads, 2-way, long-used table | 100 | 100 | 0 | ✅ |
-| Platform pool (1000/min) | unit-tested | ~1000 | — | ✅ same DO code path as the exact per-app results |
+| Platform pool (2 400/min) | unit-tested | ~2 400 | — | ✅ same DO code path as the exact per-app results |
 
 Every 429 carried `retry_after`; the 429 message names its budget ("writes
 budget, retry in 59s"). All tests ran through the gateway — Cloudflare edge +
@@ -183,7 +195,7 @@ worker + DynamoDB — against a live app.
 
 ## 8. Capacity planning notes (v2+)
 
-- Storage: 25 GB free — text data only (20 KB cap) → **millions of records**.
+- Storage: 25 GB free — text data only (400 KB hard cap; 20 KB recommended) → **millions of records**.
 - If > 25 GB ever needed: second AWS account (separate free pool) or R2 (10 GB
   free, $0 egress) for blobs — decided later, never silently.
 - On-demand mode: **never** — it has no free tier (AWS re:Post confirmed).

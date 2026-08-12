@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { pageTransition, foldIn, stagger } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
 import type { ReactNode } from "react";
+import { CELL09, CONTRACT_STRINGS } from "@/generated/contract";
 
 const GW = "https://rodex-gateway.rakxdev.workers.dev";
 
@@ -257,7 +258,7 @@ curl -X POST $GW/v1/table/create \\
             <P>
               Rows are keyed by <code className="text-ink">pk</code> (required, ≤ 500 chars) and{" "}
               <code className="text-ink">sk</code> (optional, defaults to <code className="text-ink">"~"</code>) — the
-              classic single-table composite-key model. Payloads are capped at 20 KB (413).
+              classic single-table composite-key model. Payloads are capped at 400 KB (413); 20 KB rows keep write costs low.
             </P>
             <div className="space-y-3">
               <div>
@@ -292,8 +293,8 @@ curl -X POST $GW/v1/table/create \\
 → { "written": 2, "all_ok": true, "items": [...], ... }
 // all_ok is the success signal — a 200 can contain per-item failures;
 // check all_ok and retry failed items (ok:false) with backoff.
-// total bytes ≤ 20 KB per call; every row costs max(1, ceil(bytes/1024))
-// write-units from the 120-unit/min budget (rows ≤ 1 KB = 1 unit);
+// total bytes ≤ 400 KB per call; every row costs max(1, ceil(bytes/1024))
+// write-units from the NORMAL 800-unit/min budget (rows ≤ 1 KB = 1 unit); PERFORMANCE uses guardrails;
 // every item echoes its bytes.`}</Code>
               </div>
               <div>
@@ -303,7 +304,7 @@ curl -X POST $GW/v1/table/create \\
   "keys": [ { "pk": "USER#1", "sk": "PROFILE" }, { "pk": "USER#2" } ]
 }
 → { "requested": 2, "found": [...], "missing": [...] }   // missing ≠ error
-// N keys = N reads from the 240/min budget`}</Code>
+// N keys = N reads from the active mode budget (800/min NORMAL)`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/item/increment</span> — atomic counter</H>
@@ -420,7 +421,7 @@ curl -X POST $GW/v1/table/create \\
             <ul className="font-mono text-[11.5px] text-inkdim space-y-2 mb-4 list-none">
               <li>— <b className="text-ink">Read order = sk order.</b> Put the timestamp (or the natural range) in sk when you will page through rows.</li>
               <li>— <b className="text-ink">One row per entity.</b> Prefer updating one row over delete+put pairs (writes are the scarce budget).</li>
-              <li>— <b className="text-ink">Keep rows ≤ 20 KB.</b> Big payloads belong in object storage; store the URL in the row.</li>
+              <li>— <b className="text-ink">Keep rows cost-friendly (≤ 20 KB recommended).</b> Hard cap is 400 KB; big payloads belong in object storage — store the URL in the row.</li>
               <li>— <b className="text-ink">Avoid hot keys.</b> Spread frequent writes across several pks (e.g. <code>[0-9]#&lt;id&gt;</code>) when one key would absorb all traffic.</li>
               <li>— <b className="text-ink">Version everything mutable.</b> Read the version, write with <code>expected_version</code>, handle the 409.</li>
               <li>— <b className="text-ink">All keys carry your app's id</b> inside the table — <code>app_&lt;id&gt;_&lt;name&gt;</code> is always the physical name.</li>
@@ -524,43 +525,32 @@ curl -X POST $GW/v1/table/create \\
           </Section>
 
           <Section cell="09" title="LIMITS" anchor="limits">
-            <P>Engineered so the always-free DynamoDB budget is never hit — these are the contract.</P>
+            <P>
+              Capacity-mode aware: <span className="text-ink">NORMAL</span> keeps the provisioned DynamoDB free tier honest;
+              <span className="text-ink"> PERFORMANCE</span> uses on-demand billing with guardrails only. Data rules are identical in both modes.
+            </P>
             <table className="doc-table">
               <thead>
                 <tr>
                   <th>Bound</th>
-                  <th>Limit</th>
+                  <th>NORMAL · provisioned · $0</th>
+                  <th>PERFORMANCE · on-demand</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Item size</td>
-                  <td>≤ 20 KB per row (413 above)</td>
-                </tr>
-                <tr>
-                  <td>Per app · total</td>
-                  <td>600 req/min (429 with retry_after)</td>
-                </tr>
-                <tr>
-                  <td>Per app · writes</td>
-                  <td>120 / min</td>
-                </tr>
-                <tr>
-                  <td>Per app · reads</td>
-                  <td>240 / min</td>
-                </tr>
-                <tr>
-                  <td>Platform pool</td>
-                  <td>1 000 req/min across apps</td>
-                </tr>
-                <tr>
-                  <td>Admin surface</td>
-                  <td>60 req/min</td>
-                </tr>
-                <tr>
-                  <td>Storage</td>
-                  <td>25 GB DynamoDB free tier · ap-southeast-1</td>
-                </tr>
+                {Object.values(CELL09).map((row) => (
+                  <tr key={row.bound}>
+                    <td>{row.bound}</td>
+                    {row.normal === row.performance ? (
+                      <td colSpan={2}>{row.normal}</td>
+                    ) : (
+                      <>
+                        <td>{row.normal}</td>
+                        <td>{row.performance}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </Section>
@@ -582,22 +572,22 @@ curl -X POST $GW/v1/table/create \\
               <tbody>
                 <tr>
                   <td><code>429</code> on bursts of writes</td>
-                  <td>&gt; 120 writes in one minute</td>
+                  <td>&gt; 800 write-units in one minute (NORMAL)</td>
                   <td>queue writes client-side; spread over seconds; coalesce updates</td>
                 </tr>
                 <tr>
                   <td><code>429</code> on reads</td>
-                  <td>&gt; 240 reads/min — often N+1 gets</td>
+                  <td>&gt; 800 reads/min — often N+1 gets</td>
                   <td>one query with sk_prefix + limit instead of many gets</td>
                 </tr>
                 <tr>
                   <td><code>429</code> on everything</td>
-                  <td>&gt; 600 total req/min</td>
+                  <td>&gt; {CONTRACT_STRINGS.NORMAL_TOTAL_V} total req/min (NORMAL)</td>
                   <td>back off, cache responses, gossip between instances</td>
                 </tr>
                 <tr>
                   <td><code>429</code> early on a fresh key</td>
-                  <td>platform pool (1 000/min) shared across apps</td>
+                  <td>platform pool (2 400/min) shared across apps</td>
                   <td>spread traffic; stagger cron jobs</td>
                 </tr>
                 <tr>
@@ -607,14 +597,16 @@ curl -X POST $GW/v1/table/create \\
                 </tr>
                 <tr>
                   <td><code>413</code> instead of 429</td>
-                  <td>payload over 20 KB — different ceiling</td>
+                  <td>payload over {CONTRACT_STRINGS.ITEM_SIZE.replace("≤ ", "")} — different ceiling</td>
                   <td>shrink the row; store blobs elsewhere</td>
                 </tr>
               </tbody>
             </table>
             <P>
-              The honest math: 120 writes/min ≈ 2 writes/sec ≈ 2 WCU — under the table's burst capacity, so steady apps{" "}
-              <span className="text-ink">never see 429 by design</span>. The boundaries above are the contract; treat{" "}
+              The honest math (NORMAL): 800 write-units/min ≈ 13/s ≈ half the 25 WCU/s free pool — with DynamoDB burst credit, steady apps{" "}
+              <span className="text-ink">never see 429 by design</span>. PERFORMANCE mode (on-demand) raises these to{" "}
+              <span className="text-ink">guardrails only</span> — see{" "}
+              <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/capacity.md" target="_blank" rel="noreferrer">docs/capacity.md</a>. The boundaries above are the contract; treat{" "}
               <span className="text-redx">429 as the meter</span> — if you ever see it, throttle to ~80% of the budget and it resolves within the minute.
             </P>
           </Section>
@@ -676,7 +668,7 @@ claude mcp add --transport http rodexdb ${GW}/mcp \\
                 <tr><td><code>rotate_app_key</code> · <code>view_app_key</code></td><td><span className="text-amber">mutate — confirm</span></td><td>new app key (old dies instantly) · re-view inside 48 h window</td></tr>
                 <tr><td><code>recover_app</code> · <code>force_delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>undo soft delete · immediate purge (no window)</td></tr>
                 <tr><td><code>create_table</code> · <code>delete_table</code></td><td><span className="text-amber">mutate — confirm</span></td><td>table lifecycle (delete is irreversible)</td></tr>
-                <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 20 KB cap)</td></tr>
+                <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 400 KB cap)</td></tr>
               </tbody>
             </table>
 
@@ -692,7 +684,7 @@ claude mcp add --transport http rodexdb ${GW}/mcp \\
 
             <H>BUDGETS</H>
             <P>
-              MCP traffic: <span className="text-ink">600 total / 120 writes / 240 reads per minute</span>{" "}
+              MCP traffic: <span className="text-ink">{CONTRACT_STRINGS.MCP_SURFACE_LINE} per minute</span>{" "}(NORMAL — guardrails only in PERFORMANCE)
               (platform-wide), counted by the same single-point limiter as app traffic. App budgets also apply
               — an agent's writes show up in the app's LIVE METERS. 429s name the budget and carry retry seconds.
             </P>
@@ -764,7 +756,7 @@ npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
                 <tr><td><code>403</code></td><td>not your table · app suspended / deleting</td></tr>
                 <tr><td><code>404</code></td><td>row or app not found</td></tr>
                 <tr><td><code>409</code></td><td>conflict — duplicate row, version mismatch</td></tr>
-                <tr><td><code>413</code></td><td>payload over 20 KB</td></tr>
+                <tr><td><code>413</code></td><td>payload over {CONTRACT_STRINGS.ITEM_SIZE.replace("≤ ", "")}</td></tr>
                 <tr><td><code>415</code></td><td>POST without Content-Type: application/json</td></tr>
                 <tr><td><code>429</code></td><td>rate limit — retry after <code>retry_after</code> seconds</td></tr>
                 <tr><td><code>502 / 503</code></td><td>infrastructure — safe to retry</td></tr>

@@ -20,7 +20,7 @@ Run a single file: `npx vitest run gateway/test/rate.test.ts`.
 | `test/storage-mock.test.ts` | storage contract: apps, idempotency TTL, items, versions, queries, settings rows, storageSize |
 | `test/storage-aws.test.ts` | marshaling rules (empty-string-set guard), table ACTIVE polling, 5/5 auto-upgrade, **app-row round-trip of newer fields** (view-key regression) |
 | `test/registry.test.ts` | lifecycle: rotate, soft delete/recover, purge bounds, key cipher on create/rotate |
-| `test/rate.test.ts` | **strict budgets**: writes 120, reads 240, mixed kind isolation, platform pool across 3 apps, admin 60, retry_after, window reset, DO atomicity + peek-no-consume |
+| `test/rate.test.ts` | **strict budgets**: writes 800, reads 800 (NORMAL profile), mixed kind isolation, platform pool 2 400 across 3 apps, admin 60, retry_after, window reset, DO atomicity + peek-no-consume |
 | `test/api.test.ts` | full-stack via `app.fetch`: isolation 403, idempotency, 409/413/401, table create, cross-app table checks |
 | `test/admin.test.ts` | password + GitHub OAuth (mocked fetch incl. User-Agent regression), admin CRUD, suspend, soft delete, view-key window, **change-password round-trip**, **usage endpoint (counters without consuming)**, delete alias, descriptions |
 

@@ -134,6 +134,6 @@ all_rows = scan_all(db, "crawled_tests")
 - `429` answers name their budget and carry `retry_after` — the client above
   sleeps and retries writes automatically.
 - A batch of N rows consumes `sum(max(1, ceil(bytes/1024)))` write-units —
-  rows ≤ 1 KB cost 1 unit each against the app's 120 write-units/min.
-  Keep batch TOTAL bytes ≤ 20 KB (~18 KB rows = 1 row per call).
-- Rows cap at 20 KB; `query` limit ≤ 100; batch ≤ 50 items.
+  rows ≤ 1 KB cost 1 unit each against the app's 800 write-units/min in NORMAL.
+  Keep batch TOTAL bytes ≤ 400 KB; smaller rows are more cost-friendly.
+- Rows cap at 400 KB; `query` limit ≤ 100; batch ≤ 50 items.

@@ -8,6 +8,7 @@ import KeyReveal from "@/components/KeyReveal";
 import Loader from "@/components/Loader";
 import TiltCard from "@/components/TiltCard";
 import { FoldButton } from "@/components/FoldButton";
+import { CONTRACT_STRINGS } from "@/generated/contract";
 
 function CopyCell({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -150,7 +151,7 @@ function CapacityStrip() {
               ) : (
                 <>
                   <b className="text-gold">NORMAL</b> — all {tableCount} table(s) back to provisioned 5/5: $0 free tier,
-                  generous budgets (2 000 write-units/min per app).
+                  {CONTRACT_STRINGS.APPS_MODAL_BUDGETS}
                 </>
               )}{" "}
               Switching takes minutes at AWS (max 4 switches/24 h per table).

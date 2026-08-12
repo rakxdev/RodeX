@@ -7,6 +7,7 @@ import { istDate } from "@/lib/utils";
 import KeyReveal from "@/components/KeyReveal";
 import Loader from "@/components/Loader";
 import { FoldButton } from "@/components/FoldButton";
+import { CONTRACT_STRINGS } from "@/generated/contract";
 
 /**
  * McpPage — the MCP GATEWAY console page.
@@ -343,11 +344,11 @@ claude mcp add --transport http rodexdb ${ENDPOINT} \\
 
           <Section tag="BUDGETS & ERRORS" title="The honest numbers">
             <ul className="space-y-1.5">
-              <li>MCP surface: <span className="text-ink">600 total / 120 writes / 240 reads</span> per minute, platform-wide</li>
+              <li>MCP surface: <span className="text-ink">{CONTRACT_STRINGS.MCP_SURFACE_LINE}</span> per minute, platform-wide (NORMAL; guardrails only in PERFORMANCE)</li>
               <li>App budgets still apply to MCP traffic (they share the same tables)</li>
               <li><code className="text-ink">401</code> — missing/invalid master key · <code className="text-ink">429</code> — budget spent, names the budget + retry seconds</li>
               <li><code className="text-ink">confirmation_required</code> — the gate: agent must ask you first</li>
-              <li>Items ≤ 20 KB · query limit ≤ 100 · updates are version-guarded (409 on conflict)</li>
+              <li>Items {CONTRACT_STRINGS.ITEM_SIZE} · query limit ≤ 100 · updates are version-guarded (409 on conflict)</li>
             </ul>
           </Section>
 

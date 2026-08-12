@@ -38,7 +38,7 @@ What to include:
 - Keys stored as HMAC hashes, never in plaintext or logs
 - MCP mutations require `confirmed: true` — enforced server-side
 - Idempotency + version guarding (409 on conflict)
-- 20 KB write cap, strict single-point rate budgets
+- 400 KB hard item cap, strict single-point mode-aware rate budgets
 - Secrets only via `wrangler secret` / Actions secrets
 
 ## Scope

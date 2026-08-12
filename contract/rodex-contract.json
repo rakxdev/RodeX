@@ -1,0 +1,45 @@
+{
+  "contractVersion": "0.5.1",
+  "common": {
+    "maxItemBytes": 400000,
+    "recommendedItemBytes": 20000,
+    "maxRequestBytes": 1000000,
+    "maxQueryLimit": 100,
+    "maxBatchItems": 50,
+    "maxBatchBytes": 400000,
+    "adminRequestsPerMinute": 60,
+    "storageGb": 25,
+    "dailyWorkerRequests": 100000
+  },
+  "capacityModes": {
+    "normal": {
+      "billing": "provisioned",
+      "label": "NORMAL",
+      "description": "Provisioned capacity at $0 using the DynamoDB always-free pool.",
+      "totalPerAppPerMinute": 2000,
+      "writeUnitsPerAppPerMinute": 800,
+      "readsPerAppPerMinute": 800,
+      "platformPerMinute": 2400,
+      "mcpTotalPerMinute": 2000,
+      "mcpWriteUnitsPerMinute": 800,
+      "mcpReadsPerMinute": 800
+    },
+    "performance": {
+      "billing": "on-demand",
+      "label": "PERFORMANCE",
+      "description": "On-demand capacity with guardrails; pay per request for burst work.",
+      "totalPerAppPerMinute": 500000,
+      "writeUnitsPerAppPerMinute": 100000,
+      "readsPerAppPerMinute": 400000,
+      "platformPerMinute": 2000000,
+      "mcpTotalPerMinute": 500000,
+      "mcpWriteUnitsPerMinute": 100000,
+      "mcpReadsPerMinute": 400000
+    }
+  },
+  "mcp": {
+    "endpoint": "/mcp",
+    "masterKeyPrefix": "rok_mcp_",
+    "confirmationRequired": true
+  }
+}
