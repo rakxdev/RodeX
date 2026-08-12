@@ -4,6 +4,54 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [0.5.0] — 2026-08-12 · Dual capacity modes + universal write safety
+
+### Added
+- **Capacity modes (platform-wide)**: PERFORMANCE = all tables on-demand
+  (pay-per-request, no throttling, budgets become guardrails: writes
+  100 000 units/min, reads 400 000/min) · NORMAL = provisioned 5/5 ($0 free
+  tier, budgets 800 write-units / 800 reads per app/min — the free-tier pool made honest).
+- **Switch via dashboard** (AppsPage strip + confirm modal, SWITCHING… state)
+  · **REST** `GET/POST /v1/admin/capacity` · **MCP** `get_platform_capacity`
+  + `set_platform_capacity` (confirmation-gated) — 26 tools.
+- **Item cap 20 KB → 400 KB** (DynamoDB's hard limit) in BOTH modes — reads
+  were never size-gated; writes now accept any size; 20 KB becomes a cost
+  recommendation. Batch byte cap 400 KB total.
+- docs/capacity.md (matrix + cost ladder + AWS switching facts).
+
+### Changed
+- Budgets in NORMAL were raised (120 → 800 write-units/min per app; 240 → 800 reads; 600 → 2 000 total;
+  1 000 → 2 400 platform — the real 25 WCU+25 RCU/s shared pool with margin) — 429s
+  now only at genuinely absurd rates.
+- New tables created while PERFORMANCE are on-demand directly.
+
+### Tests
+- 177 gateway + 14 package (capacity endpoint suite, PERF guardrails,
+  400 KB round-trip, TEST profile for exact end-to-end bursts).
+
+### Fixed (from the write-safety round)
+- **CORS: DELETE now allowed from the console** — app soft-delete and MCP
+  key delete were blocked by preflight since launch (day-one bug).
+- **delete_table pacing** — drains big-row tables with ≤20-item chunks,
+  1 s gaps and 429-retry backoff; cleanup no longer throttles mid-drain.
+
+### Changed (WCU-honest writes — the universal precaution, research-validated)
+- **Write budget is now size-honest**: 120 **write-units**/min where every
+  row costs `max(1, ceil(bytes/1024))` — DynamoDB's exact rounding rule.
+  Rows ≤ 1 KB = 1 unit (unchanged); an 18 KB row = 18 units; 429s name the
+  budget. Matches the OpenAI TPM / DynamoDB WCU capacity-unit precedent.
+- **`batch/put` byte cap**: total serialized bytes ≤ 20 KB per call, checked
+  before any write → 413. A WCU-burst batch is structurally impossible.
+- **`all_ok` flag** on batch responses (Elasticsearch `errors` precedent):
+  a 200 with failed items is now impossible to miss. Per-item errors still
+  carry `ok:false` + reason; retry guidance documented everywhere.
+- **`bytes` echoed on every item** (put/get/query/update/batch) — consumers
+  see the exact number the budget charges on.
+
+### Tests
+- 183 → **188** (all_ok matrix, batch byte cap, WCU-unit ceiling proof,
+  bytes echo, CORS preflight regression).
+
 ## [0.3.0] — 2026-08-12 · Serverless-data trio: batch/get + increment + TTL
 
 ### Added

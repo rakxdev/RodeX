@@ -108,8 +108,12 @@ export interface Storage {
   mcpKeyDelete(keyId: string): Promise<void>;
 
   // data tables (physical names are app_<appId>_<logical>, built by tables.ts)
-  ensureTable(physical: string): Promise<void>; // create if missing; 409→ok
+  ensureTable(physical: string, billingMode?: "on-demand" | "provisioned"): Promise<void>; // create if missing; 409→ok
   dropTable(physical: string): Promise<void>; // empty (paginated) then delete
+  /** switch a table between billing modes (on-demand = PAY_PER_REQUEST). Takes minutes at AWS. */
+  setTableCapacity(physical: string, mode: "on-demand" | "provisioned"): Promise<void>;
+  /** current billing mode of a table (null = unknown/absent). */
+  tableCapacityMode(physical: string): Promise<"on-demand" | "provisioned" | null>;
   /** observability: approximate size + item count (DynamoDB ItemCount lags ~6 h) */
   storageSize(physical: string): Promise<{ bytes: number; items: number } | null>;
 

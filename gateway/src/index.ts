@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { registerAdminRoutes } from "./admin";
+import { processCapacityChunk } from "./capacity";
 import { registerMcpKeyRoutes } from "./mcpkeys";
 import { authMcpKey, createMcpRoute } from "./mcp";
 import { gateMCPTotal } from "./rate";
@@ -38,7 +39,7 @@ app.use("*", async (c, next) => {
   const origin = dashboardOrigin(c.env);
   c.header("Access-Control-Allow-Origin", origin);
   c.header("Access-Control-Allow-Credentials", "true");
-  c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  c.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   c.header(
     "Access-Control-Allow-Headers",
     "Content-Type, X-App-Id, X-Api-Key, X-Request-Id, Authorization",
@@ -230,5 +231,9 @@ export default {
   async scheduled(_ctrl: ScheduledController, env: Env, _ctx: ExecutionContext) {
     const purged = await runPurge(env);
     if (purged > 0) console.log(`rodex purge: finalized ${purged} app(s)`);
+    // capacity-mode switches run chunk by chunk (per-request subrequest ceiling)
+    const cap = await processCapacityChunk(env, 12);
+    if (cap.processed > 0 && !cap.done) console.log(`rodex capacity: switched ${cap.processed} table(s), continuing`);
+    if (cap.done && cap.processed > 0) console.log("rodex capacity: switch complete");
   },
 } satisfies ExportedHandler<Env>;

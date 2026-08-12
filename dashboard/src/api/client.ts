@@ -166,6 +166,19 @@ export const api = {
   delete: <T>(path: string) => request<T>("DELETE", path),
 };
 
+export type CapacityMode = "normal" | "performance";
+
+export interface CapacityTableState {
+  app_id: string;
+  table: string;
+  mode: "on-demand" | "provisioned" | null;
+}
+
+export interface CapacityInfo {
+  mode: CapacityMode;
+  tables: CapacityTableState[];
+}
+
 export const gatewayBase = BASE;
 
 // ── domain types (mirror docs/api.md + openapi.yaml) ──────────────

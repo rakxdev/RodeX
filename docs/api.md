@@ -47,6 +47,9 @@ or the canonical **envelope** (identical to what reads return):
 
 - `pk` required (≤ 500 chars); `sk` optional (default `"~"`).
 - A `data` key inside `item` selects the envelope; mixing it with flat fields → 400.
+- Responses echo the stored row with its **`bytes`** (full representation);
+  the write consumes `max(1, ceil(bytes/1024))` units from the 120-unit/min
+  budget (rows ≤ 1 KB = 1 unit — unchanged behavior for small rows).
 - Optional `ttl` (integer, unix seconds) — the row **expires after this** and
   deletes itself for free (DynamoDB TTL; physical deletion lags up to ~48 h,
   but the gateway never returns an expired row). `ttl` is echoed in responses.
@@ -69,10 +72,22 @@ or the canonical **envelope** (identical to what reads return):
   (envelope or flat), plus optional `ttl`.
 - **All-or-nothing validation:** any invalid item (missing pk, bad shape, > 20 KB)
   rejects the WHOLE batch with 400/413 and nothing is written.
-- **Budget honesty:** a batch of N consumes **N writes** from the app's
-  120 writes/min (reserved before any write). 429 when the batch would exceed it.
-- Per-item result array: `items[]` with `{ pk, sk, ok, item }` or
-  `{ pk, sk, ok: false, error }`. `request_id` makes the whole batch idempotent.
+- **Budget honesty (WCU units):** every row costs
+  `max(1, ceil(bytes/1024))` write-units (DynamoDB's exact rounding rule).
+  Rows ≤ 1 KB = 1 unit; an 18 KB row = 18 units. The app's budget is
+  **120 write-units/min** (≈ 120 KB/min) — reserved BEFORE any write; 429
+  when the batch would exceed it.
+- **`all_ok` is the success signal** — `true` only when EVERY item wrote.
+  An HTTP 200 can contain per-item failures: `items[]` with
+  `{ pk, sk, ok, item }` or `{ pk, sk, ok: false, error }`. **Consumers MUST
+  check `all_ok`** (or per-item `ok`) and retry failed items individually —
+  same discipline DynamoDB's `UnprocessedItems` and Elasticsearch's bulk
+  `errors` flag demand. `request_id` makes the whole batch idempotent.
+- **Byte cap:** the batch's TOTAL serialized bytes must be ≤ 20 000 — a
+  batch can never burst the WCU ceiling. Large rows (≈18 KB) = 1 row per
+  call → 413 with a clear message before anything is written.
+- Every stored item echoes its **`bytes`** (full representation) — the
+  number write-budget math charges on.
 
 ### `POST /v1/batch/get`
 ```json
@@ -152,6 +167,8 @@ See [docs/python.md](python.md) for a working example.
 | `DELETE /v1/admin/apps/:id` | soft delete (5-min recovery window; `POST .../delete` alias exists) |
 | `POST /v1/admin/apps/:id/recover` | cancel soft delete |
 | `POST /v1/admin/apps/:id/force-delete` | purge all tables + registry now |
+| `GET /v1/admin/capacity` | platform capacity mode + every table's billing mode |
+| `POST /v1/admin/capacity` `{mode}` | switch ALL tables: `normal` (provisioned 5/5, $0) or `performance` (on-demand) — per-table results; takes minutes at AWS |
 | `GET /v1/admin/purge/run` | trigger purge manually (cron also runs it) |
 | `POST /v1/admin/mcp/keys` `{name, description?}` | mint a master key → `rok_mcp_…` returned (re-viewable anytime) |
 | `GET /v1/admin/mcp/keys` | list master keys (metadata only — never hashes/raw) |
@@ -177,17 +194,19 @@ See [docs/python.md](python.md) for a working example.
 The gateway serves the Model Context Protocol at `/mcp` (Streamable HTTP,
 JSON-RPC) — see [docs/mcp.md](mcp.md). Master keys (`rok_mcp_…`, managed via
 the console MCP page and the admin endpoints above) unlock **full platform
-access**: 22 tools over every app/table/item (incl. `batch_put_item`). Every
-mutation requires `confirmed: true` (the confirmation gate); without it the
-server refuses with `confirmation_required`. MCP budgets: 600 total / 120
-writes / 240 reads per minute, counted by the same single-point limiter.
+access**: 26 tools over every app/table/item (incl. `batch_put_item`,
+`set_platform_capacity`). Every mutation requires `confirmed: true` (the
+confirmation gate); without it the server refuses with `confirmation_required`.
+MCP budgets: NORMAL 2 000 total / 800 write-units / 800 reads per
+minute — guardrails only in PERFORMANCE — counted by the same single-point
+limiter. See [docs/capacity.md](capacity.md).
 MCP writes share ONE wire shape with REST (`{pk, sk?, data}` envelope) — rows
 written through either interface are physically identical.
 
 ## Error codes
 
 `400` malformed · `401` bad/missing credentials · `403` not your table / suspended ·
-`404` missing · `409` conflict (version, duplicate) · `413` too large ·
+`404` missing · `409` conflict (version, duplicate) · `413` too large (row > 20 KB, or batch total > 20 KB) ·
 `415` non-JSON body (POST requires `Content-Type: application/json`) ·
 `429` rate limit — **names its budget** (e.g. "writes budget, retry in 59s"), with `retry_after` ·
 `502/503` retryable infrastructure.

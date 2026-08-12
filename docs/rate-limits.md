@@ -40,6 +40,30 @@ consistency** for get/query (option `strong: true` for the rare strict case).
 
 ## 3. Per-app and platform limits (why these numbers)
 
+Writes are charged in **WCU units** — the same unit DynamoDB charges the free
+tier: every row costs `max(1, ceil(bytes/1024))` (each row rounds UP to whole
+KB, exactly like DynamoDB's own sizing). Small rows are unchanged (≤ 1 KB =
+1 unit); big rows honestly cost more.
+
+| Row size | Write cost | Rows/min at 120 units | Good for |
+|---|---|---|---|
+| ≤ 1 KB | 1 unit | 120/min | keys, flags, sessions |
+| ~2 KB | 2 units | 60/min | small records |
+| ~10 KB | 10 units | 12/min | manifest chunks, blobs |
+| ~18 KB | 18 units | ~6/min | max-size rows (1 per batch call) |
+
+The budget depends on the platform capacity mode (docs/capacity.md):
+
+- **NORMAL** (provisioned, $0): **800 write-units/min per app** (~13/s, half
+  the 25 WCU/s account pool with margin), reads 800/min, total 2 000/min,
+  platform 2 400/min — the free tier made honest; 429s name the budget.
+- **PERFORMANCE** (on-demand): guardrails only — writes 100 000 units/min,
+  reads 400 000/min — never a wall; runaway-script protection only.
+
+Reads: 1 unit per 4 KB at AWS (eventual reads cost half). Table ceiling in
+NORMAL: 5 WCU/5 RCU each per second (free pool 25+25 account-wide — that is
+WHY NORMAL budgets are 800, not thousands: the pool is the wall).
+
 Worst-case math with our caps:
 
 - 1 write op ≤ 20 KB = ≤ 20 WCU. We allow **120 writes/min/app = 2/s**.

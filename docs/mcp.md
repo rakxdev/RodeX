@@ -47,7 +47,7 @@ the console manual) to: **gather everything → present the full plan → get on
 approval → execute step by step**. The server enforces the gate regardless of
 what the agent "thinks" it was told.
 
-## Tools (24)
+## Tools (26)
 
 | Tool | Kind | Confirmation | Notes |
 |---|---|---|---|
@@ -64,8 +64,10 @@ what the agent "thinks" it was told.
 | `create_table` | **mutate** | ✅ | name pattern `^[a-z0-9][a-z0-9_-]{0,41}$` |
 | `delete_table` | **mutate** | ✅ | irreversible — ALL data in the table |
 | `put_item` | **mutate** | ✅ | `request_id` idempotency, `overwrite` force-replace, 20 KB cap |
-| `batch_put_item` | **mutate** | ✅ | up to 50 items in one call; all-or-nothing validation; consumes N writes |
+| `batch_put_item` | **mutate** | ✅ | up to 50 items / ≤ 20 KB total; all-or-nothing validation; `all_ok` flag — check it |
 | `batch_get_item` | read | — | up to 50 keys in one call; missing keys listed, not errors; N reads |
+| `get_platform_capacity` | read | — | platform mode (normal/performance) + per-table billing mode |
+| `set_platform_capacity` | **mutate** | ✅ | switch the ENTIRE platform: normal ($0) ↔ performance (on-demand, unlimited) |
 | `increment_item` | **mutate** | ✅ | atomic counter (by, default 1); 1 write, race-free; returns new value |
 | `update_item` | **mutate** | ✅ | version-guarded (`expected_version` → 409) |
 | `delete_item` | **mutate** | ✅ | exact pk/sk |
@@ -85,13 +87,13 @@ interfaces is safe (locked by a contract test in the CI gate).
 
 | Surface | Per minute | Key |
 |---|---|---|
-| MCP total (platform-wide) | 600 | `mcp:total` |
-| MCP writes | 120 | `mcp:write` |
-| MCP reads | 240 | `mcp:read` |
+| MCP total (platform-wide) | 2 000 (guardrail 500 000 in PERFORMANCE) | `mcp:total` |
+| MCP writes | 800 units (guardrail 100 000) | `mcp:write` |
+| MCP reads | 800 (guardrail 400 000) | `mcp:read` |
 
 MCP budgets live in the **same single-point RateLimiterDO** as app budgets
 (ADR-003). App budgets also apply to MCP traffic (an agent's writes count
-against the app's 120 writes/min — visible in the app's LIVE METERS). 429s
+against the app's 800 write-units/min (NORMAL) — visible in the app's LIVE METERS). 429s
 name the budget and carry `retry_after`.
 
 ## Connecting agents

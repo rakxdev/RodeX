@@ -26,6 +26,45 @@ const marshalRow = {
   keyCipherUntil: { N: "1786480151" },
 };
 
+describe("AwsStorage capacity-mode rules", () => {
+  it("ensureTable skips the 5/5 throughput upgrade on on-demand tables (regression: writes 400'd)", async () => {
+    const storage = s as unknown as { ensureTable: (physical: string, mode?: string) => Promise<void> };
+    const ops: string[] = [];
+    (s as any).call = async (op: string, params: Record<string, unknown>) => {
+      ops.push(op);
+      if (op === "DescribeTable") {
+        if (String(params.TableName).includes("ondemand")) {
+          return { Table: { TableStatus: "ACTIVE", BillingModeSummary: { BillingMode: "PAY_PER_REQUEST" } } };
+        }
+        return { Table: { TableStatus: "ACTIVE", ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 } } };
+      }
+      return {};
+    };
+    // on-demand table: describe only — NO UpdateTable
+    await storage.ensureTable("app_x_ondemand");
+    expect(ops.filter((o) => o === "UpdateTable").length).toBe(0);
+    ops.length = 0;
+    // provisioned 1/1 table: upgrade still happens
+    await storage.ensureTable("app_x_prov");
+    expect(ops.filter((o) => o === "UpdateTable").length).toBe(1);
+    expect(ops).toContain("UpdateTable");
+  });
+
+  it("setTableCapacity switches billing modes (PAY_PER_REQUEST / PROVISIONED 5/5)", async () => {
+    const storage = s as unknown as { setTableCapacity: (p: string, m: string) => Promise<void> };
+    const calls: Array<{ mode?: string; wcu?: number }> = [];
+    (s as any).call = async (_op: string, params: Record<string, unknown>) => {
+      calls.push({ mode: params.BillingMode as string, wcu: (params.ProvisionedThroughput as { WriteCapacityUnits: number } | undefined)?.WriteCapacityUnits });
+      return {};
+    };
+    await storage.setTableCapacity("app_x_t", "on-demand");
+    await storage.setTableCapacity("app_x_t", "provisioned");
+    expect(calls[0].mode).toBe("PAY_PER_REQUEST");
+    expect(calls[1].mode).toBe("PROVISIONED");
+    expect(calls[1].wcu).toBe(5);
+  });
+});
+
 describe("AwsStorage marshaling rules", () => {
   it("never emits an empty string set (DynamoDB rejects SS: [])", async () => {
     let captured: any = null;

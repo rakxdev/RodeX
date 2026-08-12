@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Search, X } from "lucide-react";
-import { api, ApiError, gatewayBase, type AppInfo, type AppStatus } from "@/api/client";
+import { api, ApiError, gatewayBase, type AppInfo, type AppStatus, type CapacityInfo, type CapacityMode } from "@/api/client";
 import { pageTransition, fadeUp, stagger } from "@/lib/motion";
 import KeyReveal from "@/components/KeyReveal";
 import Loader from "@/components/Loader";
@@ -42,6 +42,133 @@ function statusStamp(status: AppStatus) {
     case "deleting":
       return <span className="stamp stamp-deleting">Deleting</span>;
   }
+}
+
+/** PLATFORM CAPACITY strip — NORMAL ($0) ↔ PERFORMANCE (unlimited, pay-per-request). */
+function CapacityStrip() {
+  const [cap, setCap] = useState<CapacityInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pending, setPending] = useState<CapacityMode | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const targetBilling = (m: CapacityMode) => (m === "performance" ? "on-demand" : "provisioned");
+
+  async function refresh() {
+    try {
+      setCap(await api.get<CapacityInfo>("/v1/admin/capacity"));
+    } catch {
+      /* strip stays quiet on errors; the board still loads */
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // while a switch is in flight, poll fast until every table reports the target billing mode
+  useEffect(() => {
+    if (!busy || !pending || !cap) return;
+    const target = targetBilling(pending);
+    const allDone = cap.tables.length > 0 && cap.tables.every((t) => t.mode === target);
+    if (allDone) {
+      setBusy(false);
+      setPending(null);
+      return;
+    }
+    const t = setTimeout(refresh, 3_000);
+    return () => clearTimeout(t);
+  }, [cap, busy, pending]);
+
+  async function apply() {
+    if (!pending || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.post("/v1/admin/capacity", { mode: pending });
+      setConfirmOpen(false);
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Capacity switch failed");
+      setBusy(false);
+      setPending(null);
+    }
+  }
+
+  const loading = cap === null;
+  const mode = cap?.mode ?? null;
+  const switching = busy && pending !== null;
+  const tableCount = cap?.tables.length ?? null;
+  // tables that still exist (mind: deleted apps' tables report null mode)
+  const known = (cap?.tables ?? []).filter((t) => t.mode !== null);
+  const ready = known.length > 0 && known.every((t) => t.mode === targetBilling(mode ?? "normal"));
+  const status = loading ? "LOADING CAPACITY…"
+    : switching ? "SWITCHING… (AWS TAKES MINUTES)"
+    : ready ? "ALL ACTIVE"
+    : known.length > 0 ? `${known.filter((t) => t.mode === targetBilling(mode ?? "normal")).length}/${known.length} READY`
+    : "NO LIVE TABLES";
+
+  return (
+    <div className="nameplate p-4 mb-6">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="font-mono text-[10px] tracking-[0.22em] text-inkdim">PLATFORM CAPACITY</div>
+        <span className={`stamp ${mode === "performance" ? "stamp-active" : ""}`}>
+          {loading ? "CAPACITY · LOADING…" : mode === "performance" ? "PERFORMANCE · ON-DEMAND · UNLIMITED" : "NORMAL · PROVISIONED · $0"}
+        </span>
+        <span className="font-mono text-[9.5px] tracking-[0.12em] text-inkdim">
+          {tableCount === null ? "—" : `${tableCount} TABLE(S)`} · {status}
+        </span>
+        <FoldButton
+          size="sm"
+          className="ml-auto"
+          disabled={busy || loading}
+          onClick={() => {
+            if (!mode) return;
+            setPending(mode === "performance" ? "normal" : "performance");
+            setConfirmOpen(true);
+          }}
+        >
+          {loading ? "…" : switching ? "SWITCHING…" : mode === "performance" ? "↩ SWITCH TO NORMAL ($0)" : "⚡ SWITCH TO PERFORMANCE"}
+        </FoldButton>
+      </div>
+      <div className="font-mono text-[9px] tracking-[0.14em] text-inkdim mt-2">
+        PERFORMANCE = ON-DEMAND BILLING · NO THROTTLING · GUARDRAILS ONLY · ~2¢ PER BACKFILL · SWITCH TAKES MINUTES
+      </div>
+
+      {confirmOpen && pending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="nameplate p-6 max-w-md w-full">
+            <div className="font-mono text-[11px] tracking-[0.2em] mb-3 text-gold">CONFIRM CAPACITY SWITCH</div>
+            <p className="font-mono text-[10.5px] tracking-[0.08em] text-ink leading-relaxed mb-4">
+              Switch the ENTIRE platform to {pending === "performance" ? (
+                <>
+                  <b className="text-gold">PERFORMANCE</b> — all {tableCount} table(s) to on-demand: no throttling,
+                  pay-per-request billing, budget guardrails only.
+                </>
+              ) : (
+                <>
+                  <b className="text-gold">NORMAL</b> — all {tableCount} table(s) back to provisioned 5/5: $0 free tier,
+                  generous budgets (2 000 write-units/min per app).
+                </>
+              )}{" "}
+              Switching takes minutes at AWS (max 4 switches/24 h per table).
+            </p>
+            {err && <div className="font-mono text-[10px] tracking-[0.08em] text-redx mb-3">{err}</div>}
+            <div className="flex gap-3 justify-end">
+              <FoldButton size="sm" onClick={() => { setConfirmOpen(false); setPending(null); }} disabled={busy}>
+                CANCEL
+              </FoldButton>
+              <FoldButton size="sm" variant={pending === "performance" ? "gold" : "red"} onClick={apply} disabled={busy}>
+                {busy ? "SWITCHING…" : "CONFIRM"}
+              </FoldButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** FABRICATE dialog — name + optional note. */
@@ -222,6 +349,8 @@ export default function AppsPage() {
           {error}
         </motion.div>
       )}
+
+      <CapacityStrip />
 
       <FabricateModal open={fabOpen} busy={busy} onClose={() => setFabOpen(false)} onCreate={create} />
 
