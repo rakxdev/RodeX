@@ -330,7 +330,7 @@ function buildMcpServer(env: Env): McpServer {
     "set_platform_capacity",
     {
       description:
-        "Switch the ENTIRE platform between modes: normal (all tables provisioned 5/5, free tier $0, budgets 2000 write-units/min per app) or performance (all tables on-demand — unlimited throughput, pay-per-request, budget guardrails only). Switching takes minutes at AWS (max 4 switches/24h per table). MUTATION: state the target mode to the user, get approval, then confirmed: true.",
+        "Switch the ENTIRE platform between modes: normal (all tables provisioned 5/5, free tier $0, budgets 800 write-units/min per app) or performance (all tables on-demand — unlimited throughput, pay-per-request, budget guardrails only). Switching is queued and takes minutes at AWS (max 4 switches/24h per table). MUTATION: state the target mode to the user, get approval, then confirmed: true.",
       inputSchema: { mode: z.enum(["normal", "performance"]), confirmed: confirmedSchema },
     },
     async ({ mode, confirmed }) => {
