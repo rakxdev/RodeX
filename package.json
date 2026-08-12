@@ -25,7 +25,7 @@
     "openapi:lint": "npx --yes @redocly/cli@latest lint docs/openapi.yaml --skip-rule no-unused-components"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260807.2",
+    "@cloudflare/workers-types": "^5.20260809.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
