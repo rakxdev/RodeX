@@ -562,7 +562,7 @@ function buildMcpServer(env: Env): McpServer {
     "batch_put_item",
     {
       description:
-        `Write up to ${BATCH_MAX_ITEMS} items in ONE call — same wire shape as put_item ({pk, sk?, data}), each item stored flat. Consumes N writes from the 120/min budget. Pass request_id to make the whole batch idempotent; overwrite: true force-replaces (resets versions). Validation is all-or-nothing: any invalid item rejects the whole batch. MUTATION: show the user the item count and table, get approval, then confirmed: true.`,
+        `Write up to ${BATCH_MAX_ITEMS} items in ONE call — same wire shape as put_item ({pk, sk?, data}), each item stored flat. Consumes the sum of item write-units from the active mode budget (NORMAL: 800 units/min; PERFORMANCE: guardrail). Pass request_id to make the whole batch idempotent; overwrite: true force-replaces (resets versions). Validation is all-or-nothing: any invalid item rejects the whole batch. MUTATION: show the user the item count and table, get approval, then confirmed: true.`,
       inputSchema: {
         app_id: z.string().min(1),
         table: z.string().min(1).max(42),

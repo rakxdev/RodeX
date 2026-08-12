@@ -98,8 +98,9 @@ Cloudflare Pages free plan      → the console, static assets
 ```
 
 The math is the product: every budget is *derived from* the free pools and enforced
-strictly — one write ≤ 20 KB, per-app writes ≤ 120/min (~2/s), so the gateway never
-asks DynamoDB for more than the free tier gives. **Never throttled by design.**
+strictly — NORMAL allows 800 write-units/min per app and 800 reads/min, while PERFORMANCE
+uses on-demand billing with guardrails. The gateway never hides the cost/throughput tradeoff.
+**Never throttled by design in NORMAL at the documented budget.**
 See [docs/rate-limits.md](docs/rate-limits.md) for the full math + live stress evidence.
 
 ---
@@ -262,7 +263,7 @@ POST /mcp                          → MCP (JSON-RPC, master-key auth)
   view window; MCP keys viewable anytime, **no rotation** (delete + recreate)
 - MCP mutations require **`confirmed: true`** — enforced server-side, never by prompt
 - Idempotency via `request_id` (24 h, TTL-expired); version-guarded updates (409)
-- 20 KB write cap → always inside the free WCU budget
+- 400 KB hard item cap → 20 KB is the recommended cost-friendly row size; NORMAL charges by write-units
 - Secrets only via `wrangler secret`; logs never contain keys or payloads
 - Sessions: HMAC-signed, 12 h, dual-channel (cookie + bearer) — works in every browser
 - `npm audit` — 0 vulnerabilities; CI runs security audit on every push

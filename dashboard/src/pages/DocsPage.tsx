@@ -293,7 +293,7 @@ curl -X POST $GW/v1/table/create \\
 // all_ok is the success signal — a 200 can contain per-item failures;
 // check all_ok and retry failed items (ok:false) with backoff.
 // total bytes ≤ 400 KB per call; every row costs max(1, ceil(bytes/1024))
-// write-units from the 120-unit/min budget (rows ≤ 1 KB = 1 unit);
+// write-units from the NORMAL 800-unit/min budget (rows ≤ 1 KB = 1 unit); PERFORMANCE uses guardrails;
 // every item echoes its bytes.`}</Code>
               </div>
               <div>
@@ -303,7 +303,7 @@ curl -X POST $GW/v1/table/create \\
   "keys": [ { "pk": "USER#1", "sk": "PROFILE" }, { "pk": "USER#2" } ]
 }
 → { "requested": 2, "found": [...], "missing": [...] }   // missing ≠ error
-// N keys = N reads from the 240/min budget`}</Code>
+// N keys = N reads from the active mode budget (800/min NORMAL)`}</Code>
               </div>
               <div>
                 <H><Method verb="POST" /> <span className="text-ink">/v1/item/increment</span> — atomic counter</H>

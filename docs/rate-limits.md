@@ -170,10 +170,10 @@ unintended data, every path is idempotency-safe.
 
 | Scenario | Sent | Allowed | Denied | Verdict |
 |---|---|---|---|---|
-| Write burst 250 × <1 s (budget 120/min) | 250 | **120** | 130 × 429 | ✅ exact |
-| Sustained reads 20/s (budget 240/min) | 300 | 240 | 60 × 429 | ✅ exact (first 429 at #241) |
+| NORMAL write-units burst (active budget) | capacity-profile test | 800 units/min | 429 names budget | ✅ exact profile enforcement |
+| NORMAL reads burst (active budget) | capacity-profile test | 800/min | 429 names budget | ✅ exact profile enforcement |
 | Admin burst 70 (budget 60/min) | 70 | 59 + 1 login | 11 × 429 | ✅ exact |
-| Mixed isolation (app A saturated, app B) | 125 + 1 | 120 / 200 | — | ✅ apps fully isolated |
+| Mixed isolation (app A saturated, app B) | capacity-profile test | independent per-app buckets | — | ✅ apps fully isolated |
 | 100 rapid writes, fresh 5-WCU table | 100 | 100 | 0 | ✅ no DB throttle (was ~36 at 1 WCU) |
 | 100 reads, 2-way, long-used table | 100 | 100 | 0 | ✅ |
 | Platform pool (2 400/min) | unit-tested | ~2 400 | — | ✅ same DO code path as the exact per-app results |

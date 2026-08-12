@@ -16,7 +16,7 @@ closes that gap. Master-key management (mint/view/delete `rok_mcp_`) stays
    app's key cipher inside its 48 h recovery window (same rule as the
    console's VIEW KEY). Outside the window / no cipher → structured error:
    "recovery window expired — rotate instead".
-3. Both count as MCP writes (budget `mcp:write`, 120/min) — they hit the
+3. Both count as MCP writes (budget `mcp:write` (800/min since v0.5.0)) — they hit the
    registry, not reads.
 4. Tool count 18 → 20. Manual (`get_instructions`), docs/mcp.md, public
    /docs table, console MCP page tool reference, ADR-006 count, CHANGELOG
