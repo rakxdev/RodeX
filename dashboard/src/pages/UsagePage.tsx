@@ -3,18 +3,19 @@ import { pageTransition, fadeUp, stagger, foldIn } from "@/lib/motion";
 import PublicShell from "@/components/PublicShell";
 
 const writes = [
-  { k: "writes / min", v: "120", note: "per app — put / update / delete" },
-  { k: "reads / min", v: "240", note: "per app — get / query (strong reads cost 2×)" },
+  { k: "writes / min · NORMAL", v: "800", note: "write-units per app — put / update / delete (1 unit per KB)" },
+  { k: "reads / min · NORMAL", v: "800", note: "per app — get / query (strong reads cost 2×)" },
 ];
 
 const reads = [
-  { k: "total / min", v: "600", note: "per app — writes + reads combined" },
-  { k: "platform pool", v: "1 000", note: "across all apps, per Cloudflare location" },
+  { k: "total / min · NORMAL", v: "2 000", note: "per app — writes + reads combined" },
+  { k: "platform pool · NORMAL", v: "2 400", note: "shared by all your apps" },
+  { k: "PERFORMANCE mode", v: "guardrails", note: "on-demand billing — 500 000 total / 100 000 writes / 400 000 reads · switch from console or MCP" },
   { k: "admin surface", v: "60", note: "dashboard + API management" },
 ];
 
 const storage = [
-  { k: "item size", v: "≤ 20 KB", note: "413 above the cap — keeps the 25-WCU budget safe" },
+  { k: "item size · BOTH MODES", v: "≤ 400 KB", note: "413 above the cap · reads return the full row in one call (20 KB recommended for cheap writes)" },
   { k: "storage", v: "25 GB", note: "DynamoDB always-free tier · ap-southeast-1" },
   { k: "daily workers", v: "100 000", note: "requests/day, shared by gateway + dashboard" },
 ];
@@ -133,7 +134,7 @@ export default function UsagePage() {
             <tr>
               <td><code>MCP — agents</code></td>
               <td>One master key (<code>rok_mcp_</code>) per agent; endpoint <code>…/mcp</code>; console-minted, viewable anytime, no rotation</td>
-              <td>0 — MCP budgets ride the same free limiter (600/120/240 per min); a few hash reads per request</td>
+              <td>0 — MCP budgets ride the same limiter (NORMAL 2 000/800/800 per min; PERFORMANCE guardrails); a few hash reads per request</td>
             </tr>
           </tbody>
         </table>
@@ -200,7 +201,7 @@ export default function UsagePage() {
         </h4>
         <ol className="space-y-3">
           {[
-            ["Keep rows small", "20 KB is the ceiling, not a target. A 4 KB row costs half the write budget of a 19 KB row — store big payloads as a URL/object key, not inline."],
+            ["Keep rows cost-friendly", "400 KB is the hard cap, not a target. A 4 KB row costs 4 write-units vs 400 for a 400 KB row — store big payloads as a URL/object key, not inline."],
             ["Batch reads into queries", "Fetching 50 rows? One query with sk_prefix + limit 50 costs 1 read, not 50. Get-by-pk is for single lookups only."],
             ["Strong reads are 2×", "strong:true costs 2 read units — use it only when a stale read would break the app (e.g. right after a critical write), never in hot loops."],
             ["Writes are the honest budget", "800 write-units/min per app in NORMAL (≈ half the free pool) — guardrails only in PERFORMANCE. Prefer update (replace data) over delete+put; coalesce bursts; queue writes client-side if a batch exceeds the budget."],

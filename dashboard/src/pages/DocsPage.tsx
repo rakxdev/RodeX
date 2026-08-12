@@ -257,7 +257,7 @@ curl -X POST $GW/v1/table/create \\
             <P>
               Rows are keyed by <code className="text-ink">pk</code> (required, ≤ 500 chars) and{" "}
               <code className="text-ink">sk</code> (optional, defaults to <code className="text-ink">"~"</code>) — the
-              classic single-table composite-key model. Payloads are capped at 20 KB (413).
+              classic single-table composite-key model. Payloads are capped at 400 KB (413); 20 KB rows keep write costs low.
             </P>
             <div className="space-y-3">
               <div>
@@ -292,7 +292,7 @@ curl -X POST $GW/v1/table/create \\
 → { "written": 2, "all_ok": true, "items": [...], ... }
 // all_ok is the success signal — a 200 can contain per-item failures;
 // check all_ok and retry failed items (ok:false) with backoff.
-// total bytes ≤ 20 KB per call; every row costs max(1, ceil(bytes/1024))
+// total bytes ≤ 400 KB per call; every row costs max(1, ceil(bytes/1024))
 // write-units from the 120-unit/min budget (rows ≤ 1 KB = 1 unit);
 // every item echoes its bytes.`}</Code>
               </div>
@@ -420,7 +420,7 @@ curl -X POST $GW/v1/table/create \\
             <ul className="font-mono text-[11.5px] text-inkdim space-y-2 mb-4 list-none">
               <li>— <b className="text-ink">Read order = sk order.</b> Put the timestamp (or the natural range) in sk when you will page through rows.</li>
               <li>— <b className="text-ink">One row per entity.</b> Prefer updating one row over delete+put pairs (writes are the scarce budget).</li>
-              <li>— <b className="text-ink">Keep rows ≤ 20 KB.</b> Big payloads belong in object storage; store the URL in the row.</li>
+              <li>— <b className="text-ink">Keep rows cost-friendly (≤ 20 KB recommended).</b> Hard cap is 400 KB; big payloads belong in object storage — store the URL in the row.</li>
               <li>— <b className="text-ink">Avoid hot keys.</b> Spread frequent writes across several pks (e.g. <code>[0-9]#&lt;id&gt;</code>) when one key would absorb all traffic.</li>
               <li>— <b className="text-ink">Version everything mutable.</b> Read the version, write with <code>expected_version</code>, handle the 409.</li>
               <li>— <b className="text-ink">All keys carry your app's id</b> inside the table — <code>app_&lt;id&gt;_&lt;name&gt;</code> is always the physical name.</li>
@@ -686,7 +686,7 @@ claude mcp add --transport http rodexdb ${GW}/mcp \\
                 <tr><td><code>rotate_app_key</code> · <code>view_app_key</code></td><td><span className="text-amber">mutate — confirm</span></td><td>new app key (old dies instantly) · re-view inside 48 h window</td></tr>
                 <tr><td><code>recover_app</code> · <code>force_delete_app</code></td><td><span className="text-amber">mutate — confirm</span></td><td>undo soft delete · immediate purge (no window)</td></tr>
                 <tr><td><code>create_table</code> · <code>delete_table</code></td><td><span className="text-amber">mutate — confirm</span></td><td>table lifecycle (delete is irreversible)</td></tr>
-                <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 20 KB cap)</td></tr>
+                <tr><td><code>put_item</code> · <code>update_item</code> · <code>delete_item</code></td><td><span className="text-amber">mutate — confirm</span></td><td>item lifecycle (version-guarded, 400 KB cap)</td></tr>
               </tbody>
             </table>
 
@@ -774,7 +774,7 @@ npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
                 <tr><td><code>403</code></td><td>not your table · app suspended / deleting</td></tr>
                 <tr><td><code>404</code></td><td>row or app not found</td></tr>
                 <tr><td><code>409</code></td><td>conflict — duplicate row, version mismatch</td></tr>
-                <tr><td><code>413</code></td><td>payload over 20 KB</td></tr>
+                <tr><td><code>413</code></td><td>payload over 400 KB</td></tr>
                 <tr><td><code>415</code></td><td>POST without Content-Type: application/json</td></tr>
                 <tr><td><code>429</code></td><td>rate limit — retry after <code>retry_after</code> seconds</td></tr>
                 <tr><td><code>502 / 503</code></td><td>infrastructure — safe to retry</td></tr>

@@ -347,7 +347,7 @@ claude mcp add --transport http rodexdb ${ENDPOINT} \\
               <li>App budgets still apply to MCP traffic (they share the same tables)</li>
               <li><code className="text-ink">401</code> — missing/invalid master key · <code className="text-ink">429</code> — budget spent, names the budget + retry seconds</li>
               <li><code className="text-ink">confirmation_required</code> — the gate: agent must ask you first</li>
-              <li>Items ≤ 20 KB · query limit ≤ 100 · updates are version-guarded (409 on conflict)</li>
+              <li>Items ≤ 400 KB · query limit ≤ 100 · updates are version-guarded (409 on conflict)</li>
             </ul>
           </Section>
 
