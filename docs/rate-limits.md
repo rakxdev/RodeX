@@ -52,10 +52,16 @@ KB, exactly like DynamoDB's own sizing). Small rows are unchanged (≤ 1 KB =
 | ~10 KB | 10 units | 12/min | manifest chunks, blobs |
 | ~18 KB | 18 units | ~6/min | max-size rows (1 per batch call) |
 
-The budget is **120 write-units/min per app** (~120 KB/min — the original
-"120 writes" number, now size-honest). Reads stay count-based
-(240 reads/min; 4 KB per read unit at AWS). This keeps every app 12× under
-the account's 25 WCU/s physical ceiling with margin for bursts.
+The budget depends on the platform capacity mode (docs/capacity.md):
+
+- **NORMAL** (provisioned, $0): **2 000 write-units/min per app**
+  (~2 MB/min), reads 40 000/min, total 50 000/min, platform 100 000/min —
+  generous for every realistic workload; 429s name the budget.
+- **PERFORMANCE** (on-demand): guardrails only — writes 100 000 units/min,
+  reads 400 000/min — never a wall; runaway-script protection only.
+
+Reads: 1 unit per 4 KB at AWS (eventual reads cost half). Table ceiling in
+NORMAL: 5 WCU/5 RCU each per second (free pool 25+25 account-wide).
 
 Worst-case math with our caps:
 

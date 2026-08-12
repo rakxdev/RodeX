@@ -9,6 +9,8 @@ import type { Env } from "../src/env";
 import { resetMockStorage } from "../src/storage-mock";
 import { resetRateCounters, gateMCPRequest, gateMCPTotal } from "../src/rate";
 import handler from "../src/index";
+import { getMockSingleton } from "../src/storage-mock";
+import { resetModeCache } from "../src/rate";
 import { MCP_RATE_READS, MCP_RATE_WRITES } from "../src/limits";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -132,12 +134,13 @@ describe("MCP discovery", () => {
     expect(names).toEqual([
       "batch_get_item", "batch_put_item", "create_app", "create_table", "delete_app", "delete_item", "delete_table",
       "force_delete_app", "get_app", "get_app_usage", "get_instructions", "get_item",
-      "health", "increment_item", "list_apps", "list_tables", "put_item", "query", "recover_app",
-      "resume_app", "rotate_app_key", "suspend_app", "update_item", "view_app_key",
+      "get_platform_capacity", "health", "increment_item", "list_apps", "list_tables", "put_item", "query",
+      "recover_app", "resume_app", "rotate_app_key", "set_platform_capacity", "suspend_app", "update_item",
+      "view_app_key",
     ]);
     // every mutation tool description states the confirmation rule
     for (const t of tools) {
-      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "batch_put_item", "increment_item", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
+      if (["create_app", "delete_app", "create_table", "delete_table", "put_item", "update_item", "delete_item", "batch_put_item", "increment_item", "set_platform_capacity", "suspend_app", "resume_app", "recover_app", "force_delete_app", "rotate_app_key", "view_app_key"].includes(t.name)) {
         expect(t.description.toLowerCase()).toContain("confirmed: true");
       }
     }
@@ -239,8 +242,8 @@ describe("MCP get_app_usage (meters for agents)", () => {
     // 3 puts + the setup table/create = 4 app writes consumed this minute
     const req = (before.parsed.result as { requests: { writes: { used: number; limit: number; remaining: number } } }).requests;
     expect(req.writes.used).toBe(4);
-    expect(req.writes.limit).toBe(120);
-    expect(req.writes.remaining).toBe(116);
+    expect(req.writes.limit).toBe(2_000);
+    expect(req.writes.remaining).toBe(1_996);
     const st = (before.parsed.result as { storage: { bytes: number; items: number; tables: number } }).storage;
     expect(st.tables).toBe(1);
     expect(st.items).toBe(3);
@@ -500,7 +503,9 @@ describe("MCP confirmation gate (mutations)", () => {
 
 describe("MCP door rate-limit format", () => {
   it("HTTP 429 with Retry-After and a JSON-RPC error body (not the REST shape)", async () => {
-    // exhaust ONLY the platform-wide MCP total budget (600)
+    // exhaust ONLY the platform-wide MCP total budget (600 under the TEST profile)
+    await getMockSingleton().putSetting("capacity_mode", "test");
+    resetModeCache();
     for (let i = 0; i < 600; i++) {
       await gateMCPTotal(env());
     }
@@ -530,14 +535,18 @@ describe("MCP budgets (same single-point counters)", () => {
 describe("MCP write-burst stress (end-to-end)", () => {
   it("write burst: every budget bites at exactly its number, naming itself", async () => {
     // The REST table/create in setup consumed 1 app-write unit, so the APP
-    // write budget (120) exhausts at call 119 while the MCP budget (120)
-    // exhausts at call 120 — both ceilings are exact and self-naming.
+    // write budget (2000) exhausts at call 1999 while the MCP budget (2000)
+    // exhausts at call 2000 — both ceilings are exact and self-naming.
     const appId = createdApp!.app_id;
     let ok = 0;
     let refused = 0;
     let appBudget = 0;
     let mcpBudget = 0;
     let other = 0;
+    // seed the internal TEST profile (budgets 60) so the end-to-end burst
+    // proves both ceilings WITHOUT thousands of calls
+    await getMockSingleton().putSetting("capacity_mode", "test");
+    resetModeCache();
     for (let i = 0; i < 125; i++) {
       const out = await toolCall("put_item", { app_id: appId, table: "users", pk: `burst-${i}`, data: { i }, confirmed: true }, i + 1);
       if (out.parsed.ok === true) ok++;
@@ -546,12 +555,12 @@ describe("MCP write-burst stress (end-to-end)", () => {
       else if (out.parsed.code === 429 && String(out.parsed.message).includes("writes budget")) appBudget++;
       else other++;
     }
-    expect(ok).toBe(119); // app write budget started 1 unit consumed (setup table/create)
+    expect(ok).toBe(59); // app write budget started 1 unit consumed (setup table/create)
     expect(refused).toBe(0); // confirmed: true was always sent
-    expect(mcpBudget).toBe(5); // calls 121-125: mcp-writes budget
-    expect(appBudget).toBe(1); // call 120: app writes budget
+    expect(mcpBudget).toBe(65); // calls 60-125: mcp-writes budget (60 MCP units exhausted)
+    expect(appBudget).toBe(1); // call 59: app writes budget
     expect(other).toBe(0);
-    // nothing was silently dropped: 119 writes landed
+    // nothing was silently dropped: 59 writes landed
     const q = await toolCall("query", { app_id: appId, table: "users", pk: "burst-0" }, 999);
     expect(q.parsed.ok).toBe(true);
     expect((q.parsed.result as { items: unknown[] }).items.length).toBe(1);

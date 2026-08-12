@@ -12,8 +12,8 @@ import {
 const MAX_ITEM_BYTES = ITEM_BYTES;
 
 describe("limits", () => {
-  it("20 KB item cap is an explicit constant", () => {
-    expect(MAX_ITEM_BYTES).toBe(20_000);
+  it("400 KB item cap is an explicit constant (DynamoDB's hard limit)", () => {
+    expect(MAX_ITEM_BYTES).toBe(400_000);
   });
 
   it("jsonBytes measures serialized size including names", () => {

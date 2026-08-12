@@ -1,48 +1,77 @@
-# Plan — v0.4.0 round: CORS fix + bulk-load hardening (universal write safety)
+# Spec + Plan — v0.5.0: Dual capacity modes (NORMAL / PERFORMANCE), zero-error model
 
-Sources: docs/REAL_USER_REVIEW.md (v0.2.2), docs/BULKLOAD_REVIEW.md (this round),
-deep research (ES bulk `errors`, DynamoDB `UnprocessedItems`/WCU rounding,
-BigQuery `insertErrors`, OpenAI TPM) — design validated against industry patterns.
+Gated by spec-driven-development. Research base (this session, official AWS
+sources): item hard limit 400 KB · on-demand pricing $0.625/M WRU + $0.125/M
+RRU (Nov-2024 cut) · switching rules (4×/24h to on-demand per table, back
+anytime, minutes-long transition, ≥4 000 WCU/s headroom) · free tier is
+provisioned-only · on-demand max-throughput guardrail exists.
 
-## 1. CORS fix (day-one bug, already written in tree)
-`Access-Control-Allow-Methods` → `GET, POST, DELETE, OPTIONS` + regression test.
+## ASSUMPTIONS (correct me if wrong — otherwise I proceed)
 
-## 2. Universal write safety (BULKLOAD P0/P1)
-1. **all_ok flag** — `batch/put` (and MCP batch) responses gain
-   `all_ok: boolean` (true only when every item wrote). Industry = ES `errors`.
-2. **Batch byte cap** — total serialized item bytes ≤ 20 000 per call, checked
-   BEFORE any write → 413 with a clear message. A 50×18KB burst becomes
-   structurally impossible (industry = DynamoDB 16MB/call cap, tightened).
-3. **WCU-unit write budget** — 120 write-units/min where every row costs
-   `max(1, ceil(bytes/1024))` (the exact DynamoDB rounding rule). ≤1KB rows
-   cost 1 unit → identical to today; 18KB rows cost 18. 429s name the budget.
-   RateLimiterDO weights already support this.
-4. **bytes echo** — every item response (`put`/`update`/`get`/`query`/batch)
-   includes `bytes` (full stored representation) so consumers see the WCU math.
-5. **delete_table pacing** — AWS drain chunks by write-units (≤24/call) with
-   429 retry+backoff (bounded), so big-row tables never fail mid-drain.
+- A1: Platform-wide switch (all apps/tables), one master toggle — confirmed.
+- A2: NORMAL mode budgets = generous, wall-free for realistic use:
+  writes 2 000 units/min · reads 40 000/min · total 50 000/min ·
+  platform 100 000/min (MCP same). 429 only at genuinely absurd rates.
+- A3: PERFORMANCE mode = guardrails only: writes 100 000/min · reads
+  400 000/min · total 500 000/min · platform 2 000 000/min (under AWS
+  4 000 WCU/s / 12 000 RCU/s per-table headroom).
+- A4: Item cap = **400 000 bytes in BOTH modes** (DynamoDB hard 400 KB incl.
+  keys; we keep ~9 KB margin). 20 KB stays a documented cost recommendation,
+  not a wall. Reads are NEVER size-gated in any mode.
+- A5: Batch byte cap 400 000 total (allows any max row; units reserved
+  upfront). all_ok/validation/idempotency rules unchanged.
+- A6: Switch-back to provisioned = 5 WCU/5 RCU per table (free-tier $0).
+  New tables created while PERFORMANCE = on-demand directly.
+- A7: Mode persists in platform settings (`capacity_mode`), worker-side 30 s
+  cache; switchable only via admin REST + MCP (confirmation-gated).
+- A8: No auto-switch-back timer (not requested).
+- A9: Dashboard toggle lives on the AppsPage (platform strip).
 
-## 3. Docs (everywhere)
-api.md (byte cap, all_ok, bytes, retry guidance), rate-limits.md (units math
-table), mcp.md (batch tool notes), python.md (all_ok + byte-smart batches),
-faq.md (new Q: "Why did my batch partially fail?"), testing.md, CHANGELOG
-[0.4.0], README badge/counts, dashboard DocsPage examples. CORS notes.
+## Objective
 
-## 4. Tasks
-- [ ] T1: limits.ts `wcuUnits` + items.ts (parse→gate order, weights, byte cap,
-      all_ok, bytes echo) + tests
-- [ ] T2: storage-aws dropTable pacing chunks + retry + helper test
-- [ ] T3: docs sweep + CHANGELOG + FAQ + dashboard DocsPage
-- [ ] T4: full verify (vitest, tsc, eslint, bundles, dashboard build)
-- [ ] T5: deploy gateway+dashboard; live-verify (CORS preflight DELETE, byte
-      cap, all_ok, unit budget with big rows, delete_table); cleanup; commit
-      locally (NO PUSH until user orders)
+"Never blocked, never stranded": mode changes throughput/cost ONLY — data
+rules (sizes, shapes, validation, per-item results) are identical in both
+modes, so switching can never break reading/writing existing rows.
+
+## Design
+
+1. limits.ts: MAX_ITEM_BYTES 20 000 → 400 000; BATCH_MAX_BYTES = 400 000.
+2. rate.ts: two profiles (NORMAL/PERFORMANCE above); capacityMode(env) reads
+   setting `capacity_mode` with 30 s cache; gateAppRequest/gateMCPRequest pick
+   the profile; admin gate unchanged (60).
+3. storage: `setTableCapacity(physical, "on-demand"|"provisioned")` +
+   `tableCapacityMode(physical)` (mock: no-op records); ensureTable accepts an
+   optional billing mode for new tables (on-demand in performance).
+4. Admin REST: `GET /v1/admin/capacity` (mode + per-table BillingMode) ·
+   `POST /v1/admin/capacity {mode}` (switch every table sequentially,
+   per-table results, AWS 4×/24h errors surfaced; persists the setting).
+5. MCP: `get_platform_capacity` (read) · `set_platform_capacity` (mutate,
+   confirmed) — 26 tools; manual updated.
+6. Dashboard: AppsPage platform strip — mode chip, toggle with red/gold
+   confirm modal, SWITCHING… state, poll until ACTIVE.
+7. Docs: new docs/capacity.md (matrix + cost table + switching facts + "reads
+   never size-gated"), api.md, mcp.md, rate-limits.md rewrite, faq.md,
+   README, CHANGELOG [Unreleased] v0.5.0, testing.md, DocsPage.
+
+## Tasks
+
+- [ ] T1: limits + rate profiles + mode cache + tests
+- [ ] T2: storage setTableCapacity/tableMode/ensureTable-mode (mock+aws)
+- [ ] T3: admin capacity endpoints + routes
+- [ ] T4: MCP tools + manual (26)
+- [ ] T5: dashboard AppsPage strip
+- [ ] T6: tests rework (old 120-budget tests → 2 000) + new coverage
+- [ ] T7: docs sweep
+- [ ] T8: verify (vitest/tsc/eslint/bundles/dashboard build) → deploy →
+      live-verify (perf switch, 400 KB write+read round-trip, budget math,
+      switch-back) → cleanup → commit locally (NO PUSH)
 
 ## Success criteria
-- Preflight allows DELETE from console origin
-- Batch of 2×18KB rows → 413, nothing written; single 18KB row → OK
-- all_ok=false surfaces per-item failures (duplicate-row test)
-- ~18KB row = 18 units: 6 rows ok, 7th → 429 "writes budget"
-- Items echo `bytes`; docs/FAQ teach the all_ok rule
-- dropTable drains a big-row mock table without unhandled throttle
-- 183 + new tests green; live verified; no push
+
+- 400 000-byte item: put + get returns full payload; 400 001 → 413
+- Batch total ≤ 400 000 ok; > cap → 413, nothing written
+- Normal budgets: 100×20 KB rows (2 000 units) ok → next 429
+- Performance mode: same 101st write OK (guardrails only)
+- POST capacity switches all tables + persists; GET reports per-table state
+- MCP: 26 tools; set_platform_capacity gated
+- Docs/FAQ matrix accurate; no push; live verified

@@ -15,6 +15,7 @@ import { APP_NAME_PATTERN, MAX_APPS } from "./limits";
 import { gateAdminRequest } from "./rate";
 import { createApp, forceDelete, getApp, purgeDue, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { createStorage } from "./storage";
+import { getPlatformCapacity, setPlatformCapacity } from "./capacity";
 import { usageSnapshot } from "./usage";
 export { resetStorageCache } from "./usage"; // shared cache, same source as the MCP usage tool
 
@@ -181,6 +182,19 @@ export function registerAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   });
 
   // lazy purge on admin list (belt-and-suspenders to the cron trigger)
+  app.get("/v1/admin/capacity", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    return c.json({ ok: true, result: await getPlatformCapacity(c.env) });
+  });
+
+  app.post("/v1/admin/capacity", async (c) => {
+    await gateAdminRequest(c.env);
+    await requireSession(sessionSecret(c.env), sessionTokenOf(c));
+    const body = (await c.req.json().catch(() => null)) as { mode?: string } | null;
+    return c.json({ ok: true, result: await setPlatformCapacity(c.env, body?.mode) });
+  });
+
   app.get("/v1/admin/purge/run", async (c) => {
     await gateAdminRequest(c.env);
     await requireSession(sessionSecret(c.env), sessionTokenOf(c));

@@ -10,18 +10,49 @@
  * with identical semantics is used.
  */
 import { tooManyRequests } from "./errors";
-import {
-  MCP_RATE_READS,
-  MCP_RATE_TOTAL,
-  MCP_RATE_WRITES,
-  RATE_ADMIN,
-  RATE_PLATFORM,
-  RATE_READS_PER_APP,
-  RATE_TOTAL_PER_APP,
-  RATE_WINDOW_SECONDS,
-  RATE_WRITES_PER_APP,
-} from "./limits";
+import { NORMAL_PROFILE, PERFORMANCE_PROFILE, TEST_PROFILE, type RateProfile, RATE_ADMIN, RATE_WINDOW_SECONDS } from "./limits";
 import type { Env } from "./env";
+import { createStorage } from "./storage";
+
+// ── capacity-mode selection (NORMAL / PERFORMANCE) ──────────────────────────
+// The platform setting `capacity_mode` picks the budget profile. Cached 30 s
+// worker-side: mode switches take minutes at AWS anyway, so a 30 s lag is
+// harmless. Cache lives per isolate and re-reads after TTL.
+const MODE_CACHE_TTL_MS = 30_000;
+let modeCache: { mode: "normal" | "performance"; at: number } | null = null;
+
+export type CapacityMode = "normal" | "performance";
+
+export async function capacityModeOf(env: Env): Promise<CapacityMode> {
+  const now = Date.now();
+  if (modeCache && now - modeCache.at < MODE_CACHE_TTL_MS) return modeCache.mode;
+  let mode: CapacityMode = "normal";
+  try {
+    const stored = await createStorage(env).getSetting("capacity_mode");
+    if (stored === "performance") mode = "performance";
+  } catch {
+    // settings read failed → behave conservatively (normal)
+  }
+  modeCache = { mode, at: now };
+  return mode;
+}
+
+/** Tests only: reset the mode cache (unit tests set the setting directly). */
+export function resetModeCache(): void {
+  modeCache = null;
+}
+
+async function profileFor(env: Env): Promise<RateProfile> {
+  const mode = await capacityModeOf(env);
+  if (mode === "performance") return PERFORMANCE_PROFILE;
+  // internal test profile — seeded by the test suite only (capacity_mode=test)
+  try {
+    if ((await createStorage(env).getSetting("capacity_mode")) === "test") return TEST_PROFILE;
+  } catch {
+    /* settings read failed → normal */
+  }
+  return NORMAL_PROFILE;
+}
 
 // ── local fallback (dev/tests; same semantics as the DO) ────────────────────
 const localCounters = new Map<string, { start: number; count: number }>();
@@ -85,12 +116,13 @@ function fail(result: { retry: number; budget: string }): never {
 }
 
 /** Per-app gate: total + write/read budget + platform pool — all strict.
- * `weight` lets one HTTP request consume N units (batch writes). */
+ * `weight` lets one HTTP request consume N units (big items, batch writes). */
 export async function gateAppRequest(env: Env, appId: string, kind: "write" | "read", weight = 1): Promise<void> {
+  const p = await profileFor(env);
   const checks: RateCheck[] = [
-    { key: appId, limit: RATE_TOTAL_PER_APP, budget: "total", weight },
-    { key: `${appId}:${kind}`, limit: kind === "write" ? RATE_WRITES_PER_APP : RATE_READS_PER_APP, budget: kind === "write" ? "writes" : "reads", weight },
-    { key: "platform:all", limit: RATE_PLATFORM, budget: "platform", weight },
+    { key: appId, limit: p.totalPerApp, budget: "total", weight },
+    { key: `${appId}:${kind}`, limit: kind === "write" ? p.writesPerApp : p.readsPerApp, budget: kind === "write" ? "writes" : "reads", weight },
+    { key: "platform:all", limit: p.platform, budget: "platform", weight },
   ];
   const result = await doCheck(env, checks);
   if (result) fail(result);
@@ -104,15 +136,17 @@ export async function gateAdminRequest(env: Env): Promise<void> {
 
 /** MCP entry gate: platform-wide total only (initialize/list are reads). */
 export async function gateMCPTotal(env: Env): Promise<void> {
-  const result = await doCheck(env, [{ key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total" }]);
+  const p = await profileFor(env);
+  const result = await doCheck(env, [{ key: "mcp:total", limit: p.mcpTotal, budget: "mcp-total" }]);
   if (result) fail(result);
 }
 
 /** MCP tool gate: total + kind budget (writes/reads). Weight = items in a batch. */
 export async function gateMCPRequest(env: Env, kind: "write" | "read", weight = 1): Promise<void> {
+  const p = await profileFor(env);
   const result = await doCheck(env, [
-    { key: "mcp:total", limit: MCP_RATE_TOTAL, budget: "mcp-total", weight },
-    { key: `mcp:${kind}`, limit: kind === "write" ? MCP_RATE_WRITES : MCP_RATE_READS, budget: kind === "write" ? "mcp-writes" : "mcp-reads", weight },
+    { key: "mcp:total", limit: p.mcpTotal, budget: "mcp-total", weight },
+    { key: `mcp:${kind}`, limit: kind === "write" ? p.mcpWrites : p.mcpReads, budget: kind === "write" ? "mcp-writes" : "mcp-reads", weight },
   ]);
   if (result) fail(result);
 }

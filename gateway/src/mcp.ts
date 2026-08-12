@@ -24,6 +24,7 @@ import { createStorage } from "./storage";
 import { usageSnapshot } from "./usage";
 import type { AppContext } from "./items";
 import { handleDelete, handleGet, handlePut, handleQuery, handleUpdate, handleBatchPut, handleBatchGet, handleIncrement, BATCH_MAX_ITEMS } from "./items";
+import { getPlatformCapacity, setPlatformCapacity } from "./capacity";
 import { handleCreateTable, handleDeleteTable, handleListTables } from "./tables";
 import { createApp, forceDelete, getApp, recover, rotateKey, setStatus, softDelete, toPublic } from "./registry";
 import { gateMCPRequest } from "./rate";
@@ -115,6 +116,7 @@ EVERY app, table, and item on the platform.
 - list_apps / get_app — app inventory + details (read)
 - list_tables — tables of an app, with key schema (read)
 - get_app_usage — live request budgets (total/writes/reads used this minute) + storage size (read)
+- get_platform_capacity — NORMAL/PERFORMANCE mode + every table's billing mode (read)
 - get_item — one item (pk required; sk defaults to "~") (read)
 - batch_get_item — up to 50 keys in ONE call; missing keys reported, not errors (read)
 - query — pk + optional sk_prefix, limit <= 100, pagination (read)
@@ -125,13 +127,18 @@ EVERY app, table, and item on the platform.
 - recover_app — undo a soft delete inside its window (MUTATION — confirm)
 - force_delete_app — immediate purge of an app and ALL its tables (MUTATION — confirm)
 - create_table / delete_table — table lifecycle (MUTATION — confirm)
+- set_platform_capacity — switch EVERY table between NORMAL (provisioned $0) and
+  PERFORMANCE (on-demand, pay-per-request) — platform-wide (MUTATION — confirm)
 - put_item / update_item / delete_item — item lifecycle (MUTATION — confirm)
 - increment_item — atomic counter (MUTATION — confirm; 1 write, race-free)
 - batch_put_item — up to 50 items in ONE call (MUTATION — confirm; consumes N writes)
 
 ## Budgets
 
-MCP traffic: 600 total / 120 writes / 240 reads per minute, platform-wide.
+NORMAL mode: MCP 50 000 total / 2 000 writes / 40 000 reads per minute
+platform-wide; app budgets 50 000 total / 2 000 write-units / 40 000 reads.
+PERFORMANCE mode (on-demand billing): guardrails only — 500 000 / 100 000 /
+400 000. App budgets apply to MCP traffic too.
 429 responses name the budget and carry retry_after seconds. App budgets
 apply too (per-app 600 total / 120 writes / 240 reads per minute).
 
@@ -304,6 +311,36 @@ function buildMcpServer(env: Env): McpServer {
   );
 
   // ── mutation tools (confirmation-gated) ────────────────────────────────────
+
+  server.registerTool(
+    "get_platform_capacity",
+    {
+      description:
+        "Read the platform capacity mode (normal = provisioned, $0 free tier | performance = on-demand, pay-per-request) plus every table's current billing mode. READ — no confirmation.",
+      inputSchema: {},
+    },
+    async () =>
+      safe(async () => {
+        await gateMCPRequest(env, "read");
+        return getPlatformCapacity(env);
+      }),
+  );
+
+  server.registerTool(
+    "set_platform_capacity",
+    {
+      description:
+        "Switch the ENTIRE platform between modes: normal (all tables provisioned 5/5, free tier $0, budgets 2000 write-units/min per app) or performance (all tables on-demand — unlimited throughput, pay-per-request, budget guardrails only). Switching takes minutes at AWS (max 4 switches/24h per table). MUTATION: state the target mode to the user, get approval, then confirmed: true.",
+      inputSchema: { mode: z.enum(["normal", "performance"]), confirmed: confirmedSchema },
+    },
+    async ({ mode, confirmed }) => {
+      if (!confirmed) return needConfirmation({ action: "set_platform_capacity", mode });
+      return safe(async () => {
+        await gateMCPRequest(env, "write");
+        return setPlatformCapacity(env, mode);
+      });
+    },
+  );
 
   server.registerTool(
     "create_app",

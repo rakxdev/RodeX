@@ -741,7 +741,7 @@ const user = await db.get("users", "u1");`}</Code>
 // or the live instance (key from the console MCP page):
 npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
             <P>
-              Same 24 tools, same confirmation gate — any local MCP client
+              Same 26 tools, same confirmation gate — any local MCP client
               (Claude Desktop, VS Code) can now drive your data. Full guide:{" "}
               <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/developers.md" target="_blank" rel="noreferrer">docs/developers.md</a>.
             </P>
@@ -779,7 +779,7 @@ npx -y rodex-mcp --key $RODEX_MCP_KEY`}</Code>
           <div className="flex flex-col gap-1 px-1 pb-2">
             <div className="foldline" />
             <div className="font-mono text-[10px] tracking-[0.16em] text-inkdim pt-2">
-              FULL CONTRACT — <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/openapi.yaml" target="_blank" rel="noreferrer">OPENAPI.YAML</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/api.md" target="_blank" rel="noreferrer">API.MD</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/faq.md" target="_blank" rel="noreferrer">FAQ</a>
+              FULL CONTRACT — <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/openapi.yaml" target="_blank" rel="noreferrer">OPENAPI.YAML</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/api.md" target="_blank" rel="noreferrer">API.MD</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/capacity.md" target="_blank" rel="noreferrer">CAPACITY</a> · <a className="text-gold hover:underline" href="https://github.com/rakxdev/RodeX/blob/main/docs/faq.md" target="_blank" rel="noreferrer">FAQ</a>
             </div>
           </div>
         </motion.div>

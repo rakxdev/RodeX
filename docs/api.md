@@ -167,6 +167,8 @@ See [docs/python.md](python.md) for a working example.
 | `DELETE /v1/admin/apps/:id` | soft delete (5-min recovery window; `POST .../delete` alias exists) |
 | `POST /v1/admin/apps/:id/recover` | cancel soft delete |
 | `POST /v1/admin/apps/:id/force-delete` | purge all tables + registry now |
+| `GET /v1/admin/capacity` | platform capacity mode + every table's billing mode |
+| `POST /v1/admin/capacity` `{mode}` | switch ALL tables: `normal` (provisioned 5/5, $0) or `performance` (on-demand) — per-table results; takes minutes at AWS |
 | `GET /v1/admin/purge/run` | trigger purge manually (cron also runs it) |
 | `POST /v1/admin/mcp/keys` `{name, description?}` | mint a master key → `rok_mcp_…` returned (re-viewable anytime) |
 | `GET /v1/admin/mcp/keys` | list master keys (metadata only — never hashes/raw) |
@@ -192,10 +194,12 @@ See [docs/python.md](python.md) for a working example.
 The gateway serves the Model Context Protocol at `/mcp` (Streamable HTTP,
 JSON-RPC) — see [docs/mcp.md](mcp.md). Master keys (`rok_mcp_…`, managed via
 the console MCP page and the admin endpoints above) unlock **full platform
-access**: 22 tools over every app/table/item (incl. `batch_put_item`). Every
-mutation requires `confirmed: true` (the confirmation gate); without it the
-server refuses with `confirmation_required`. MCP budgets: 600 total / 120
-writes / 240 reads per minute, counted by the same single-point limiter.
+access**: 26 tools over every app/table/item (incl. `batch_put_item`,
+`set_platform_capacity`). Every mutation requires `confirmed: true` (the
+confirmation gate); without it the server refuses with `confirmation_required`.
+MCP budgets: NORMAL 50 000 total / 2 000 write-units / 40 000 reads per
+minute — guardrails only in PERFORMANCE — counted by the same single-point
+limiter. See [docs/capacity.md](capacity.md).
 MCP writes share ONE wire shape with REST (`{pk, sk?, data}` envelope) — rows
 written through either interface are physically identical.
 

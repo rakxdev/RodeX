@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import { resetMockStorage } from "../src/storage-mock";
 import { resetRateCounters } from "../src/rate";
+import { processCapacityChunk } from "../src/capacity";
 import handler from "../src/index";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -273,7 +274,7 @@ describe("admin app management", () => {
     }
     const before = await (await call("GET", `/v1/admin/apps/${app_id}/usage`, undefined, { Cookie: adminCookie })).json() as any;
     expect(before.result.requests.writes.used).toBeGreaterThanOrEqual(5);
-    expect(before.result.requests.writes.limit).toBe(120);
+    expect(before.result.requests.writes.limit).toBe(2_000);
     expect(before.result.requests.reads.used).toBe(0);
     expect(before.result.storage.tables).toBe(5);
     expect(typeof before.result.storage.items).toBe("number");
@@ -287,6 +288,85 @@ describe("admin app management", () => {
     const r = await call("GET", `/v1/admin/apps/app_x/usage`);
     expect(r.status).toBe(401);
   });
+});
+
+describe("platform capacity (NORMAL / PERFORMANCE)", () => {
+  let appId = "";
+  let apiKey = "";
+
+  beforeEach(async () => {
+    const r = await call("POST", "/v1/admin/apps", { name: "cap-app" }, { Cookie: adminCookie });
+    const b = (await r.json()) as { result: { app_id: string; api_key: string } };
+    appId = b.result.app_id;
+    apiKey = b.result.api_key;
+    await call("POST", "/v1/table/create", { name: "cap_tbl" }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+  });
+
+  it("GET reports normal mode + table billing modes", async () => {
+    const res = await call("GET", "/v1/admin/capacity", undefined, { Cookie: adminCookie });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { result: { mode: string; tables: Array<{ table: string; mode: string }> } };
+    expect(body.result.mode).toBe("normal");
+    expect(body.result.tables.length).toBeGreaterThan(0);
+    expect(body.result.tables.every((t) => t.mode === "provisioned")).toBe(true);
+  });
+
+  it("POST queues the switch; the scheduled runner completes it; invalid mode → 400", async () => {
+    const res = await call("POST", "/v1/admin/capacity", { mode: "performance" }, { Cookie: adminCookie });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { result: { mode: string; queued: number; note: string } };
+    expect(body.result.mode).toBe("performance");
+    expect(body.result.queued).toBeGreaterThan(0);
+    expect(body.result.note).toContain("background");
+
+    // switching shows as pending until the runner drains it
+    const mid = (await (await call("GET", "/v1/admin/capacity", undefined, { Cookie: adminCookie })).json()) as {
+      result: { switching: boolean };
+    };
+    expect(mid.result.switching).toBe(true);
+
+    // drain the queue as the cron would
+    for (let i = 0; i < 50; i++) {
+      const { done } = await processCapacityChunk(env(), 12);
+      if (done) break;
+    }
+    const after = (await (await call("GET", "/v1/admin/capacity", undefined, { Cookie: adminCookie })).json()) as {
+      result: { mode: string; switching: boolean; tables: Array<{ mode: string }> };
+    };
+    expect(after.result.switching).toBe(false);
+    expect(after.result.mode).toBe("performance");
+    expect(after.result.tables.every((t) => t.mode === "on-demand")).toBe(true);
+
+    const bad = await call("POST", "/v1/admin/capacity", { mode: "turbo" }, { Cookie: adminCookie });
+    expect(bad.status).toBe(400);
+  });
+
+  it("PERFORMANCE mode budgets are guardrails: > 2000 units still allowed", async () => {
+    await call("POST", "/v1/admin/capacity", { mode: "performance" }, { Cookie: adminCookie });
+    for (let i = 0; i < 50; i++) {
+      const { done } = await processCapacityChunk(env(), 12);
+      if (done) break;
+    }
+    // fresh window: normal would trip at 2000; performance swallows 2100 tiny writes
+    for (let i = 0; i < 2_100; i++) {
+      const r = await call("POST", "/v1/item/increment", { table: "cap_tbl", pk: `p${i}` }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+      expect(r.status).toBe(200);
+    }
+    // and back to normal restores the ceiling (switches take minutes at AWS,
+    // so a fresh minute window is the realistic state after switching)
+    await call("POST", "/v1/admin/capacity", { mode: "normal" }, { Cookie: adminCookie });
+    for (let i = 0; i < 50; i++) {
+      const { done } = await processCapacityChunk(env(), 12);
+      if (done) break;
+    }
+    resetRateCounters();
+    for (let i = 0; i < 2_000; i++) {
+      const r = await call("POST", "/v1/item/increment", { table: "cap_tbl", pk: `n${i}` }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+      expect(r.status).toBe(200);
+    }
+    const trip = await call("POST", "/v1/item/increment", { table: "cap_tbl", pk: "trip" }, { "X-App-Id": appId, "X-Api-Key": apiKey });
+    expect(trip.status).toBe(429);
+  }, 60_000);
 });
 
 describe("GitHub OAuth", () => {

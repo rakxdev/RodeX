@@ -389,24 +389,34 @@ export class AwsStorage implements Storage {
 
   // ── data tables ─────────────────────────────────────────────────────────────
 
-  async ensureTable(physical: string): Promise<void> {
+  async ensureTable(physical: string, billingMode?: "on-demand" | "provisioned"): Promise<void> {
     const status = await this.tableStatus(physical);
     if (status === "ACTIVE") {
       // legacy tables were created at 1 WCU / 1 RCU — auto-upgrade to the
-      // free-tier-optimal 5/5 so a busy table is never the throttle point
-      const cap = await this.call<{ Table?: { ProvisionedThroughput?: { ReadCapacityUnits?: number; WriteCapacityUnits?: number } } }>("DescribeTable", { TableName: physical });
-      const rc = cap.Table?.ProvisionedThroughput?.ReadCapacityUnits ?? 0;
-      const wc = cap.Table?.ProvisionedThroughput?.WriteCapacityUnits ?? 0;
-      if (rc < TABLE_RCU || wc < TABLE_WCU) {
-        await this.call("UpdateTable", {
-          TableName: physical,
-          ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU },
-        });
+      // free-tier-optimal 5/5 so a busy table is never the throttle point.
+      // SKIP on on-demand tables: throughput is invalid with PAY_PER_REQUEST.
+      const cap = await this.call<{
+        Table?: {
+          ProvisionedThroughput?: { ReadCapacityUnits?: number; WriteCapacityUnits?: number };
+          BillingModeSummary?: { BillingMode?: string };
+        };
+      }>("DescribeTable", { TableName: physical });
+      const billing = cap.Table?.BillingModeSummary?.BillingMode;
+      if (billing !== "PAY_PER_REQUEST") {
+        const rc = cap.Table?.ProvisionedThroughput?.ReadCapacityUnits ?? 0;
+        const wc = cap.Table?.ProvisionedThroughput?.WriteCapacityUnits ?? 0;
+        if (rc < TABLE_RCU || wc < TABLE_WCU) {
+          await this.call("UpdateTable", {
+            TableName: physical,
+            ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU },
+          });
+        }
       }
       return;
     }
     if (status === null) {
       // create it, then poll until ACTIVE (data ops are rejected while CREATING)
+      const onDemand = billingMode === "on-demand";
       await this.call("CreateTable", {
         TableName: physical,
         KeySchema: [
@@ -417,8 +427,10 @@ export class AwsStorage implements Storage {
           { AttributeName: "pk", AttributeType: "S" },
           { AttributeName: "sk", AttributeType: "S" },
         ],
-        BillingMode: "PROVISIONED",
-        ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU },
+        BillingMode: onDemand ? "PAY_PER_REQUEST" : "PROVISIONED",
+        ...(onDemand
+          ? {}
+          : { ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU } }),
       });
     }
     // poll up to ~20 s (max 10 extra subrequests — free-plan budget safe)
@@ -436,6 +448,29 @@ export class AwsStorage implements Storage {
       await new Promise((r) => setTimeout(r, 2000));
     }
     throw serviceUnavailable("Table did not become ready in time");
+  }
+
+  /** Switch a table between billing modes. Takes several minutes at AWS;
+   *  reads/writes continue during the transition at the old throughput.
+   *  Switching back to provisioned needs explicit capacity → free-tier 5/5. */
+  async setTableCapacity(physical: string, mode: "on-demand" | "provisioned"): Promise<void> {
+    await this.call("UpdateTable", {
+      TableName: physical,
+      BillingMode: mode === "on-demand" ? "PAY_PER_REQUEST" : "PROVISIONED",
+      ...(mode === "provisioned"
+        ? { ProvisionedThroughput: { ReadCapacityUnits: TABLE_RCU, WriteCapacityUnits: TABLE_WCU } }
+        : {}),
+    });
+  }
+
+  async tableCapacityMode(physical: string): Promise<"on-demand" | "provisioned" | null> {
+    const out = await this.call<{ Table?: { BillingModeSummary?: { BillingMode?: string } } }>("DescribeTable", {
+      TableName: physical,
+    });
+    const mode = out.Table?.BillingModeSummary?.BillingMode;
+    if (mode === "PAY_PER_REQUEST") return "on-demand";
+    if (mode === "PROVISIONED") return "provisioned";
+    return null;
   }
 
   /** Returns "ACTIVE" / "CREATING" / … or null when the table doesn't exist. */

@@ -130,6 +130,15 @@ export class MockStorage implements Storage {
   async dropTable(physical: string): Promise<void> {
     this.tables.delete(physical);
   }
+  /** mock: billing modes are recorded for admin/status reads */
+  private tableModes = new Map<string, "on-demand" | "provisioned">();
+  async setTableCapacity(physical: string, mode: "on-demand" | "provisioned"): Promise<void> {
+    this.tableModes.set(physical, mode);
+  }
+  async tableCapacityMode(physical: string): Promise<"on-demand" | "provisioned" | null> {
+    if (!this.tables.has(physical)) return null;
+    return this.tableModes.get(physical) ?? "provisioned"; // tables default provisioned
+  }
 
   async storageSize(physical: string): Promise<{ bytes: number; items: number } | null> {
     const t = this.tables.get(physical);

@@ -31,38 +31,38 @@ async function expect429(p: Promise<void>): Promise<number> {
 }
 
 describe("strict rate limiting (local counter = DO semantics)", () => {
-  it("write budget: exactly 120 writes pass per window, then 429", async () => {
-    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
-    await expect429(gateAppRequest(env(), "app1", "write")); // 121st write → 429
-  });
+  it("write budget: exactly 2000 write-units pass per window, then 429", async () => {
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(env(), "app1", "write");
+    await expect429(gateAppRequest(env(), "app1", "write")); // 2001st write → 429
+  }, 30_000);
 
-  it("read budget: 240 reads pass, then 429", async () => {
-    for (let i = 0; i < 240; i++) await gateAppRequest(env(), "app1", "read");
+  it("read budget: 40 000 reads pass, then 429", async () => {
+    for (let i = 0; i < 40_000; i++) await gateAppRequest(env(), "app1", "read");
     await expect429(gateAppRequest(env(), "app1", "read"));
-  });
+  }, 60_000);
 
-  it("mixed traffic: kind budgets trip independently (120 writes + 240 reads, then both 429)", async () => {
-    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
-    for (let i = 0; i < 240; i++) await gateAppRequest(env(), "app1", "read");
+  it("mixed traffic: kind budgets trip independently (2000 writes + 40k reads, then both 429)", async () => {
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(env(), "app1", "write");
+    for (let i = 0; i < 40_000; i++) await gateAppRequest(env(), "app1", "read");
     await expect429(gateAppRequest(env(), "app1", "write")); // write budget exhausted
     await expect429(gateAppRequest(env(), "app1", "read")); // read budget exhausted
-  });
+  }, 60_000);
 
   it("apps are isolated: app1 at its write cap does not touch app2", async () => {
-    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(env(), "app1", "write");
     await gateAppRequest(env(), "app2", "write"); // still allowed
-  });
+  }, 30_000);
 
-  it("platform pool binds across THREE apps (kind budgets alone max at 720)", async () => {
+  it("platform pool binds across THREE apps (kind budgets alone max at 82 000)", async () => {
     const e = env();
-    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appA", "write");
-    for (let i = 0; i < 240; i++) await gateAppRequest(e, "appA", "read");
-    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appB", "write");
-    for (let i = 0; i < 240; i++) await gateAppRequest(e, "appB", "read");
-    // appC: 120 writes (cum 840) + reads — platform trips once the shared pool crosses 1000
-    for (let i = 0; i < 120; i++) await gateAppRequest(e, "appC", "write");
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(e, "appA", "write");
+    for (let i = 0; i < 40_000; i++) await gateAppRequest(e, "appA", "read");
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(e, "appB", "write");
+    for (let i = 0; i < 40_000; i++) await gateAppRequest(e, "appB", "read");
+    // appC: 2000 writes (cum 86 000) + reads — platform trips once the shared pool crosses 100 000
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(e, "appC", "write");
     let allowed = 0;
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 30_000; i++) {
       try {
         await gateAppRequest(e, "appC", "read");
         allowed++;
@@ -70,9 +70,9 @@ describe("strict rate limiting (local counter = DO semantics)", () => {
         break;
       }
     }
-    expect(allowed).toBeGreaterThanOrEqual(155); // cum 1000 needs ~160 reads
-    expect(allowed).toBeLessThanOrEqual(170); // and trips well before appC's read cap (240)
-  });
+    expect(allowed).toBeGreaterThanOrEqual(12_000); // cum 100 000 needs ~14 000 reads
+    expect(allowed).toBeLessThanOrEqual(16_000); // and trips well before appC's read cap (40 000)
+  }, 60_000);
 
   it("admin budget: 60, then 429", async () => {
     for (let i = 0; i < 60; i++) await gateAdminRequest(env());
@@ -80,18 +80,18 @@ describe("strict rate limiting (local counter = DO semantics)", () => {
   });
 
   it("retry_after reflects the remaining window", async () => {
-    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(env(), "app1", "write");
     const retry = await expect429(gateAppRequest(env(), "app1", "write"));
     expect(retry).toBeGreaterThanOrEqual(1);
     expect(retry).toBeLessThanOrEqual(60);
-  });
+  }, 30_000);
 
   it("a fresh window resets every counter", async () => {
-    for (let i = 0; i < 120; i++) await gateAppRequest(env(), "app1", "write");
+    for (let i = 0; i < 2_000; i++) await gateAppRequest(env(), "app1", "write");
     await expect429(gateAppRequest(env(), "app1", "write"));
     resetRateCounters(); // simulates the window boundary / DO restart
     await gateAppRequest(env(), "app1", "write"); // allowed again
-  });
+  }, 30_000);
 });
 
 describe("RateLimiterDO (single-point counters)", () => {

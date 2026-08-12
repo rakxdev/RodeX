@@ -4,6 +4,31 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
+## [Unreleased] — v0.5.0 round: dual capacity modes (NORMAL $0 ↔ PERFORMANCE unlimited)
+
+### Added
+- **Capacity modes (platform-wide)**: PERFORMANCE = all tables on-demand
+  (pay-per-request, no throttling, budgets become guardrails: writes
+  100 000 units/min, reads 400 000/min) · NORMAL = provisioned 5/5 ($0 free
+  tier, budgets 2 000 write-units / 40 000 reads per app/min).
+- **Switch via dashboard** (AppsPage strip + confirm modal, SWITCHING… state)
+  · **REST** `GET/POST /v1/admin/capacity` · **MCP** `get_platform_capacity`
+  + `set_platform_capacity` (confirmation-gated) — 26 tools.
+- **Item cap 20 KB → 400 KB** (DynamoDB's hard limit) in BOTH modes — reads
+  were never size-gated; writes now accept any size; 20 KB becomes a cost
+  recommendation. Batch byte cap 400 KB total.
+- docs/capacity.md (matrix + cost ladder + AWS switching facts).
+
+### Changed
+- Budgets in NORMAL were raised (120 → 2 000 write-units/min per app;
+  240 → 40 000 reads; 600 → 50 000 total; 1 000 → 100 000 platform) — 429s
+  now only at genuinely absurd rates.
+- New tables created while PERFORMANCE are on-demand directly.
+
+### Tests
+- 177 gateway + 14 package (capacity endpoint suite, PERF guardrails,
+  400 KB round-trip, TEST profile for exact end-to-end bursts).
+
 ## [Unreleased] — v0.4.0 round: universal write safety (CORS + bulk-load hardening)
 
 ### Fixed

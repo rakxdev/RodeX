@@ -4,7 +4,7 @@
 
 ```bash
 npm install
-npm test          # vitest — 188 tests, mock storage
+npm test          # vitest — 177 gateway tests + 14 package tests, mock storage
 npm run typecheck # strict TS (gateway)
 cd dashboard && npx tsc --noEmit   # dashboard typecheck
 npx eslint gateway/src gateway/test   # lint gate (CI matches)

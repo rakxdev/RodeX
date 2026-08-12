@@ -6,7 +6,7 @@ import type { Context } from "hono";
 import { badRequest, forbidden, notFound, HttpError, payloadTooLarge } from "./errors";
 import type { Env } from "./env";
 import { assertItemSize, IDEMPOTENCY_TTL_SECONDS, PK_MAX_CHARS, SK_MAX_CHARS, wcuUnits, jsonBytes, MAX_ITEM_BYTES } from "./limits";
-import { gateAppRequest } from "./rate";
+import { capacityModeOf, gateAppRequest } from "./rate";
 import { physicalName } from "./registry";
 import type { Storage, StoredItem } from "./storage";
 
@@ -16,6 +16,11 @@ export interface AppContext {
   storage: Storage;
   /** logical tables this app owns (registry snapshot at auth time) */
   ownedTables: Set<string>;
+}
+
+/** New tables follow the platform capacity mode: on-demand while PERFORMANCE. */
+async function billingFor(ctx: AppContext): Promise<"on-demand" | undefined> {
+  return (await capacityModeOf(ctx.env)) === "performance" ? "on-demand" : undefined;
 }
 
 /** Isolation invariant: 403 before any storage call when the app doesn't own the table. */
@@ -188,7 +193,7 @@ export async function handlePut(ctx: AppContext, body: Record<string, unknown>) 
   const overwrite = body["overwrite"] === true;
   const physical = physicalName(ctx.appId, table);
   return withIdem(ctx.storage, requestId, async () => {
-    await ctx.storage.ensureTable(physical); // no-op if exists
+    await ctx.storage.ensureTable(physical, await billingFor(ctx)); // no-op if exists
     const stored = await ctx.storage.putItem(physical, item, { overwrite });
     return { ok: true as const, result: { ...itemToJson(stored), table } };
   });
@@ -299,7 +304,7 @@ export async function handleIncrement(ctx: AppContext, body: Record<string, unkn
   if (typeof by !== "number" || !Number.isInteger(by)) throw badRequest("by must be an integer (default 1; negative decrements)");
   await gateAppRequest(ctx.env, ctx.appId, "write");
   const physical = physicalName(ctx.appId, table);
-  await ctx.storage.ensureTable(physical);
+  await ctx.storage.ensureTable(physical, await billingFor(ctx));
   const item = await ctx.storage.increment(physical, pk, sk, by);
   return { ok: true as const, result: { ...itemToJson(item), table, incremented_by: by } };
 }
@@ -344,7 +349,7 @@ export async function handleBatchPut(ctx: AppContext, body: Record<string, unkno
   await gateAppRequest(ctx.env, ctx.appId, "write", units);
   const physical = physicalName(ctx.appId, table);
   return withIdem(ctx.storage, requestId, async () => {
-    await ctx.storage.ensureTable(physical);
+    await ctx.storage.ensureTable(physical, await billingFor(ctx));
     const items: Array<Record<string, unknown>> = [];
     let written = 0;
     for (const item of parsed) {
