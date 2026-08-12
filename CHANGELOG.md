@@ -4,7 +4,7 @@ All notable changes, newest first. REV letters map to review rounds with the
 founder; each shipped round went through the protected-main PR flow with the
 `quality` gate green.
 
-## [Unreleased] — v0.5.0 round: dual capacity modes (NORMAL $0 ↔ PERFORMANCE unlimited)
+## [0.5.0] — 2026-08-12 · Dual capacity modes + universal write safety
 
 ### Added
 - **Capacity modes (platform-wide)**: PERFORMANCE = all tables on-demand
@@ -29,9 +29,7 @@ founder; each shipped round went through the protected-main PR flow with the
 - 177 gateway + 14 package (capacity endpoint suite, PERF guardrails,
   400 KB round-trip, TEST profile for exact end-to-end bursts).
 
-## [Unreleased] — v0.4.0 round: universal write safety (CORS + bulk-load hardening)
-
-### Fixed
+### Fixed (from the write-safety round)
 - **CORS: DELETE now allowed from the console** — app soft-delete and MCP
   key delete were blocked by preflight since launch (day-one bug).
 - **delete_table pacing** — drains big-row tables with ≤20-item chunks,
