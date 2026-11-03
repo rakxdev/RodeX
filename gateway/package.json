@@ -13,7 +13,7 @@
     "agents": "^0.20.1",
     "aws4fetch": "^1.0.20",
     "hono": "^4.6.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260807.2",
